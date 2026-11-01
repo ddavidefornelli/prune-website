@@ -54,9 +54,8 @@ export function TaskForm(props: TaskFormProps) {
         class="task-form"
         onSubmit={(event) => {
           event.preventDefault();
-          input.setCustomValidity(
-            outcome().trim() ? "" : "Please write an outcome for this task.",
-          );
+          // An empty Add is an invitation to type, not an error to report.
+          if (!outcome().trim()) return input.focus();
           if (!event.currentTarget.reportValidity() || props.busy) return;
           const typed = parsed().minutes;
           if (typed !== null) void create(typed);
@@ -77,7 +76,6 @@ export function TaskForm(props: TaskFormProps) {
             value={outcome()}
             disabled={props.busy}
             onInput={(event) => {
-              event.currentTarget.setCustomValidity("");
               setOutcome(event.currentTarget.value);
               const typed = parsed().minutes;
               if (typed !== null) setMinutes(typed);
@@ -110,6 +108,7 @@ export function TaskForm(props: TaskFormProps) {
         <button
           type="submit"
           class="add-task"
+          classList={{ "is-empty": !outcome().trim() }}
           aria-label="Add task"
           disabled={props.busy}
         >
