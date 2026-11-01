@@ -836,6 +836,10 @@ textarea:focus {
   margin: 32px 0 24px;
   gap: 24px;
 }
+/* An empty list would only push the outcome input toward the fold. */
+#app .task-list:empty {
+  display: none;
+}
 #app .task,
 #app .task:not(:has(> button)) {
   min-height: auto;
@@ -930,6 +934,16 @@ textarea:focus {
   background: var(--accent);
   border-color: var(--accent);
   color: #000;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+/* Stays clickable so a tap can hand focus to the input, but reads as inactive. */
+#app .task-form .add-task.is-empty {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
 }
 .estimate-dial {
   width: 48px;

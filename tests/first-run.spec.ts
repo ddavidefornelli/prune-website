@@ -9,6 +9,21 @@ test.describe("first run", () => {
       await openPlanner(page);
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
+      const input = page.getByRole("textbox", { name: "Outcome", exact: true });
+      const add = page.locator(".task-form").getByRole("button", { name: "Add task", exact: true });
+      await expect(input).toBeInViewport({ ratio: 1 });
+      const inputBox = (await input.boundingBox())!;
+      const startersBox = (await page.locator(".starters").boundingBox())!;
+      expect(inputBox.y + inputBox.height).toBeLessThan(startersBox.y);
+      await expect(add).toHaveClass(/is-empty/);
+      await input.blur();
+      await add.click();
+      await expect(input).toBeFocused();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      expect(backend.requests.filter((request) => request.body.p_action === "create_task")).toHaveLength(0);
+      await input.fill("Draft");
+      await expect(add).not.toHaveClass(/is-empty/);
+      await input.fill("");
       await page.getByRole("region", { name: "Starting ideas" })
         .getByRole("button", { name: /Plan the week ahead/ }).click();
       await synced(page);

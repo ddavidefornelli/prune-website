@@ -197,28 +197,6 @@ export function PlanView(props: {
           </Index>
         </ol>
       </header>
-      <Show when={firstPlan()}>
-        <section class="starters" aria-label="Starting ideas">
-          <p class="muted">
-            Pick a starting point, or write your own below. Add a time like{" "}
-            <q>45m</q> to set the estimate.
-          </p>
-          <div class="starter-list">
-            <For each={STARTERS}>
-              {(starter) => (
-                <button
-                  type="button"
-                  disabled={planner.busy()}
-                  onClick={() => void create(starter.outcome, starter.minutes)}
-                >
-                  <span>{starter.outcome}</span>
-                  <span class="muted">{starter.minutes} min</span>
-                </button>
-              )}
-            </For>
-          </div>
-        </section>
-      </Show>
       <ul class="task-list">
         <For each={tasks()}>
           {(task) => (
@@ -328,6 +306,28 @@ export function PlanView(props: {
           autofocus={firstPlan() && desktop}
           onCreate={create}
         />
+      </Show>
+      <Show when={firstPlan()}>
+        <section class="starters" aria-label="Starting ideas">
+          <p class="muted">
+            Or start with one of these. When you write your own, add a time like{" "}
+            <q>45m</q> to set the estimate.
+          </p>
+          <div class="starter-list">
+            <For each={STARTERS}>
+              {(starter) => (
+                <button
+                  type="button"
+                  disabled={planner.busy()}
+                  onClick={() => void create(starter.outcome, starter.minutes)}
+                >
+                  <span>{starter.outcome}</span>
+                  <span class="muted">{starter.minutes} min</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </section>
       </Show>
       <Switch>
         <Match when={hint() === "start"}>
