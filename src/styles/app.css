@@ -306,6 +306,26 @@ textarea:focus {
   padding: 10px 4px;
   font-size: 15px;
 }
+/* Equal columns squeeze long labels into their neighbours on phones; size each
+   tab to its label and share the leftover space evenly instead. */
+@media (max-width: 759px) {
+  #app .navigation-header > nav {
+    grid-auto-columns: auto;
+    gap: 2px;
+  }
+  #app .navigation-header > nav button {
+    padding-inline: 8px;
+    font-size: 14px;
+    word-spacing: normal;
+  }
+}
+@media (max-width: 359px) {
+  #app .navigation-header > nav button {
+    padding-inline: 5px;
+    font-size: 13px;
+    letter-spacing: 0.01em;
+  }
+}
 #app > .error {
   flex: none;
   overflow-wrap: anywhere;

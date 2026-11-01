@@ -20,6 +20,17 @@ test("touch-first signup and policy remain usable on a phone", async ({ page }, 
 
 test.describe("mobile planner", () => {
   test.use({ signedIn: true });
+  test("navigation labels keep their own space on narrow phones", async ({ page }) => {
+    for (const width of [320, 375, 390]) {
+      await page.setViewportSize({ width, height: 700 });
+      await openPlanner(page);
+      const tabs = await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button").evaluateAll(
+        (buttons) => buttons.map((button) => ({ label: button.textContent, fits: button.scrollWidth <= button.clientWidth })),
+      );
+      expect(tabs.length).toBe(4);
+      for (const tab of tabs) expect(tab, `${tab.label} at ${width}px`).toMatchObject({ fits: true });
+    }
+  });
   test("task controls, timer and pause dialog work with touch", async ({ page }, info) => {
     await openPlanner(page);
     for (const title of ["Write the first draft", "Ship the small update", "Make time to read"]) { await addTask(page, title); await synced(page); }
