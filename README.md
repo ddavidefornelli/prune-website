@@ -317,7 +317,7 @@ npm run test:unit      # Domain/queue/security tests and Solid lifecycle tests
 npm run test:e2e       # Production-artifact Chromium + WebKit workflows
 ```
 
-CI runs the same quality gates before testing and packaging. Supabase CLI, PGlite, formatting, linting and server-build tools are development dependencies. Dependencies referenced by the existing in-progress Clerk frontend/backend code are explicitly declared, so a clean `npm ci` does not rely on extraneous local packages. **This refactor does not switch the active Supabase transport to Clerk or deploy its bridge migration.** Existing Clerk/backend source is preserved; its frontend files are excluded from bulk formatting.
+CI runs the same quality gates before testing and packaging. Supabase CLI, PGlite, formatting, linting and server-build tools are development dependencies. Dependencies referenced by the existing in-progress Clerk frontend/backend code are explicitly declared, so a clean `npm ci` does not rely on extraneous local packages. `package.json` overrides `minimatch` to `^11.0.1` (advisory GHSA-g3hv-75wg-m249) because eslint and typescript-eslint still declare `^10`; remove the override once they accept 11. **This refactor does not switch the active Supabase transport to Clerk or deploy its bridge migration.** Existing Clerk/backend source is preserved; its frontend files are excluded from bulk formatting.
 
 ### Component and data boundaries
 
