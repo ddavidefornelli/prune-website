@@ -1,12 +1,16 @@
-# prune — web app
+# prune
 
 A mobile-first daily planner and focus timer, with immediate guest access at `/` and optional account sign-in from **Overview → Sign in**. Behind `VITE_SURVEY_FLOW`, first-time visitors can instead get a short [onboarding survey](#onboarding-survey) that ends in a focus plan and **Continue with Google**. `/download` starts the Mac download.
 
-**Launch status:** see [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for the security review, test results and remaining hosted launch gates. Passing local tests is not production approval.
+prune is a simple daily planner. Each day you pick just three tasks, focus on them one at a time with a timer, and get a free weekly review that shows what's holding you back.
 
-An idiomatic **SolidJS + TypeScript** application using reactive components, signals/stores and lifecycle-managed effects. The planner's timing/statistics rules and durable local outbox share the sibling Mac application's protocol in `../pro`. This is a browser client for the **same Supabase backend**, not a local demo or a new database. There is one Solid render root; screens do not manually build or replace DOM subtrees. No Tauri runtime or sibling checkout is required to build this website.
+It works on your phone, in the browser, and on Mac.
 
-## Configure and run
+<p align="center">
+  <img src="screenshots/welcome.png" width="250" alt="Welcome screen">
+  <img src="screenshots/today.png" width="250" alt="Today's three tasks">
+  <img src="screenshots/focus.png" width="250" alt="Focus timer">
+</p>
 
 Requires Node.js 22.12+.
 
