@@ -34,10 +34,13 @@
   }
 }
 
-/* The intro reuses .auth-panel; only its actions differ. */
-.survey-intro {
+/* The intro reuses .auth-panel, but starts where question headings sit, so
+   nothing jumps on Start and it clears the first-visit cookie banner. */
+#app .survey-intro {
   flex: none;
   gap: 0;
+  margin: 0 auto;
+  padding-top: calc(44px + clamp(28px, 7vh, 88px));
 }
 .survey-intro .auth-description {
   margin-bottom: 32px;
