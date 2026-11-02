@@ -11,7 +11,9 @@ test("home opens the guest planner; sign-in requires an unchecked notice", async
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("DO LESS.ACHIEVE MORE.");
   await expect(page.getByRole("checkbox")).not.toBeChecked();
   await expect(page.getByRole("button", { name: "Email me a sign-in code" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in with Google" })).toHaveCount(0);
+  // Google sign-in now exists on purpose, but only on the onboarding survey's
+  // Save screen (tests/survey.spec.ts). Overview's sign-in stays email-only.
+  await expect(page.getByRole("button", { name: /Google/ })).toHaveCount(0);
   expect(backend.requests).toEqual([]);
   expect(await page.locator("script[src*='googletagmanager'],script[src*='goatcounter'],script[src*='vercel-scripts']").count()).toBe(0);
 });

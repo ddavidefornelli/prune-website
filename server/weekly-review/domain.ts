@@ -16,7 +16,10 @@ export type ReviewInput = {
   weekStart: string;
   weekEnd: string;
   activity: Activity;
+  /** The outcome the user wrote for this week during onboarding, if any. */
+  weekGoal?: string;
 };
+export const WEEK_GOAL_LENGTH = 200;
 export type Analysis = WeeklyReview["analysis"];
 function invalid(): never {
   throw new ApiError(
@@ -205,6 +208,15 @@ export function validateInput(
     weekEnd,
     activity: { tasks, stops, totalStops, omittedStops },
   };
+}
+
+/** Optional context: an unusable goal is dropped, never fatal to the review. */
+export function validateWeekGoal(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const goal = value.trim();
+  return goal && [...goal].length <= WEEK_GOAL_LENGTH && !goal.includes("\0")
+    ? goal
+    : undefined;
 }
 
 /** Reconstruct fields rather than trusting structured output or provider-supplied evidence. */

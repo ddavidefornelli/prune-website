@@ -1,5 +1,5 @@
 /** Bump alongside PRIVACY.md whenever a newly presented notice is required. */
-export const PRIVACY_POLICY_VERSION = "privacy-web-v9";
+export const PRIVACY_POLICY_VERSION = "privacy-web-v10";
 export const PRIVACY_ACKNOWLEDGEMENT_KEY = "prune:privacy:acknowledgement";
 
 export interface PrivacyAcknowledgement {
@@ -34,6 +34,20 @@ export function hasPrivacyAcknowledgement(
     );
   } catch {
     return false;
+  }
+}
+
+/** Every sign-in entry point records acceptance first, or explains why it cannot. */
+export function requirePrivacyAcknowledgement(
+  storage: Pick<Storage, "getItem" | "setItem">,
+): void {
+  if (hasPrivacyAcknowledgement(storage)) return;
+  try {
+    acknowledgePrivacy(storage);
+  } catch {
+    throw new Error(
+      "Could not save your terms acceptance. Allow browser storage and try again. No sign-in request was sent.",
+    );
   }
 }
 

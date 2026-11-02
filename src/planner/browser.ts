@@ -126,11 +126,39 @@ export class BrowserCloud implements CloudTransport {
     return data.session;
   }
 
+  /** A disabled provider would strand the visitor on a raw Supabase error page. */
+  private async requireGoogle(): Promise<void> {
+    let settings: { external?: { google?: unknown } } | null = null;
+    let response: Response;
+    try {
+      response = await apiFetch(
+        `${this.config!.url}${SUPABASE_ROUTES.authSettings}`,
+        { headers: { apikey: this.config!.publicKey } },
+      );
+    } catch (error) {
+      if (error instanceof CloudError) throw error;
+      throw new CloudError(
+        "network",
+        "Could not reach sign-in services. Check your connection and try again.",
+      );
+    }
+    try {
+      settings = await response.json();
+    } catch {
+      /* Treated as unavailable below. */
+    }
+    if (!response.ok || settings?.external?.google !== true)
+      throw new CloudError(
+        "auth",
+        "Google sign-in isn't available right now. Use email instead.",
+      );
+  }
+
   private async status(): Promise<AuthStatus> {
     const sdk = this.sdk();
     const callback = new URL(window.location.href);
-    // Complete already-issued OAuth/email callbacks, even though the current UI
-    // starts sign-in only with an email code.
+    // Complete Google redirects started by sign_in_with_google, and
+    // already-issued email-link callbacks.
     if (
       ["google", "email"].includes(callback.searchParams.get("oauth") ?? "")
     ) {
@@ -252,6 +280,26 @@ export class BrowserCloud implements CloudTransport {
           email: String(args.email),
         });
         if (error) throw authError(error);
+        result = null;
+        break;
+      }
+      case "sign_in_with_google": {
+        const sdk = this.sdk();
+        await this.requireGoogle();
+        // PKCE: the SDK stores the verifier; status() exchanges the code on return.
+        const { data, error } = await sdk.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/?oauth=google`,
+            skipBrowserRedirect: true,
+          },
+        });
+        if (error || !data.url)
+          throw new CloudError(
+            "auth",
+            "Google sign-in could not be started. Try again or use email instead.",
+          );
+        window.location.assign(data.url);
         result = null;
         break;
       }

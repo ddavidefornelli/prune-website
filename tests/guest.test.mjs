@@ -78,6 +78,36 @@ test('guest transfer retains data on failure, binds account, and retries the sam
   assert.equal(storage.getItem(GUEST_KEY), null);
 });
 
+test('survey answers ride along with a guest import and stay frozen for retries', async () => {
+  const { store, storage } = fixture();
+  await store.mutate('create_task', { outcome: 'Plan task', day: store.dashboard().today, estimatedMinutes: 60 }, timezone);
+  const survey = { goal: 'ship', focusMinutes: 60, weekGoal: 'Launch', weekStart: '2026-11-02' };
+  let first;
+  await assert.rejects(store.transfer('account-a', async (payload) => {
+    first = payload;
+    throw new Error('offline');
+  }, survey), /offline/);
+  assert.deepEqual(first.survey, survey);
+  // Answers changed after the first attempt cannot alter the import identity's payload.
+  assert.equal(await store.transfer('account-a', async (payload) => {
+    assert.deepEqual(payload, first);
+    return { imported: true };
+  }, { goal: 'study' }), true);
+  assert.equal(storage.getItem(GUEST_KEY), null);
+});
+
+test('an import without answers reports none, and an empty journal sends nothing', async () => {
+  const { store } = fixture();
+  let sent = 0;
+  assert.equal(await store.transfer('account-a', async () => { sent++; return { imported: true }; }, { goal: 'ship' }), false);
+  assert.equal(sent, 0);
+  await store.mutate('create_task', { outcome: 'Task', day: store.dashboard().today, estimatedMinutes: 30 }, timezone);
+  assert.equal(await store.transfer('account-a', async (payload) => {
+    assert.equal('survey' in payload, false);
+    return { imported: true };
+  }), false);
+});
+
 test('guest limits are enforced before saving', async () => {
   const { store } = fixture();
   const args = { outcome: 'Task', day: store.dashboard().today, estimatedMinutes: 30 };

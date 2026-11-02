@@ -3,8 +3,8 @@ import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import type { PlanningClient } from "../planner/api";
 import { errorMessage } from "../planner/errors";
 import {
-  acknowledgePrivacy,
   hasPrivacyAcknowledgement,
+  requirePrivacyAcknowledgement,
 } from "../planner/privacy-state";
 import { isAccount, type Account } from "../planner/types";
 
@@ -34,13 +34,7 @@ export function SignIn(props: SignInProps) {
 
   function acceptNotice(): void {
     if (acknowledged()) return;
-    try {
-      acknowledgePrivacy(localStorage);
-    } catch {
-      throw new Error(
-        "Could not save your terms acceptance. Allow browser storage and try again. No sign-in request was sent.",
-      );
-    }
+    requirePrivacyAcknowledgement(localStorage);
     setAcknowledged(true);
   }
 

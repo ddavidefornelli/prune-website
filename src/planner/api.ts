@@ -7,8 +7,9 @@ import type {
   TaskArguments,
 } from "./commands.ts";
 import { WEEKLY_AI_VERSION } from "./constants.ts";
+import type { SurveyImport } from "../survey/model.ts";
 import { errorCode } from "./errors.ts";
-import { GuestStore } from "./guest.ts";
+import { GuestStore, type GuestImport } from "./guest.ts";
 import { reportGuestUsage } from "./guest-usage.ts";
 import type { LocalQueue } from "./local-queue.ts";
 import type {
@@ -184,10 +185,33 @@ export class PlanningClient {
     return this.loadAccount(await this.request<AuthStatus>("auth_status"));
   }
 
-  async importGuestTasks(): Promise<void> {
+  /**
+   * Moves guest tasks, with any survey answers, into the signed-in account.
+   * Answers without tasks are best-effort: they never hold up the planner and
+   * are retried at the next startup. Resolves whether the answers arrived.
+   */
+  async importGuestTasks(survey?: SurveyImport): Promise<boolean> {
     this.assertOpen();
     const guest = new GuestStore();
-    if (!guest.hasTasks()) return;
+    const send = (payload: GuestImport) =>
+      this.request<{ imported: boolean }>("import_guest", {
+        payload,
+        accountKey: this.accountKey,
+      });
+    if (!guest.hasTasks()) {
+      if (!survey || !this.accountKey) return false;
+      try {
+        const result = await send({
+          importId: crypto.randomUUID(),
+          tasks: [],
+          stops: [],
+          survey,
+        });
+        return result?.imported === true;
+      } catch {
+        return false;
+      }
+    }
     if (!this.accountKey)
       throw new Error("Sign in before syncing guest tasks.");
     await this.sync();
@@ -195,17 +219,18 @@ export class PlanningClient {
       throw new Error(
         "Finish syncing existing account changes before importing guest tasks.",
       );
-    await guest.transfer(this.accountKey, (payload) =>
-      this.request<{ imported: boolean }>("import_guest", {
-        payload,
-        accountKey: this.accountKey,
-      }),
-    );
+    const included = await guest.transfer(this.accountKey, send, survey);
     await this.sync();
+    return included;
   }
 
   async sendCode(email: string): Promise<void> {
     await this.request("send_code", { email });
+  }
+
+  /** Leaves the page for Google; authStatus() completes the return trip. */
+  async signInWithGoogle(): Promise<void> {
+    await this.request("sign_in_with_google");
   }
 
   async verifyCode(email: string, code: string): Promise<AuthStatus> {

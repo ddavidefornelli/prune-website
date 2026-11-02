@@ -37,10 +37,15 @@ export interface Backend {
   loseNextAcknowledgement: boolean;
   malformedAcknowledgement: boolean;
   failSignIn: boolean;
+  /** The Google provider is switched off in the fixture project's Auth settings. */
+  googleDisabled: boolean;
+  /** The visitor backs out on Google's consent screen. */
+  googleCancelled: boolean;
   previewStatus: number;
   suggestions: TaskSuggestion[];
   protocolVersion: number;
   receipts: Map<string, unknown>;
+  imports: Record<string, any>[];
 }
 
 export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: boolean; firstVisit: boolean }>({
@@ -48,7 +53,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
   expired: [false, { option: true }],
   firstVisit: [false, { option: true }],
   backend: async ({ context, signedIn, expired, firstVisit }, use) => {
-    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, failSignIn: false, previewStatus: 200, suggestions: [], protocolVersion: 1, receipts: new Map() };
+    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, failSignIn: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, receipts: new Map(), imports: [] };
     // Seed once per browser context, not on reload/sign-out or each new tab.
     await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey }) => {
       if (localStorage.getItem("prune:test:seeded")) return;
@@ -68,7 +73,9 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
     await context.route(`${PROJECT}/**`, async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      const headers = { "Access-Control-Allow-Origin": "http://127.0.0.1:4173", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
+      // Both local preview builds (survey flag off and on) call the fixture project.
+      const origin = /^http:\/\/127\.0\.0\.1:417[34]$/.test(request.headers().origin ?? "") ? request.headers().origin! : "http://127.0.0.1:4173";
+      const headers = { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
       const send = async (value: unknown, status = 200) => route.fulfill({ status, headers, contentType: "application/json", body: JSON.stringify(value) });
       if (request.method() === "OPTIONS") { await route.fulfill({ status: 204, headers }); return; }
       const body = request.postDataJSON() ?? {};
@@ -80,6 +87,28 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (url.pathname === "/auth/v1/verify") {
         const valid = body.email === user.email && body.token === "12345678" && body.type === "email";
         await send(valid ? session() : { msg: "private upstream error", error_code: "invalid_credentials" }, valid ? 200 : 400);
+        return;
+      }
+      if (url.pathname === "/auth/v1/settings") { await send({ external: { email: true, google: !state.googleDisabled } }); return; }
+      if (url.pathname === "/auth/v1/authorize") {
+        // Stand in for Google and Supabase: return straight to the PKCE callback.
+        const callback = new URL(url.searchParams.get("redirect_to")!);
+        if (state.googleCancelled) {
+          callback.searchParams.set("error", "access_denied");
+          callback.searchParams.set("error_description", "private-diagnostic");
+        } else callback.searchParams.set("code", "fixture-oauth-code");
+        // WebKit cannot fulfill navigations with a 3xx; an immediate refresh is equivalent here.
+        await route.fulfill({ contentType: "text/html", body: `<!doctype html><meta http-equiv="refresh" content="0;url=${callback.toString().replaceAll("&", "&amp;")}">` });
+        return;
+      }
+      if (url.pathname === "/rest/v1/rpc/planner_import_guest") {
+        const payload = body.p_payload;
+        state.imports.push(payload);
+        if (payload.tasks.length) {
+          state.data.todayTasks.push(...payload.tasks);
+          state.data.revision = (state.data.revision ?? 0) + 1;
+        }
+        await send({ imported: true });
         return;
       }
       if (url.pathname === "/auth/v1/user") { await send(user); return; }
