@@ -19,6 +19,8 @@ export const POLLING = {
   pendingReview: 3000,
 } as const;
 export const MOBILE_QUERY = "(max-width: 759px)";
+/** Session-only: the view to reopen, with a welcome, after signing in. */
+export const RESUME_VIEW_KEY = "prune:resume-view:v1";
 export const WEEKLY_AI_VERSION = "weekly-ai-v1";
 
 export const VIEW_LABELS = {

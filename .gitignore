@@ -3,6 +3,7 @@ dist/
 test-results/
 playwright-report/
 .playwright-dist/
+.playwright-dist-survey/
 .vercel/
 .DS_Store
 *.local

@@ -80,6 +80,44 @@ test("guest transfer has explicit failure and retry phases bound to the same acc
   assert.equal(attempts, 2);
 });
 
+test("survey answers travel with the import, and only fresh sign-ins count as interactive", async (t) => {
+  const env = environment(t);
+  acknowledgePrivacy(env.storage);
+  const sent = [];
+  const signedIn = [];
+  let attempts = 0;
+  const cloud = client({
+    async importGuestTasks(survey) {
+      sent.push(survey);
+      if (++attempts === 2) throw new Error("Offline");
+      return true;
+    },
+  });
+  const { state } = env.mount(() =>
+    createSession(cloud, client(), () => {}, {
+      surveyImport: () => ({ goal: "ship" }),
+      onSignedIn: (interactive, imported) =>
+        signedIn.push({ interactive, imported }),
+    }),
+  );
+  await settle();
+  assert.deepEqual(signedIn, [{ interactive: false, imported: true }]);
+  await state.finishSignIn(account, true);
+  assert.equal(state.phase(), "transferFailed");
+  state.retryTransfer();
+  await settle();
+  assert.equal(state.phase(), "ready");
+  assert.deepEqual(signedIn, [
+    { interactive: false, imported: true },
+    { interactive: true, imported: true },
+  ]);
+  assert.deepEqual(sent, [
+    { goal: "ship" },
+    { goal: "ship" },
+    { goal: "ship" },
+  ]);
+});
+
 test("simultaneous sign-in callbacks cannot start duplicate guest transfers", async (t) => {
   const env = environment(t);
   const pending = deferred();

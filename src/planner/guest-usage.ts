@@ -6,6 +6,19 @@ import { webConfig } from "./config.ts";
 import { localDay } from "./time.ts";
 import type { Task } from "./types.ts";
 
+/** Onboarding-survey funnel, per experiment variant. Never answers. */
+export const FUNNEL_METRICS = [
+  "funnel_control_shown",
+  "funnel_control_signed_up",
+  "funnel_survey_shown",
+  "funnel_survey_started",
+  "funnel_survey_finished",
+  "funnel_survey_plan_shown",
+  "funnel_survey_google_clicked",
+  "funnel_survey_signed_up",
+  "funnel_survey_skipped",
+] as const;
+export type FunnelMetric = (typeof FUNNEL_METRICS)[number];
 export type GuestMetric =
   | "new_guests"
   | "active_guests"
@@ -13,7 +26,8 @@ export type GuestMetric =
   | "tasks_created"
   | "tasks_started"
   | "tasks_completed"
-  | "focus_minutes";
+  | "focus_minutes"
+  | FunnelMetric;
 export type GuestUsage = Partial<Record<GuestMetric, number>>;
 
 /**

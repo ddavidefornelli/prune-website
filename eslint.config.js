@@ -3,7 +3,7 @@ import ts from "typescript-eslint";
 import solid from "eslint-plugin-solid";
 
 export default ts.config(
-  { ignores: ["dist/**", ".playwright-dist/**", ".vercel/**", "node_modules/**"] },
+  { ignores: ["dist/**", ".playwright-dist/**", ".playwright-dist-survey/**", ".vercel/**", "node_modules/**"] },
   {
     files: ["{src,server,api}/**/*.{ts,tsx}"],
     extends: [js.configs.recommended, ...ts.configs.recommended],

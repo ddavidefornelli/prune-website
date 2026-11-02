@@ -1,6 +1,6 @@
 # prune — web app
 
-A mobile-first daily planner and focus timer, with immediate guest access at `/` and optional account sign-in from **Overview → Sign in**. `/download` starts the Mac download.
+A mobile-first daily planner and focus timer, with immediate guest access at `/` and optional account sign-in from **Overview → Sign in**. Behind `VITE_SURVEY_FLOW`, first-time visitors can instead get a short [onboarding survey](#onboarding-survey) that ends in a focus plan and **Continue with Google**. `/download` starts the Mac download.
 
 **Launch status:** see [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for the security review, test results and remaining hosted launch gates. Passing local tests is not production approval.
 
@@ -28,7 +28,7 @@ Visitors can plan immediately without an account. Guest tasks and stop reasons a
 
 Before deploying, apply `supabase/migrations/20261028000100_guest_import.sql` after the previous migrations. Guest import is an authenticated, atomic RPC with a durable import receipt: a failed/ambiguous response retains the guest journal, and retries use the same import identity and payload. Imports do not overwrite existing account tasks. If a planning day has no free slots or the account already has an active task, the import fails without partial writes; the guest copy remains on this device. Once transfer starts, guest edits are frozen and the transfer is bound to that account until completion.
 
-Configure the Supabase email templates to display `{{ .Token }}` for code entry. Existing `/?oauth=email` and `/?oauth=google` callbacks remain supported for already-issued links, but the current UI does not initiate those flows. A missing backend import migration must be fixed before guest transfer can complete.
+Configure the Supabase email templates to display `{{ .Token }}` for code entry. `/?oauth=google` callbacks complete Google sign-ins started from the survey's Save screen; existing `/?oauth=email` callbacks remain supported for already-issued links. A missing backend import migration must be fixed before guest transfer can complete.
 
 ## Features
 
@@ -55,7 +55,7 @@ Apply `supabase/migrations/20261025000100_equal_tasks.sql` after the previous sh
 Do **not** reset the Mac app's database or create a parallel account store. Point both clients at the same project. The web transport calls the existing endpoints:
 
 ```text
-/auth/v1/otp, /verify, /user, /token, /logout
+/auth/v1/otp, /verify, /user, /token, /logout, /settings
 /rest/v1/rpc/planner_call
 /rest/v1/rpc/guest_record_usage
 /functions/v1/weekly-review
@@ -94,6 +94,35 @@ select day,
 from public.guest_usage_daily group by day order by day desc;
 ```
 
+### Onboarding survey
+
+`VITE_SURVEY_FLOW` is read **at build time** (set it in Vercel's environment and redeploy):
+
+| Value | Behaviour |
+| --- | --- |
+| `off` (default, also when unset or unknown) | Today's behaviour: everyone opens the guest planner. Nothing new is rendered, stored or counted. |
+| `on` | First-time visitors see the survey. |
+| `split` | Each browser is assigned 50/50 to `survey` or `control` once, and keeps that assignment. |
+
+Only fresh browsers start the survey: no guest journal (`prune:guest:v1`) and no notice acceptance of any version. A started survey resumes where it was left, including after a reload or a cancelled Google round trip; skipped or finished surveys never return. Every question has Back, step progress and **Skip, just let me plan**. The flow: intro (the sign-in hero), first name, goal, role, focus window, focus length, the three-task rule, derailer, deep-work target, an optional week outcome, a "Building your plan…" checklist whose lines come from `buildPlan`, the plan, and **Save your plan** (Continue with Google, the unchecked notice checkbox, Use email instead, Not now).
+
+`startersFor(answers)` (`src/planner/starters.ts`) picks the three first-run tasks from goal, role, focus length and derailer, and returns today's three starters when nothing was answered. The answered focus length also sets the default estimate for new tasks, capped at 60 minutes. A kept plan is added to Today by the next planner to open, as a guest (**Not now**) or in the account after sign-in, only into free slots and skipping titles already planned.
+
+**Storage and privacy.** Answers live only in `prune:survey:v1` (with the variant and the funnel events already counted) until sign-in; nothing is sent before then. The first name never leaves the browser. After sign-in, the other answers and a current-week outcome travel inside the existing `planner_import_guest` payload as an optional `survey` object: frozen with the import identity when guest tasks transfer, or sent alone, best-effort, when there are none (a failure never blocks the account planner and retries at the next startup).
+
+1. Apply `supabase/migrations/20261102000100_onboarding_survey.sql` after the previous migrations, **before turning the flag on**. It adds the service-role-only `planner_onboarding` table, re-creates `planner_import_guest` with strict validation of the optional `survey` object (answers alone leave the planner revision untouched), adds the server-only `planner_week_goal(user, week_start)`, and lets `guest_record_usage` count the funnel metrics.
+2. Weekly reviews receive the outcome through the handler's optional `loadWeekGoal` dependency, which `server/planner-runtime.ts` wires to `planner_week_goal`. The hosted `weekly-review` Edge Function lives in `../pro`; pass the same `loadWeekGoal: (userId, weekStart) => rpc("planner_week_goal", { p_user_id: userId, p_week_start: weekStart })` there and redeploy it. Until then, reviews run exactly as before, without the goal.
+3. Enable Google sign-in (below), then rebuild with the flag.
+
+**Google sign-in.** In the Supabase dashboard, enable **Authentication → Providers → Google** with a Google Cloud OAuth client whose authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Add every served origin's callback, e.g. `https://www.prune.win/?oauth=google`, to **Authentication → URL Configuration → Redirect URLs**. The button first reads the public `/auth/v1/settings`; if Google is disabled it shows "Google sign-in isn't available right now. Use email instead." rather than sending visitors to a Supabase error page.
+
+**Funnel.** Each event counts once per browser and variant in `guest_usage_daily`, with no answers: `funnel_control_shown`, `funnel_control_signed_up`, and `funnel_survey_` + `shown`, `started`, `finished`, `plan_shown`, `google_clicked`, `signed_up`, `skipped`. *Shown* is a fresh browser's first eligible visit (the shared denominator); *signed up* is a completed interactive sign-in (email code or Google, new or existing account) from a browser already counted as shown.
+
+```sql
+select day, metric, total from public.guest_usage_daily
+where metric like 'funnel\_%' order by day desc, metric;
+```
+
 ### Account deletion
 
 Apply `supabase/migrations/20261024000200_soft_delete_accounts.sql` after the shared backend migrations and this repo's automatic-weekly-reviews migration **before deploying this client**. It adds `planner_accounts."isDeleted"` (default `false`) and `deleted_at`. Deletion is authenticated, immediate, idempotent and never queued offline. It disables weekly AI and blocks planner RPCs/direct planner-data reads across web and Mac clients. Auth identity and cloud data remain until manual removal; signing in again does not reactivate the account. Other devices may retain offline caches.
@@ -113,9 +142,9 @@ Review this list and permanently delete the corresponding **Auth users** via Sup
 
 Enable Supabase email Auth and configure SMTP for production delivery. Email templates (including Magic Link and Confirm Signup) must display `{{ .Token }}` so users can enter the code on the website, rather than follow a magic link. Keep this aligned with the Mac app’s existing email-code configuration. Auth rate limits, code expiry and email delivery still need hosted smoke tests; do not enable a mandatory CAPTCHA until a matching client flow is added.
 
-### Existing authentication callbacks
+### Authentication callbacks
 
-The current sign-in screen uses email codes only. Unused Google/magic-link initiation methods have been removed; this does not remove accounts or change backend provider settings. The Supabase transport still completes already-issued `/?oauth=google` and `/?oauth=email` PKCE callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Keep any required existing redirect URLs configured until older links/clients have been retired. The unfinished Clerk transport is not selected by the current app.
+The Overview sign-in screen uses email codes only. With the survey flag on, its Save screen starts Google sign-in (`sign_in_with_google`, PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` and already-issued `/?oauth=email` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Keep the redirect URLs configured. The unfinished Clerk transport is not selected by the current app.
 
 ### Weekly AI CORS
 
@@ -180,7 +209,7 @@ Our production policy is **hash-locked and generated from the final build**:
 - Denies resources by default (`default-src 'none'`). Application JavaScript is authorized by SHA-384 hashes of the emitted bytes, with matching Subresource Integrity (`integrity`) on every entry script. The only managed-script exception is `/_vercel/insights/script.js` on `https://www.prune.win` and `https://prune.win`; this script is trusted without SRI and can change independently of the build. There is no broad `'self'` fallback or `strict-dynamic` delegation. A newly injected same-origin script is blocked too. Modified script bytes fail integrity verification.
 - Adds stylesheet integrity checks. Stylesheets and images stay same-origin; inline styles/style attributes, data images, fonts, manifests, media, plugins, frames and workers are denied. Existing property-level CSSOM updates for the calendar, progress bars and animations still work.
 - Blocks inline scripts, event handlers, `eval()`/string compilation, base-URL overrides and embedding this website in another site's frame. **All native form submissions are denied**, including same-origin ones: app forms use prevented submit events and the authenticated API transport.
-- Allows connections only to the exact configured backend's five used Auth endpoints, `planner_call` RPC and `weekly-review` Edge Function. Also allows Vercel Web Analytics connections under `/_vercel/insights/` on the two production origins. No broad same-origin fetch allowance, Supabase wildcard, Storage, arbitrary RPCs/Functions or Realtime. CSP path restrictions are not an authorization boundary (redirects can relax CSP path matching); the API transport also rejects redirects, and backend Auth/RLS remain mandatory.
+- Allows connections only to the exact configured backend's six used Auth endpoints (including the public `/auth/v1/settings` read before Google sign-in), `planner_call` RPC and `weekly-review` Edge Function. Also allows Vercel Web Analytics connections under `/_vercel/insights/` on the two production origins. No broad same-origin fetch allowance, Supabase wildcard, Storage, arbitrary RPCs/Functions or Realtime. CSP path restrictions are not an authorization boundary (redirects can relax CSP path matching); the API transport also rejects redirects, and backend Auth/RLS remain mandatory.
 - Upgrades insecure requests in deployed HTTPS responses. Adjacent headers enforce MIME checks, referrer suppression, framing denial, opener/resource isolation and disabled DNS prefetch. HTML is served `no-store` to avoid stale document/hash-policy combinations.
 
 The Vite plugin in `scripts/csp-plugin.ts` hashes the finished bundle, adds integrity attributes and a restrictive meta fallback, and emits `security-headers.json`. `scripts/build-vercel.ts` revalidates the complete HTML and script/stylesheet bytes before packaging those exact headers with the static files, so the real HTTP policy—not just a meta tag—pins scripts and API endpoints. Meta cannot enforce `frame-ancestors`; do not omit the HTTP headers. Builds fail on inline executable content, ambiguous asset attributes, missing assets, known marketing integrations or module/code-splitting dependencies rather than silently weakening the allowlist. The source, build and hosted scans share `scripts/tracking-policy.ts`; this recognized-tracker denylist is not an exhaustive network audit. Introducing dynamic imports requires a deliberate integrity/CSP design review.
@@ -193,7 +222,7 @@ After deployment, run `npm run check:production` with the matching public config
 
 ### Privacy before public release
 
-`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. One unchecked sign-in checkbox records terms acceptance and privacy acknowledgement (`privacy-web-v5`) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for default-on AI, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
+`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. One unchecked sign-in checkbox (on the email form, or on the survey's Save screen before Google) records terms acceptance and privacy acknowledgement (`privacy-web-v10`, which added the survey, its funnel totals and Google sign-in) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for default-on AI, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
 
 Apply `supabase/migrations/20261024000100_automatic_weekly_reviews.sql` after the shared backend migrations before deploying this client. It enables reviews for newly provisioned planner accounts and preserves all existing account preferences (including disabled reviews). It affects all clients using this shared backend. Legacy backend `consent_*` fields remain protocol compatibility gates, not evidence of affirmative consent. Do not automatically enable existing disabled accounts from the browser. Users can turn reviews off or back on in Profile.
 
@@ -211,7 +240,7 @@ npm run test:e2e
 
 Unit tests cover the durable queue, retry identities, ambiguous failures, storage failures, account isolation, timer projection, public-key validation, privacy records, HTTP error classification, profile statistics, onboarding and review timing. `test:reactivity` additionally runs real Solid browser reactivity under Node's `browser` export condition to check keyed reconciliation, memory-only notes, preference races, late responses and lifecycle cleanup. The active UI never renders Mac resource URLs; browser security tests verify that metadata stays inert. Playwright runs Chromium and WebKit, including real touch/mobile contexts, email-code sign-in/invalid codes, refresh/restoration, task/focus workflows, previews, conflicts, multi-tab sign-out and phone/landscape layouts.
 
-Browser tests build production output into ignored `.playwright-dist/` (never overwriting production `dist/`) and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not send real email, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify real email delivery and code verification, Mac↔web sync, timer conflicts, real review generation and sign-out against the actual hosted project.
+Browser tests build production output into ignored `.playwright-dist/` with the survey flag off (never overwriting production `dist/`), and a second build into `.playwright-dist-survey/` with it on for `tests/survey.spec.ts`, and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not send real email, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify real email delivery and code verification, Mac↔web sync, timer conflicts, real review generation and sign-out against the actual hosted project.
 
 ### Hosted release checks (non-destructive)
 
@@ -245,6 +274,7 @@ src/
   App.tsx                       Error boundary and download/session route selection
   index.tsx                     The single Solid render root and private analytics URLs
   auth/                         Session phases, guest transfer and email-code sign-in UI
+  survey/                       Onboarding survey: answers, state model, flag/variant, plan and screens
   components/                   Native dialog, privacy policy, download page and canvas
   planner/
     Planner.tsx                 Feature composition and navigation/onboarding state
@@ -262,6 +292,7 @@ src/
     constants.ts                UI bounds, estimate ranges, views and polling intervals
     task-model.ts               Pure task-completion and tracked-time rules
     onboarding.ts               Pure, account-scoped eligibility/storage key rules
+    starters.ts                 startersFor(answers): first-run tasks from survey answers
     config.ts                   Public-only backend configuration validation
     privacy-state.ts            Versioned, device-local legal acknowledgement
   profile/                      Profile components and pure calendar-based statistics
@@ -286,7 +317,7 @@ npm run test:unit      # Domain/queue/security tests and Solid lifecycle tests
 npm run test:e2e       # Production-artifact Chromium + WebKit workflows
 ```
 
-CI runs the same quality gates before testing and packaging. Supabase CLI, PGlite, formatting, linting and server-build tools are development dependencies. Dependencies referenced by the existing in-progress Clerk frontend/backend code are explicitly declared, so a clean `npm ci` does not rely on extraneous local packages. **This refactor does not switch the active Supabase transport to Clerk or deploy its bridge migration.** Existing Clerk/backend source is preserved; its frontend files are excluded from bulk formatting.
+CI runs the same quality gates before testing and packaging. Supabase CLI, PGlite, formatting, linting and server-build tools are development dependencies. Dependencies referenced by the existing in-progress Clerk frontend/backend code are explicitly declared, so a clean `npm ci` does not rely on extraneous local packages. `package.json` overrides `minimatch` to `^11.0.1` (advisory GHSA-g3hv-75wg-m249) because eslint and typescript-eslint still declare `^10`; remove the override once they accept 11. **This refactor does not switch the active Supabase transport to Clerk or deploy its bridge migration.** Existing Clerk/backend source is preserved; its frontend files are excluded from bulk formatting.
 
 ### Component and data boundaries
 

@@ -4,13 +4,24 @@ import PixelBackground from "../components/PixelBackground";
 import { PlanningClient } from "../planner/api";
 import { GUEST_ACCOUNT } from "../planner/guest";
 import { Planner } from "../planner/Planner";
+import { createSurvey } from "../survey/create-survey";
+import { isFreshVisitor, parseFlag } from "../survey/model";
+import { Survey } from "../survey/Survey";
 import { createSession } from "./create-session";
 import { SignIn } from "./SignIn";
 
 export function Session() {
   const client = new PlanningClient();
   const guestClient = new PlanningClient({ guest: true });
-  const session = createSession(client, guestClient);
+  // Off unless VITE_SURVEY_FLOW is "on" or "split" at build time.
+  const survey = createSurvey({
+    flag: parseFlag(import.meta.env.VITE_SURVEY_FLOW),
+    fresh: isFreshVisitor(localStorage),
+  });
+  const session = createSession(client, guestClient, undefined, {
+    surveyImport: survey.importPayload,
+    onSignedIn: survey.signedIn,
+  });
 
   return (
     <Switch>
@@ -41,11 +52,35 @@ export function Session() {
             client={client}
             initialError={session.initialError()}
             configurationError={session.configurationError}
-            onAuthenticated={(status) => void session.finishSignIn(status)}
+            onAuthenticated={(status) =>
+              void session.finishSignIn(status, true)
+            }
           />
-          <button type="button" onClick={session.continueAsGuest}>
+          <button
+            type="button"
+            onClick={() => {
+              survey.finishAsGuest();
+              session.continueAsGuest();
+            }}
+          >
             Continue without an account
           </button>
+        </div>
+      </Match>
+      <Match
+        when={
+          session.phase() === "ready" && !session.account() && survey.visible()
+        }
+      >
+        <PixelBackground completionLevel={0} />
+        <div id="app" class="survey-app">
+          <Survey
+            survey={survey}
+            client={client}
+            initialError={session.initialError()}
+            configurationError={session.configurationError}
+            onEmail={session.startSignIn}
+          />
         </div>
       </Match>
       <Match when={session.phase() === "ready"}>

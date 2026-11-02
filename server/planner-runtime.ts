@@ -154,6 +154,11 @@ export function plannerRuntime(env: Record<string, string | undefined>) {
             p_user_id: userId,
             p_timezone: timezone,
           }),
+        loadWeekGoal: (userId, weekStart) =>
+          rpc("planner_week_goal", {
+            p_user_id: userId,
+            p_week_start: weekStart,
+          }),
         reserve: (userId, input, hash, preview) =>
           rpc(
             preview ? "reserve_review_preview" : "reserve_planner_review",
