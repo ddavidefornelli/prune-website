@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "web-survey",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["VITE_SURVEY_FLOW=on", "npm", "run", "dev", "--", "--port", "5174"],
+      "port": 5174
     }
   ]
 }

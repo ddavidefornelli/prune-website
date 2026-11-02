@@ -1,3 +1,4 @@
+import type { SurveyImport } from "../survey/model.ts";
 import type { QueuedAction, TaskAction, TaskArguments } from "./commands.ts";
 import { ESTIMATE, PLANNER_LIMITS } from "./constants.ts";
 import { alignDashboardDate, dashboardTasks } from "./dashboard.ts";
@@ -16,12 +17,14 @@ export interface GuestImport {
   importId: string;
   tasks: Task[];
   stops: { taskId: string; reason: string; at: number; day: string }[];
+  /** Onboarding answers, frozen with the import identity for retries. */
+  survey?: SurveyImport;
 }
 interface GuestState {
   version: 1;
   base: Dashboard;
   commands: QueuedAction[];
-  transfer?: { accountKey: string; importId: string };
+  transfer?: { accountKey: string; importId: string; survey?: SurveyImport };
 }
 function emptyGuestDashboard(now = Math.floor(Date.now() / 1000)): Dashboard {
   const today = localDay(now, Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -153,18 +156,24 @@ export class GuestStore {
       return structuredClone(task);
     });
   }
+  /** Resolves whether onboarding answers were part of the confirmed import. */
   async transfer(
     accountKey: string,
     send: (payload: GuestImport) => Promise<{ imported: boolean }>,
-  ): Promise<void> {
-    await this.lock(async () => {
+    survey?: SurveyImport,
+  ): Promise<boolean> {
+    return this.lock(async () => {
       const state = this.load();
-      if (!state.commands.length) return;
+      if (!state.commands.length) return false;
       if (state.transfer && state.transfer.accountKey !== accountKey)
         throw new Error(
           "These guest tasks are already being saved to a different account. Sign in to that account to finish.",
         );
-      state.transfer ??= { accountKey, importId: crypto.randomUUID() };
+      state.transfer ??= {
+        accountKey,
+        importId: crypto.randomUUID(),
+        ...(survey ? { survey } : {}),
+      };
       this.save(state);
       const tasks = new Map<string, Task>();
       const stops: GuestImport["stops"] = [];
@@ -189,12 +198,14 @@ export class GuestStore {
         importId: state.transfer.importId,
         tasks: [...tasks.values()],
         stops,
+        ...(state.transfer.survey ? { survey: state.transfer.survey } : {}),
       });
       if (result?.imported !== true)
         throw new Error(
           "Task transfer was not confirmed. Your guest tasks are still on this device. Retry Save & sync.",
         );
       this.storage.removeItem(GUEST_KEY);
+      return Boolean(state.transfer.survey);
     });
   }
 }

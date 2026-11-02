@@ -5,6 +5,7 @@ export const SUPABASE_ROUTES = {
   user: "/auth/v1/user",
   token: "/auth/v1/token",
   signOut: "/auth/v1/logout",
+  authSettings: "/auth/v1/settings",
   planner: "/rest/v1/rpc/planner_call",
   importGuest: "/rest/v1/rpc/planner_import_guest",
   guestUsage: "/rest/v1/rpc/guest_record_usage",

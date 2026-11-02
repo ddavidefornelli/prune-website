@@ -116,6 +116,47 @@ test("a failed deletion resumes syncing, rather than silently disabling account 
   assert.equal(f.data.todayTasks[0].outcome, "Still usable");
 });
 
+test("survey answers without guest tasks import best-effort and never block the account", async (t) => {
+  const f = fixture(t);
+  const imports = [];
+  let offline = true;
+  const execute = f.cloud.execute.bind(f.cloud);
+  f.cloud.execute = async (command, args) => {
+    if (command !== "import_guest") return execute(command, args);
+    imports.push(args.payload);
+    if (offline) throw new Error("Offline");
+    return { imported: true };
+  };
+  await f.client.authStatus();
+  assert.equal(await f.client.importGuestTasks(), false);
+  assert.equal(imports.length, 0, "nothing to send without tasks or answers");
+  const survey = { goal: "ship", weekGoal: "Launch", weekStart: "2026-11-02" };
+  assert.equal(await f.client.importGuestTasks(survey), false);
+  offline = false;
+  assert.equal(await f.client.importGuestTasks(survey), true);
+  assert.deepEqual(
+    imports.map(({ tasks, stops, survey }) => ({ tasks, stops, survey })),
+    [
+      { tasks: [], stops: [], survey },
+      { tasks: [], stops: [], survey },
+    ],
+  );
+  assert.equal(
+    f.storage.getItem("prune:guest:v1"),
+    null,
+    "answers alone never create or freeze a guest journal",
+  );
+});
+
+test("Google sign-in goes through the transport, never the guest store", async (t) => {
+  const f = fixture(t, { execute: () => null });
+  await f.client.signInWithGoogle();
+  assert.deepEqual(
+    f.calls.map(({ command }) => command),
+    ["sign_in_with_google"],
+  );
+});
+
 test("guest planning and review checks never use the cloud transport", async (t) => {
   const f = fixture(t);
   const guest = new PlanningClient({ cloud: f.cloud, guest: true });

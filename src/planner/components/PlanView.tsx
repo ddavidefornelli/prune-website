@@ -13,16 +13,12 @@ import { PLANNER_LIMITS } from "../constants";
 import type { PlannerState } from "../create-planner";
 import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
 import type { Hints } from "../hints";
+import type { Starter } from "../starters";
 import { formatDuration, previousDay } from "../time";
 import { EstimateDial } from "./EstimateDial";
 import { TaskForm } from "./TaskForm";
 import { TaskTitle } from "./TaskTitle";
 
-const STARTERS = [
-  { outcome: "Clear my inbox", minutes: 20 },
-  { outcome: "Deep work on my main project", minutes: 60 },
-  { outcome: "Plan the week ahead", minutes: 30 },
-] as const;
 const DESKTOP_QUERY = "(hover: hover) and (min-width: 760px)";
 
 export function PlanView(props: {
@@ -30,6 +26,8 @@ export function PlanView(props: {
   client: PlanningClient;
   hints: Hints;
   firstRun: boolean;
+  starters: readonly Starter[];
+  defaultMinutes: number;
   guest?: boolean;
   onSignIn: () => void;
   onShortcuts: () => void;
@@ -304,6 +302,7 @@ export function PlanView(props: {
         <TaskForm
           busy={planner.busy()}
           autofocus={firstPlan() && desktop}
+          defaultMinutes={props.defaultMinutes}
           onCreate={create}
         />
       </Show>
@@ -314,7 +313,7 @@ export function PlanView(props: {
             <q>45m</q> to set the estimate.
           </p>
           <div class="starter-list">
-            <For each={STARTERS}>
+            <For each={props.starters}>
               {(starter) => (
                 <button
                   type="button"

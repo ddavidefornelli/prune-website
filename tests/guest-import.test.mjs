@@ -6,7 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 const user = '11111111-1111-4111-8111-111111111111';
 const other = '22222222-2222-4222-8222-222222222222';
 const taskId = '33333333-3333-4333-8333-333333333333';
-async function fixture() {
+async function fixture(migrations) {
   const db = new PGlite();
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
@@ -21,7 +21,7 @@ async function fixture() {
     create table public.planner_stops(user_id uuid not null, task_id uuid not null, reason text not null check(length(reason) between 1 and 1000), stopped_at bigint not null, stopped_on date not null, foreign key(user_id, task_id) references public.planner_tasks(user_id, id));
     set test.uid = '${user}';
   `);
-  await db.exec(readFileSync(new URL('../supabase/migrations/20261028000100_guest_import.sql', import.meta.url), 'utf8'));
+  for (const name of migrations) await db.exec(readFileSync(new URL(`../supabase/migrations/${name}`, import.meta.url), 'utf8'));
   return db;
 }
 function payload() {
@@ -29,8 +29,14 @@ function payload() {
 }
 const send = (db, data) => db.query('select public.planner_import_guest($1::jsonb) as result', [JSON.stringify(data)]);
 
-test('guest SQL import is atomic, authenticated, idempotent, and account scoped', async () => {
-  const db = await fixture();
+// The onboarding-survey migration replaces planner_import_guest; both versions must hold.
+const VERSIONS = {
+  original: ['20261028000100_guest_import.sql'],
+  'with onboarding answers': ['20261028000100_guest_import.sql', '20261031000100_guest_usage.sql', '20261102000100_onboarding_survey.sql'],
+};
+for (const [version, migrations] of Object.entries(VERSIONS)) {
+test(`guest SQL import is atomic, authenticated, idempotent, and account scoped (${version})`, async () => {
+  const db = await fixture(migrations);
   try {
     const data = payload();
     assert.equal((await send(db, data)).rows[0].result.imported, true);
@@ -46,8 +52,8 @@ test('guest SQL import is atomic, authenticated, idempotent, and account scoped'
   } finally { await db.close(); }
 });
 
-test('full planning days and deleted accounts reject imports without losing existing tasks', async () => {
-  const db = await fixture();
+test(`full planning days and deleted accounts reject imports without losing existing tasks (${version})`, async () => {
+  const db = await fixture(migrations);
   try {
     for (let i = 0; i < 3; i++) {
       const data = payload();
@@ -62,8 +68,8 @@ test('full planning days and deleted accounts reject imports without losing exis
   } finally { await db.close(); }
 });
 
-test('bad guest data rolls back all tasks, stops and receipts', async () => {
-  const db = await fixture();
+test(`bad guest data rolls back all tasks, stops and receipts (${version})`, async () => {
+  const db = await fixture(migrations);
   try {
     const data = payload();
     data.tasks.push({ ...data.tasks[0], id: crypto.randomUUID(), estimatedMinutes: 999 });
@@ -72,3 +78,4 @@ test('bad guest data rolls back all tasks, stops and receipts', async () => {
       assert.equal((await db.query(`select count(*)::int as count from ${table}`)).rows[0].count, 0);
   } finally { await db.close(); }
 });
+}
