@@ -4,14 +4,23 @@ import { webConfig } from "../planner/config.ts";
 import { errorMessage } from "../planner/errors.ts";
 import { hasPrivacyAcknowledgement } from "../planner/privacy-state.ts";
 import { isAccount, type Account } from "../planner/types.ts";
+import type { SurveyImport } from "../survey/model.ts";
 
 type SessionPhase = "restoring" | "transferring" | "transferFailed" | "ready";
+
+interface SessionHooks {
+  /** Survey answers to send with the guest import, if any. */
+  surveyImport?: () => SurveyImport | undefined;
+  /** After sign-in and import. `interactive` excludes restored sessions. */
+  onSignedIn?: (interactive: boolean, surveyImported: boolean) => void;
+}
 
 /** Session restoration and guest transfer have one lifecycle and explicit phases. */
 export function createSession(
   client: PlanningClient,
   guestClient: PlanningClient,
   configure: () => unknown = webConfig,
+  hooks: SessionHooks = {},
 ) {
   const [account, setAccount] = createSignal<Account>();
   const [phase, setPhase] = createSignal<SessionPhase>("restoring");
@@ -19,6 +28,7 @@ export function createSession(
   const [initialError, setInitialError] = createSignal("");
   const [transferError, setTransferError] = createSignal("");
   let disposed = false;
+  let interactiveSignIn = false;
   let configurationError = "";
   try {
     configure();
@@ -26,14 +36,20 @@ export function createSession(
     configurationError = errorMessage(cause);
   }
 
-  async function finishSignIn(status: Account): Promise<void> {
+  async function finishSignIn(
+    status: Account,
+    interactive = false,
+  ): Promise<void> {
     if (disposed || phase() === "transferring") return;
+    interactiveSignIn ||= interactive;
     setAccount(status);
     setPhase("transferring");
     setTransferError("");
     try {
-      await client.importGuestTasks();
+      const imported = await client.importGuestTasks(hooks.surveyImport?.());
       if (!disposed) {
+        hooks.onSignedIn?.(interactiveSignIn, imported === true);
+        interactiveSignIn = false;
         setSigningIn(false);
         setPhase("ready");
       }
@@ -64,8 +80,13 @@ export function createSession(
       try {
         // SDK construction can refresh a session; gate even that access.
         if (!configurationError && hasPrivacyAcknowledgement(localStorage)) {
+          // authStatus() strips the callback parameters it completes.
+          const callback = new URLSearchParams(window.location.search).has(
+            "oauth",
+          );
           const status = await client.authStatus();
-          if (!disposed && isAccount(status)) await finishSignIn(status);
+          if (!disposed && isAccount(status))
+            await finishSignIn(status, callback);
         }
       } catch (cause) {
         if (!disposed)

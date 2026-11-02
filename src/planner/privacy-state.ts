@@ -37,6 +37,20 @@ export function hasPrivacyAcknowledgement(
   }
 }
 
+/** Every sign-in entry point records acceptance first, or explains why it cannot. */
+export function requirePrivacyAcknowledgement(
+  storage: Pick<Storage, "getItem" | "setItem">,
+): void {
+  if (hasPrivacyAcknowledgement(storage)) return;
+  try {
+    acknowledgePrivacy(storage);
+  } catch {
+    throw new Error(
+      "Could not save your terms acceptance. Allow browser storage and try again. No sign-in request was sent.",
+    );
+  }
+}
+
 /** Let storage errors reach the gate: do not proceed after a failed durable save. */
 export function acknowledgePrivacy(
   storage: Pick<Storage, "setItem">,
