@@ -4,6 +4,7 @@ import {
   type ReviewInput,
   validateAnalysis,
   validateInput,
+  validateWeekGoal,
 } from "./domain.ts";
 import { ApiError, MAX_REQUEST_BYTES, readLimited } from "../http.ts";
 import { MODEL } from "./provider.ts";
@@ -34,6 +35,8 @@ export type Dependencies = {
     timezone: string,
     preview?: boolean,
   ) => Promise<unknown>;
+  /** Service-only planner_week_goal: the onboarding outcome for that week. */
+  loadWeekGoal?: (userId: string, weekStart: string) => Promise<unknown>;
   reserve: (
     userId: string,
     input: ReviewInput,
@@ -202,6 +205,13 @@ export function createHandler(
           return respond(200, { noData: true });
       }
       const input = validateInput(source, deps.now(), preview);
+      if (deps.loadWeekGoal) {
+        // Context only: a failed lookup reviews the week without a goal.
+        const weekGoal = validateWeekGoal(
+          await deps.loadWeekGoal(userId, input.weekStart).catch(() => null),
+        );
+        if (weekGoal) input.weekGoal = weekGoal;
+      }
       const claim = await deps.reserve(
         userId,
         input,

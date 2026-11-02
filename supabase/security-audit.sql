@@ -6,7 +6,8 @@
 with expected(name) as (values
   ('planner_accounts'), ('planner_tasks'), ('planner_resources'), ('planner_stops'),
   ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests'), ('ai_review_previews'), ('guest_usage_daily')
+  ('ai_review_requests'), ('ai_review_previews'), ('guest_usage_daily'),
+  ('planner_onboarding')
 )
 select e.name, c.oid is not null as table_exists,
   coalesce(c.relrowsecurity, false) as rls_enabled
@@ -19,7 +20,8 @@ order by e.name;
 with expected(name) as (values
   ('planner_accounts'), ('planner_tasks'), ('planner_resources'), ('planner_stops'),
   ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests'), ('ai_review_previews'), ('guest_usage_daily')
+  ('ai_review_requests'), ('ai_review_previews'), ('guest_usage_daily'),
+  ('planner_onboarding')
 ), roles(name) as (values ('anon'), ('authenticated'))
 select e.name as table_name, r.name as role_name,
   has_table_privilege(r.name, c.oid, 'SELECT') as can_select,
@@ -44,6 +46,7 @@ order by tablename, policyname;
 -- 4. All security-definer functions require an empty search_path.
 -- No anon execute; authenticated execute ONLY on planner_call(text,jsonb,text).
 -- PUBLIC execute must be false. All other listed functions are server-only.
+-- planner_week_goal(uuid,date) is server-only: service_role, for the review loader.
 select p.oid::regprocedure::text as function_name, p.prosecdef as security_definer,
   p.proconfig as function_settings,
   has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
