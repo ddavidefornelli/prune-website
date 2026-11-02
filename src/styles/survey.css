@@ -21,6 +21,9 @@
 .survey[data-direction="back"] .survey-step {
   animation-name: survey-back;
 }
+.survey-step.is-entering {
+  pointer-events: none;
+}
 @keyframes survey-forward {
   from {
     opacity: 0;

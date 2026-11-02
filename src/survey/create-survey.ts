@@ -18,6 +18,7 @@ import {
   type FunnelEvent,
   type SurveyFlag,
   type SurveyState,
+  type SurveyStep,
 } from "./model.ts";
 
 interface SurveyOptions {
@@ -96,10 +97,11 @@ export function createSurvey(options: SurveyOptions) {
       update(start);
       track("started");
     },
-    answer(patch: SurveyAnswers) {
-      const finishing = state().step === "outcome";
+    /** Ignored unless `from` is still the current step: no double submits. */
+    answer(from: SurveyStep, patch: SurveyAnswers) {
+      if (state().step !== from) return;
       update((current) => answer(current, patch, now()));
-      if (finishing) track("finished");
+      if (from === "outcome") track("finished");
     },
     back: () => update(back, "back"),
     showPlan: () => update((current) => ({ ...current, step: "plan" })),

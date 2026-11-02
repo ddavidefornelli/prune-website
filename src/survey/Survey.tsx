@@ -181,9 +181,25 @@ function Frame(props: {
   children: JSX.Element;
 }) {
   const number = questionNumber(untrack(() => props.step));
+  // Taps during the slide-in belong to the screen before (a quick double
+  // tap), so the incoming screen takes none until it has settled.
+  const [entering, setEntering] = createSignal(true);
+  let section!: HTMLElement;
+  onMount(() => {
+    const settle = () => setEntering(false);
+    // The slide-in takes 280 ms; a stalled animation clock must not leave
+    // the screen unresponsive.
+    const fallback = window.setTimeout(settle, 400);
+    void Promise.allSettled(
+      section.getAnimations().map((animation) => animation.finished),
+    ).then(settle);
+    onCleanup(() => clearTimeout(fallback));
+  });
   return (
     <section
+      ref={(element) => (section = element)}
       class={`survey-step ${props.class ?? ""}`}
+      classList={{ "is-entering": entering() }}
       aria-labelledby={props.titleId}
     >
       <div class="survey-bar">
@@ -263,7 +279,7 @@ function TextStep(
         class="survey-form"
         onSubmit={(event) => {
           event.preventDefault();
-          props.survey.answer({ [props.answer]: value() });
+          props.survey.answer(props.step, { [props.answer]: value() });
         }}
       >
         <h1 id={titleId} class="survey-question">
@@ -308,7 +324,7 @@ function ChoiceQuestion(props: StepProps & { step: ChoiceStep }) {
     if (picked() !== undefined) return;
     setPicked(value);
     timer = window.setTimeout(
-      () => props.survey.answer({ [key]: value } as SurveyAnswers),
+      () => props.survey.answer(props.step, { [key]: value } as SurveyAnswers),
       ADVANCE_MS,
     );
   }
@@ -322,8 +338,10 @@ function ChoiceQuestion(props: StepProps & { step: ChoiceStep }) {
         event.altKey ||
         event.ctrlKey ||
         event.metaKey ||
+        event.repeat ||
         !Number.isInteger(index) ||
-        !options[index]
+        !options[index] ||
+        document.querySelector("dialog[open]")
       )
         return;
       event.preventDefault();
@@ -392,7 +410,7 @@ function Fact(props: StepProps) {
         ref={(element) => (next = element)}
         type="button"
         class="survey-primary"
-        onClick={() => props.survey.answer({})}
+        onClick={() => props.survey.answer("fact", {})}
       >
         Continue
       </button>
