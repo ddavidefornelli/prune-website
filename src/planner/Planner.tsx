@@ -12,6 +12,7 @@ import PixelBackground from "../components/PixelBackground";
 import { LoadingIndicator } from "../components/LoadingIndicator";
 import { Profile } from "../profile/Profile";
 import { createWeeklyReview } from "../reviews/create-weekly-review";
+import { readSurvey } from "../survey/model";
 import type { PlanningClient } from "./api";
 import { FocusView } from "./components/FocusView";
 import { Overview } from "./components/Overview";
@@ -23,6 +24,7 @@ import { createPlanner } from "./create-planner";
 import { createHints } from "./hints";
 import { onboardingKey, shouldOfferOnboarding } from "./onboarding";
 import { createShortcuts } from "./shortcuts";
+import { focusBlockMinutes, startersFor } from "./starters";
 import type { Account } from "./types";
 
 const RESUME_KEY = "prune:resume-view:v1";
@@ -42,6 +44,10 @@ export function Planner(props: {
       (planner.view() === "habits" || planner.view() === "profile"),
   );
   const hints = createHints(untrack(() => props.account.accountKey));
+  // Survey answers stay on this device and personalize its first plan.
+  const answers = readSurvey(localStorage).answers;
+  const starters = startersFor(answers);
+  const defaultMinutes = focusBlockMinutes(answers.focusMinutes);
   const [firstRun, setFirstRun] = createSignal(false);
   const [shortcuts, setShortcuts] = createSignal(false);
   const [welcome, setWelcome] = createSignal("");
@@ -180,6 +186,8 @@ export function Planner(props: {
                   client={props.client}
                   hints={hints}
                   firstRun={firstRun()}
+                  starters={starters}
+                  defaultMinutes={defaultMinutes}
                   guest={props.guest}
                   onSignIn={saveAndSync}
                   onShortcuts={() => setShortcuts(true)}
