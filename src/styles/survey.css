@@ -45,6 +45,13 @@
   margin: 0 auto;
   padding-top: calc(44px + clamp(28px, 7vh, 88px));
 }
+/* Laptops have room to spare: the intro sits in the middle of the window. */
+@media (min-width: 1024px) {
+  #app .survey-intro {
+    margin: auto;
+    padding-top: 0;
+  }
+}
 .survey-intro .auth-description {
   margin-bottom: 32px;
 }
