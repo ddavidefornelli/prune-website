@@ -81,7 +81,8 @@ test.describe("survey flag on", () => {
       weekGoal: "Launch the new homepage", weekStart: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
     expect(JSON.stringify(backend.requests.map((request) => request.body))).not.toContain("Ada");
-    // The kept plan lands in the account's Today.
+    // The kept plan lands in the account's Today, and the first-run tour opens over it.
+    await page.locator(".tour-popup").getByRole("button", { name: "Skip tour" }).click();
     for (const outcome of PLAN) await expect(page.getByRole("button", { name: `Edit task title: ${outcome}` })).toBeVisible();
     await expect(page.locator(".starters")).toHaveCount(0);
     await expect.poll(() => backend.data.todayTasks.map((task) => [task.outcome, task.estimatedMinutes])).toEqual([[PLAN[0], 60], [PLAN[1], 15], [PLAN[2], 10]]);

@@ -23,6 +23,7 @@ import { FocusView } from "./components/FocusView";
 import { Overview } from "./components/Overview";
 import { PlanView } from "./components/PlanView";
 import { PlannerNavigation } from "./components/PlannerNavigation";
+import { PlannerTour } from "./components/PlannerTour";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { RESUME_VIEW_KEY, VIEW_LABELS, type PlannerView } from "./constants";
 import { createPlanner } from "./create-planner";
@@ -51,6 +52,7 @@ export function Planner(props: {
   const defaultMinutes = focusBlockMinutes(answers.focusMinutes);
   const [firstRun, setFirstRun] = createSignal(false);
   const [shortcuts, setShortcuts] = createSignal(false);
+  const [tour, setTour] = createSignal(false);
   const [welcome, setWelcome] = createSignal("");
   let firstRunChecked = false;
   let previousView = planner.view();
@@ -75,6 +77,18 @@ export function Planner(props: {
     props.onSaveAndSync?.();
   }
 
+  /** The tour's last stop starts the first planned task, as its button would. */
+  async function startFirstTask(): Promise<void> {
+    const task = planner.data()?.todayTasks.find((t) => t.status === "planned");
+    if (!task) return;
+    hints.dismiss("start");
+    const success = await planner.mutate(async () => {
+      await client.start(task.id);
+      planner.visit("focus");
+    });
+    if (!success) throw new Error(planner.error());
+  }
+
   /** A plan kept from the survey lands in Today once, guest or account. */
   async function addKeptPlan(data: Dashboard): Promise<void> {
     const survey = readSurvey(localStorage);
@@ -84,10 +98,11 @@ export function Planner(props: {
     const tasks = tasksToAdd(buildPlan(survey.answers).tasks, data.todayTasks);
     if (!tasks.length) return;
     const today = data.today;
-    await planner.mutate(async () => {
+    const success = await planner.mutate(async () => {
       for (const task of tasks)
         await client.create(task.outcome, today, task.minutes);
     });
+    if (success) setTour(true);
   }
 
   onMount(() => {
@@ -119,7 +134,9 @@ export function Planner(props: {
     if (keptPlan) untrack(() => void addKeptPlan(data));
   });
   createEffect(() => {
-    if (firstRun() && planner.data()?.todayTasks.length) finishFirstRun();
+    if (!firstRun() || !planner.data()?.todayTasks.length) return;
+    finishFirstRun();
+    setTour(true);
   });
   createEffect(() => {
     const view = planner.view();
@@ -215,6 +232,16 @@ export function Planner(props: {
             </Switch>
           </Show>
         </main>
+        <Show when={tour()}>
+          <PlannerTour
+            onVisit={planner.visit}
+            onDone={(started) => {
+              setTour(false);
+              if (!started) planner.visit("today");
+            }}
+            onStart={startFirstTask}
+          />
+        </Show>
         <Show when={shortcuts()}>
           <ShortcutSheet onDismiss={() => setShortcuts(false)} />
         </Show>

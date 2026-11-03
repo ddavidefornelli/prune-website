@@ -24,6 +24,7 @@ test("optional recorder waits for consent, remembers it and stops after withdraw
   await page.getByRole("textbox", { name: "Outcome", exact: true }).fill("Test task");
   await page.getByRole("textbox", { name: "Outcome", exact: true }).press("Enter");
   await expect(page.getByText("Test task", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Skip tour" }).click();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await page.reload();
   await expect(banner).toHaveCount(0);
