@@ -45,7 +45,6 @@ interface SurveyProps {
   client: PlanningClient;
   initialError: string;
   configurationError: string;
-  onEmail: () => void;
 }
 
 type StepProps = SurveyProps & {
@@ -160,24 +159,16 @@ function Intro(props: StepProps) {
       >
         Start
       </button>
-      <button
-        type="button"
-        class="text-button survey-exit"
-        onClick={() => props.survey.skip()}
-      >
-        Skip, just let me plan
-      </button>
     </section>
   );
 }
 
-/** Back, progress and the quiet way out that every question screen shares. */
+/** Back and progress that every question screen shares. */
 function Frame(props: {
   survey: SurveyController;
   step: SurveyStep;
   titleId: string;
   class?: string;
-  exit?: boolean;
   children: JSX.Element;
 }) {
   const number = questionNumber(untrack(() => props.step));
@@ -243,15 +234,6 @@ function Frame(props: {
         </Show>
       </div>
       <div class="survey-body">{props.children}</div>
-      <Show when={props.exit}>
-        <button
-          type="button"
-          class="text-button survey-exit"
-          onClick={() => props.survey.skip()}
-        >
-          Skip, just let me plan
-        </button>
-      </Show>
     </section>
   );
 }
@@ -274,7 +256,7 @@ function TextStep(
   let input!: HTMLInputElement;
   onMount(() => props.focus(input));
   return (
-    <Frame survey={props.survey} step={props.step} titleId={titleId} exit>
+    <Frame survey={props.survey} step={props.step} titleId={titleId}>
       <form
         class="survey-form"
         onSubmit={(event) => {
@@ -331,31 +313,11 @@ function ChoiceQuestion(props: StepProps & { step: ChoiceStep }) {
 
   onMount(() => {
     props.focus(heading);
-    // Number keys pick an answer on keyboards; touch never shows the hints.
-    const keydown = (event: KeyboardEvent) => {
-      const index = Number(event.key) - 1;
-      if (
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.repeat ||
-        !Number.isInteger(index) ||
-        !options[index] ||
-        document.querySelector("dialog[open]")
-      )
-        return;
-      event.preventDefault();
-      choose(options[index].value);
-    };
-    window.addEventListener("keydown", keydown);
-    onCleanup(() => {
-      window.removeEventListener("keydown", keydown);
-      clearTimeout(timer);
-    });
+    onCleanup(() => clearTimeout(timer));
   });
 
   return (
-    <Frame survey={props.survey} step={props.step} titleId={titleId} exit>
+    <Frame survey={props.survey} step={props.step} titleId={titleId}>
       <h1
         id={titleId}
         ref={(element) => (heading = element)}
@@ -366,14 +328,13 @@ function ChoiceQuestion(props: StepProps & { step: ChoiceStep }) {
       </h1>
       <div class="survey-options" role="group" aria-labelledby={titleId}>
         <For each={options}>
-          {(option, index) => (
+          {(option) => (
             <button
               type="button"
               aria-pressed={chosen() === option.value}
               onClick={() => choose(option.value)}
             >
-              <span>{option.label}</span>
-              <kbd aria-hidden="true">{index() + 1}</kbd>
+              {option.label}
             </button>
           )}
         </For>
@@ -393,7 +354,6 @@ function Fact(props: StepProps) {
       step="fact"
       titleId={titleId}
       class="survey-fact"
-      exit
     >
       <h1 id={titleId}>
         <span class="survey-fact-figure">3</span>{" "}
@@ -631,27 +591,6 @@ function SavePlan(props: StepProps) {
       <p class="error" role="alert">
         {props.configurationError || error()}
       </p>
-      <div class="survey-alternatives">
-        <button
-          type="button"
-          class="text-button"
-          disabled={busy()}
-          onClick={() => {
-            resumeOnToday();
-            props.onEmail();
-          }}
-        >
-          Use email instead
-        </button>
-        <button
-          type="button"
-          class="text-button"
-          disabled={busy()}
-          onClick={() => props.survey.finishAsGuest()}
-        >
-          Not now, start planning
-        </button>
-      </div>
     </Frame>
   );
 }

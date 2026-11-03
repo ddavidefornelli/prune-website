@@ -165,8 +165,6 @@
 #app .survey-options button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   width: 100%;
   min-height: 56px;
   padding: 14px 16px;
@@ -192,25 +190,6 @@
   color: #000;
   background: var(--text);
   border-color: var(--text);
-}
-.survey-options kbd {
-  flex: none;
-  min-width: 22px;
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-family: inherit;
-  font-size: 12px;
-  text-align: center;
-}
-.survey-options [aria-pressed="true"] kbd {
-  border-color: #0003;
-  color: #0009;
-}
-@media (hover: none) {
-  .survey-options kbd {
-    display: none;
-  }
 }
 
 .survey-form {
@@ -241,16 +220,6 @@
     background: var(--blood-red);
     border-color: var(--blood-red);
   }
-}
-#app .survey-exit {
-  align-self: center;
-  min-height: 44px;
-  margin-top: 16px;
-  padding-inline: 8px;
-}
-.survey-step > .survey-exit {
-  margin-top: auto;
-  padding-top: 24px;
 }
 
 /* The one rule, drawn with Today's three slots. */
@@ -496,16 +465,6 @@
   margin: 0;
   font-size: 13px;
   overflow-wrap: anywhere;
-}
-.survey-alternatives {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0 16px;
-  margin-top: -8px;
-}
-#app .survey-alternatives .text-button {
-  min-height: 44px;
 }
 
 @media (prefers-reduced-motion: reduce) {

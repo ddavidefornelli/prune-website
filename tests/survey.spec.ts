@@ -51,6 +51,8 @@ test.describe("survey flag on", () => {
 
     await page.getByRole("button", { name: "Save my plan →" }).click();
     await expect(page.getByRole("heading", { name: "SAVE YOUR PLAN." })).toBeVisible();
+    // Google is the only way on: no email form and no guest planner from here.
+    await expect(page.getByRole("button", { name: /email|not now/i })).toHaveCount(0);
     const notice = page.getByRole("checkbox");
     await expect(notice).not.toBeChecked();
     const google = page.getByRole("button", { name: "Continue with Google" });
@@ -81,6 +83,7 @@ test.describe("survey flag on", () => {
     expect(JSON.stringify(backend.requests.map((request) => request.body))).not.toContain("Ada");
     // The kept plan lands in the account's Today.
     for (const outcome of PLAN) await expect(page.getByRole("button", { name: `Edit task title: ${outcome}` })).toBeVisible();
+    await expect(page.locator(".starters")).toHaveCount(0);
     await expect.poll(() => backend.data.todayTasks.map((task) => [task.outcome, task.estimatedMinutes])).toEqual([[PLAN[0], 60], [PLAN[1], 15], [PLAN[2], 10]]);
     const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), SURVEY_KEY);
     expect(saved).toMatchObject({ status: "done", plan: "applied", synced: true });
@@ -88,45 +91,49 @@ test.describe("survey flag on", () => {
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
     expect(backend.imports).toHaveLength(1);
     expect(backend.data.todayTasks).toHaveLength(3);
-  });
-
-  test("skip opens today's guest planner and the questions never come back", async ({ page, backend }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Skip, just let me plan" }).click();
-    await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
-    await expect(page.getByRole("region", { name: "Starting ideas" }).getByRole("button")).toHaveText(["Clear my inbox20 min", "Deep work on my main project60 min", "Plan the week ahead30 min"]);
-    await page.reload();
-    await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
-    await expect(page.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
-    expect(backend.requests).toEqual([]);
-  });
-
-  test("Not now keeps planning as a guest with the plan's tasks in Today", async ({ page, backend }) => {
-    await page.goto("/");
-    await answerEverything(page, "");
-    await page.getByRole("button", { name: "Save my plan →" }).click();
-    await page.getByRole("button", { name: "Not now, start planning" }).click();
-    for (const outcome of PLAN) await expect(page.getByRole("button", { name: `Edit task title: ${outcome}` })).toBeVisible();
-    await expect(page.locator(".starters")).toHaveCount(0);
-    await expect(page.locator(".task.is-next")).toContainText(PLAN[0]);
-    await page.reload();
-    await expect(page.locator(".task")).toHaveCount(3);
     // Focus length set the default estimate for new tasks.
     await page.setViewportSize({ width: 1100, height: 900 });
-    await page.getByRole("navigation").getByRole("button", { name: "Tomorrow", exact: true }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Tomorrow", exact: true }).click();
     await expect(page.locator(".task-form .estimate-dial")).toHaveAttribute("aria-valuenow", "60");
-    expect(backend.requests, "Guest planning stays on this device").toEqual([]);
   });
 
-  test("Use email instead opens the code form; leaving it keeps the plan as a guest", async ({ page, backend }) => {
+  test("no question offers a way around the survey, and a reload comes back to it", async ({ page }) => {
+    const skip = page.getByRole("button", { name: /skip/i });
+    // Waits for each screen first, so a missing Skip is never just an unrendered one.
+    async function screen(heading: string) {
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+      await expect(skip).toHaveCount(0);
+    }
     await page.goto("/");
-    await answerEverything(page);
-    await page.getByRole("button", { name: "Save my plan →" }).click();
-    await page.getByRole("button", { name: "Use email instead" }).click();
-    await expect(page.getByRole("button", { name: "Email me a sign-in code" })).toBeVisible();
-    await page.getByRole("button", { name: "Continue without an account" }).click();
-    await expect(page.locator(".task")).toHaveCount(3);
-    expect(backend.requests).toEqual([]);
+    await expect(page.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+    await expect(skip).toHaveCount(0);
+    await page.reload();
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    // The first name can be left blank; the choices cannot.
+    await screen("First, what should we call you?");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    for (const [question, answer] of [
+      ["What are you here to do?", "Study"],
+      ["What do you do?", "Student"],
+      ["When do you focus best?", "Evening"],
+      ["How long can you focus before you drift?", "30 min"],
+    ]) {
+      await screen(question);
+      await page.getByRole("button", { name: answer, exact: true }).click();
+    }
+    await screen("3 tasks a day. That’s the whole rule.");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    for (const [question, answer] of [
+      ["What derails you most?", "Interruptions"],
+      ["How many hours of deep work do you want each day?", "1 hour"],
+    ]) {
+      await screen(question);
+      await page.getByRole("button", { name: answer, exact: true }).click();
+    }
+    await screen("One outcome you want this week?");
+    await page.reload();
+    await screen("One outcome you want this week?");
+    await expect(page.locator(".plan-summary")).toHaveCount(0);
   });
 
   test("back keeps every answer, and a reload resumes the same step", async ({ page }) => {
@@ -160,7 +167,7 @@ test.describe("survey flag on", () => {
     await page.getByRole("button", { name: "Save my plan →" }).click();
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Continue with Google" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Google sign-in isn't available right now. Use email instead.");
+    await expect(page.getByRole("alert")).toHaveText("Google sign-in isn't available right now. Please try again later.");
     await expect(page.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
     await expect(page).toHaveURL(`${SURVEY_BUILD}/`);
     expect(backend.requests.map((request) => request.path)).toEqual(["/auth/v1/settings"]);
@@ -183,7 +190,7 @@ test.describe("survey flag on", () => {
     expect(backend.requests.filter((request) => request.path.startsWith("/auth/v1/token"))).toEqual([]);
   });
 
-  test("returning visitors with guest plans or an earlier sign-in skip the questions", async ({ page }) => {
+  test("returning visitors with guest plans or an earlier sign-in go straight to the planner", async ({ page }) => {
     await page.addInitScript((key) => {
       if (!sessionStorage.getItem("returning-seeded")) {
         sessionStorage.setItem("returning-seeded", "true");

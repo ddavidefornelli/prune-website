@@ -64,14 +64,14 @@ export type FunnelEvent =
   | "finished"
   | "plan_shown"
   | "google_clicked"
-  | "signed_up"
-  | "skipped";
+  | "signed_up";
 
 export interface SurveyState {
   version: 1;
   /** Persisted experiment assignment; null while the flow is off. */
   variant: SurveyVariant | null;
-  status: "new" | "active" | "skipped" | "done";
+  /** The questions cannot be skipped: only signing in finishes them. */
+  status: "new" | "active" | "done";
   step: SurveyStep;
   answers: SurveyAnswers;
   /** Local Monday of the week the outcome was written for. */
@@ -132,7 +132,9 @@ export function parseSurvey(raw: string | null): SurveyState {
   const value = saved as Record<string, unknown>;
   if (oneOf(value.variant, ["survey", "control"]))
     state.variant = value.variant;
-  if (oneOf(value.status, ["new", "active", "skipped", "done"]))
+  // Earlier builds stored "skipped"; it now reads as "new", so a browser that
+  // is still fresh gets the questions again.
+  if (oneOf(value.status, ["new", "active", "done"]))
     state.status = value.status;
   if (oneOf(value.step, STEPS)) state.step = value.step;
   if (oneOf(value.plan, ["none", "pending", "applied"]))
@@ -292,24 +294,11 @@ export function back(state: SurveyState): SurveyState {
   return { ...state, step: previousStep(state.step) };
 }
 
-export function skip(state: SurveyState): SurveyState {
-  return { ...state, status: "skipped" };
-}
-
 /** "Save my plan": the plan waits for whichever planner opens next. */
 export function keepPlan(state: SurveyState): SurveyState {
   return {
     ...state,
     step: "save",
-    plan: state.plan === "applied" ? "applied" : "pending",
-  };
-}
-
-/** "Not now": finish as a guest; the guest planner adds the plan. */
-export function finishAsGuest(state: SurveyState): SurveyState {
-  return {
-    ...state,
-    status: "done",
     plan: state.plan === "applied" ? "applied" : "pending",
   };
 }

@@ -56,13 +56,7 @@ export function Session() {
               void session.finishSignIn(status, true)
             }
           />
-          <button
-            type="button"
-            onClick={() => {
-              survey.finishAsGuest();
-              session.continueAsGuest();
-            }}
-          >
+          <button type="button" onClick={session.continueAsGuest}>
             Continue without an account
           </button>
         </div>
@@ -79,7 +73,6 @@ export function Session() {
             client={client}
             initialError={session.initialError()}
             configurationError={session.configurationError}
-            onEmail={session.startSignIn}
           />
         </div>
       </Match>

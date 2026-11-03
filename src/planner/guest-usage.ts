@@ -16,7 +16,6 @@ export const FUNNEL_METRICS = [
   "funnel_survey_plan_shown",
   "funnel_survey_google_clicked",
   "funnel_survey_signed_up",
-  "funnel_survey_skipped",
 ] as const;
 export type FunnelMetric = (typeof FUNNEL_METRICS)[number];
 export type GuestMetric =
