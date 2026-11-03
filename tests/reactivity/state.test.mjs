@@ -180,14 +180,14 @@ test("a preference write cannot be overwritten by an older weekly-review read", 
   const client = {
     weeklyOverview: () => pending.promise,
     generateIfDue: async () => {},
-    setWeeklyAiEnabled: async (enabled) => overview({ settings: { enabled }, status: "disabled" }),
+    enableWeeklyAi: async () => overview(),
   };
   const { state } = env.mount(() => createWeeklyReview(client, () => true));
-  await state.setEnabled(false);
-  assert.equal(state.data().settings.enabled, false);
-  pending.resolve(overview());
+  await state.enable();
+  assert.equal(state.data().settings.enabled, true);
+  pending.resolve(overview({ settings: { enabled: false }, status: "disabled" }));
   await settle();
-  assert.equal(state.data().settings.enabled, false);
+  assert.equal(state.data().settings.enabled, true);
   assert.equal(state.error(), "");
 });
 

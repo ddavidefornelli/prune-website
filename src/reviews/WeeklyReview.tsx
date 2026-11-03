@@ -52,7 +52,8 @@ function ReviewCountdown(props: { data: WeeklyOverview; now: number }) {
 
 function statusMessage(data: WeeklyOverview): string {
   const messages: Record<WeeklyOverview["status"], string> = {
-    disabled: "Weekly reviews are off. You can turn them on in Profile.",
+    disabled:
+      "Weekly reviews are off for this account. Turning them on sends selected planner activity to OpenAI for weekly reviews and daily task suggestions. Once on, they can’t be turned off.",
     unavailable:
       "Hosted weekly AI is temporarily unavailable. Your planner is unaffected.",
     pending: `Your review for ${reviewRange(data.week.start, data.week.end)} is queued.`,
@@ -107,6 +108,18 @@ export function WeeklyReview(props: {
             </Show>
             <Show when={data().settings.enabled}>
               <ReviewCountdown data={data()} now={props.now} />
+            </Show>
+            {/* Reviews can't be turned off; only accounts that opted out earlier are disabled. */}
+            <Show when={data().status === "disabled"}>
+              <button
+                type="button"
+                disabled={review.saving()}
+                onClick={() => {
+                  void review.enable();
+                }}
+              >
+                Turn on weekly reviews
+              </button>
             </Show>
             <For each={data().reviews}>
               {(report, index) => (

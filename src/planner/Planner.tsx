@@ -42,9 +42,7 @@ export function Planner(props: {
   const planner = createPlanner(client);
   const review = createWeeklyReview(
     client,
-    () =>
-      !props.guest &&
-      (planner.view() === "habits" || planner.view() === "profile"),
+    () => !props.guest && planner.view() === "habits",
   );
   const hints = createHints(untrack(() => props.account.accountKey));
   // Survey answers stay on this device and personalize its first plan.
@@ -179,7 +177,6 @@ export function Planner(props: {
                 <Profile
                   email={props.account.email}
                   planner={planner}
-                  review={review}
                   guest={props.guest}
                 />
               </Match>

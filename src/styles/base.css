@@ -225,6 +225,12 @@ h1 {
 .profile-stats + .profile-section-heading {
   margin-top: 28px;
 }
+.profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 20px;
+}
 .profile-footer {
   display: flex;
   justify-content: flex-end;
@@ -846,21 +852,9 @@ textarea {
 .weekly-overview li {
   overflow-wrap: anywhere;
 }
-.weekly-settings {
-  padding: 16px 20px;
-  margin-block: 20px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0;
-}
-.weekly-overview summary,
-.review-preferences summary {
+.weekly-overview summary {
   cursor: pointer;
   line-height: 1.5;
-}
-.review-preferences :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
 }
 .weekly-overview button:focus-visible,
 .weekly-overview summary:focus-visible {

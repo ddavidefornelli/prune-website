@@ -1,8 +1,7 @@
 import { createMemo, For, Show, untrack } from "solid-js";
+import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import { ActivityCalendar } from "../planner/components/ActivityCalendar";
 import type { PlannerState } from "../planner/create-planner";
-import { ReviewPreferences } from "../reviews/ReviewPreferences";
-import type { WeeklyReviewState } from "../reviews/create-weekly-review";
 import { profileStats, todayFocusSeconds } from "./profile-stats";
 
 function focusMinutes(seconds: number): string {
@@ -31,7 +30,6 @@ export function Profile(props: {
   email: string;
   guest?: boolean;
   planner: PlannerState;
-  review: WeeklyReviewState;
 }) {
   const planner = untrack(() => props.planner);
   const stats = createMemo(() => {
@@ -97,17 +95,19 @@ export function Profile(props: {
           </>
         )}
       </Show>
-      <button
-        type="button"
-        class="privacy-policy-button"
-        onClick={() =>
-          window.dispatchEvent(new Event("prune:preferences:open"))
-        }
-      >
-        Cookie settings
-      </button>
+      <div class="profile-links">
+        <PrivacyPolicyButton />
+        <button
+          type="button"
+          class="privacy-policy-button"
+          onClick={() =>
+            window.dispatchEvent(new Event("prune:preferences:open"))
+          }
+        >
+          Cookie settings
+        </button>
+      </div>
       <Show when={!props.guest}>
-        <ReviewPreferences review={props.review} disabled={planner.busy()} />
         <footer class="profile-footer">
           <button
             type="button"

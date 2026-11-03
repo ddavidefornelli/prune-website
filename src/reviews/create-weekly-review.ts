@@ -49,21 +49,20 @@ export function createWeeklyReview(
     if (!disposed && visible()) await refresh();
   }
 
-  async function setEnabled(enabled: boolean): Promise<void> {
+  async function enable(): Promise<void> {
     if (saving() || disposed) return;
     version++;
     setSaving(true);
     setError("");
     try {
-      const next = await client.setWeeklyAiEnabled(enabled);
+      const next = await client.enableWeeklyAi();
       if (!disposed) apply(next);
     } catch {
       if (!disposed) setError("Could not save AI settings. Please try again.");
     } finally {
       if (!disposed) setSaving(false);
     }
-    if (enabled && !error() && !disposed && data()?.settings.enabled)
-      await checkDue();
+    if (!error() && !disposed && data()?.settings.enabled) await checkDue();
   }
 
   createEffect(
@@ -93,7 +92,7 @@ export function createWeeklyReview(
     });
   });
 
-  return { data, saving, error, refresh, setEnabled };
+  return { data, saving, error, refresh, enable };
 }
 
 export type WeeklyReviewState = ReturnType<typeof createWeeklyReview>;
