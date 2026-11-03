@@ -30,7 +30,9 @@ h1 {
     sans-serif;
   color: var(--text);
   background: var(--background);
-  font-size: 18px;
+  /* Fluid type: 18px up to 1280px wide, scaling to 22px at 2560px.
+     rem-based so browser zoom and the user's font-size setting still apply. */
+  font-size: clamp(1.125rem, 0.875rem + 0.3125vw, 1.375rem);
   letter-spacing: 0.035em;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -74,7 +76,7 @@ h1 {
   align-items: flex-start;
   gap: 12px;
   color: inherit;
-  font-size: 15px;
+  font-size: 0.8333rem;
   line-height: 1.6;
   cursor: pointer;
 }
@@ -87,7 +89,7 @@ h1 {
   cursor: pointer;
 }
 .privacy-dialog {
-  width: min(820px, calc(100vw - 32px));
+  width: min(45.5556rem, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   padding: 0;
   overflow: hidden;
@@ -114,23 +116,23 @@ h1 {
 }
 .privacy-dialog-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.1111rem;
 }
 .privacy-dialog-header button {
-  font-size: 13px;
+  font-size: 0.7222rem;
 }
 .privacy-policy-content {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 24px 24px;
-  font-size: 14px;
+  font-size: 0.7778rem;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
 .privacy-policy-content h3 {
   margin: 28px 0 12px;
-  font-size: 18px;
+  font-size: 1rem;
 }
 .privacy-policy-content li {
   margin-block: 12px;
@@ -182,7 +184,7 @@ h1 {
 .profile-email {
   min-width: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.7222rem;
   overflow-wrap: anywhere;
 }
 .profile-page :focus-visible {
@@ -191,7 +193,7 @@ h1 {
 }
 .profile-section-heading {
   margin: 0 0 8px;
-  font-size: 21px;
+  font-size: 1.1667rem;
   letter-spacing: -0.02em;
 }
 .profile-stats {
@@ -210,13 +212,13 @@ h1 {
 }
 .profile-stat dt {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.7222rem;
   line-height: 1.5;
 }
 .profile-stat dd {
   order: -1;
   margin: 0;
-  font-size: clamp(24px, 3vw, 32px);
+  font-size: clamp(1.3333rem, 3vw, 1.7778rem);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
@@ -258,11 +260,11 @@ h1 {
   gap: 10px;
   margin-top: 14px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.6667rem;
 }
 .sync-bar button {
   padding: 5px 9px;
-  font-size: 12px;
+  font-size: 0.6667rem;
 }
 .sync-bar[hidden] {
   display: none;
@@ -283,7 +285,7 @@ nav {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  width: min(640px, 100%);
+  width: min(35.5556rem, 100%);
   margin-inline: auto;
   gap: 6px;
   padding: 5px;
@@ -386,7 +388,7 @@ button:disabled {
   background: var(--accent);
 }
 h1 {
-  font-size: clamp(32px, 4vw, 44px);
+  font-size: clamp(1.7778rem, 4vw, 2.4444rem);
   font-weight: 600;
   letter-spacing: 0.025em;
   margin: 12px 0;
@@ -403,7 +405,7 @@ h1 {
   letter-spacing: -0.03em;
 }
 h2 {
-  font-size: 19px;
+  font-size: 1.0556rem;
   font-weight: 550;
   margin: 0 0 8px;
   overflow-wrap: anywhere;
@@ -439,7 +441,7 @@ p {
 }
 .muted {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 0.8889rem;
 }
 .task-list {
   list-style: none;
@@ -526,14 +528,14 @@ p {
   pointer-events: none;
 }
 .dial-readout strong {
-  font-size: 16px;
+  font-size: 0.8889rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 label {
   display: grid;
   gap: 8px;
-  font-size: 15px;
+  font-size: 0.8333rem;
   color: var(--muted);
 }
 input,
@@ -578,7 +580,7 @@ textarea::placeholder {
   position: relative;
   display: grid;
   place-items: center;
-  width: min(360px, 100%);
+  width: min(20rem, 100%);
   aspect-ratio: 1;
   margin: 28px 0;
   padding: 0;
@@ -617,11 +619,11 @@ textarea::placeholder {
 }
 .timer-value {
   font-variant-numeric: tabular-nums;
-  font-size: clamp(30px, 8vw, 56px);
+  font-size: clamp(1.6667rem, 8vw, 3.1111rem);
   letter-spacing: -0.04em;
 }
 .timer-caption {
-  font-size: 15px;
+  font-size: 0.8333rem;
   color: var(--muted);
 }
 .timer.is-paused {
@@ -671,7 +673,7 @@ textarea {
 }
 .activity-heading {
   margin: 0 0 12px;
-  font-size: 16px;
+  font-size: 0.8889rem;
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -695,7 +697,7 @@ textarea {
 .activity-month {
   grid-row: 1;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6111rem;
   line-height: 1;
   align-self: start;
 }
@@ -735,7 +737,7 @@ textarea {
   align-items: center;
   margin: 14px 3px 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6111rem;
 }
 .activity-legend {
   display: flex;
@@ -763,12 +765,12 @@ textarea {
   border-top: 1px solid var(--border);
 }
 .weekly-overview > h2 {
-  font-size: 24px;
+  font-size: 1.3333rem;
   letter-spacing: -0.03em;
 }
 .weekly-overview h3 {
   margin: 0 0 8px;
-  font-size: 20px;
+  font-size: 1.1111rem;
   letter-spacing: -0.02em;
 }
 .review-countdown {
@@ -783,7 +785,7 @@ textarea {
 }
 .weekly-overview .review-countdown-title {
   margin: 0 0 24px;
-  font-size: 20px;
+  font-size: 1.1111rem;
   font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -795,7 +797,7 @@ textarea {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(6px, 2vw, 16px);
-  max-width: 480px;
+  max-width: 26.6667rem;
 }
 .review-countdown-unit {
   min-width: 0;
@@ -808,7 +810,7 @@ textarea {
   background: transparent;
 }
 .review-countdown-value {
-  font-size: clamp(26px, 5vw, 44px);
+  font-size: clamp(1.4444rem, 5vw, 2.4444rem);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -816,7 +818,7 @@ textarea {
   color: var(--text);
 }
 .review-countdown-label {
-  font-size: 10px;
+  font-size: 0.5556rem;
   font-weight: 500;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -838,14 +840,14 @@ textarea {
 .review-countdown-date {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.6667rem;
 }
 .review-countdown.is-preparing {
   border-color: #ffffff55;
 }
 .weekly-overview h4 {
   margin: 28px 0 12px;
-  font-size: 16px;
+  font-size: 0.8889rem;
   font-weight: 600;
 }
 .weekly-overview p,
@@ -916,7 +918,7 @@ textarea {
 }
 .review-timing-delta {
   color: var(--timing-color);
-  font-size: 12px;
+  font-size: 0.6667rem;
   font-variant-numeric: tabular-nums;
 }
 .review-timing-row {
@@ -931,10 +933,10 @@ textarea {
 }
 .review-timing-label {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.7222rem;
 }
 .review-timing-value {
-  font-size: 20px;
+  font-size: 1.1111rem;
   font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
@@ -970,7 +972,7 @@ textarea {
   background: var(--warning);
 }
 .review-legend {
-  font-size: 12px;
+  font-size: 0.6667rem;
 }
 .weekly-reason {
   margin-block: 18px;
@@ -990,14 +992,14 @@ textarea {
 .review-count {
   flex-shrink: 0;
   color: var(--warning);
-  font-size: 13px;
+  font-size: 0.7222rem;
   font-variant-numeric: tabular-nums;
 }
 .weekly-reason .review-evidence {
   margin-top: 12px;
 }
 .review-evidence {
-  font-size: 14px;
+  font-size: 0.7778rem;
 }
 .review-evidence summary {
   color: var(--muted);
@@ -1035,7 +1037,7 @@ textarea {
   display: block;
   margin-bottom: 10px;
   color: var(--accent);
-  font-size: 11px;
+  font-size: 0.6111rem;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
