@@ -38,7 +38,8 @@ h1 {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   /* Reference palette: near-black, charcoal, warm ivory, and blood red. */
-  --background: #0b0b0b;
+  /* Matches the background artwork's own black, so its edges never show. */
+  --background: #000000;
   --surface: #1e1e1e;
   --surface-hover: #292825;
   --text: #efeee7;
