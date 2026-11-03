@@ -76,6 +76,23 @@ body:has(#app[data-completion-level]:not([data-completion-level="0"]))
   visibility: visible;
   opacity: var(--pixel-opacity);
 }
+/* Dormant artwork breathes faintly so it reads as alive before any task is done.
+   Opacity only, so it stays on the compositor; completion levels take over. */
+@media (prefers-reduced-motion: no-preference) {
+  body::before {
+    animation: artwork-breathe 8s ease-in-out infinite;
+  }
+  body:has(
+      #app[data-completion-level]:not([data-completion-level="0"])
+    )::before {
+    animation: none;
+  }
+}
+@keyframes artwork-breathe {
+  50% {
+    opacity: 0.085;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   body::before,
   .cyber-artwork,
