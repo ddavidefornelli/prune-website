@@ -13,7 +13,7 @@ import { PLANNER_LIMITS } from "../constants";
 import type { PlannerState } from "../create-planner";
 import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
 import type { Hints } from "../hints";
-import type { Starter } from "../starters";
+import { STARTERS } from "../starters";
 import { formatDuration, previousDay } from "../time";
 import { EstimateDial } from "./EstimateDial";
 import { TaskForm } from "./TaskForm";
@@ -26,10 +26,6 @@ export function PlanView(props: {
   client: PlanningClient;
   hints: Hints;
   firstRun: boolean;
-  starters: readonly Starter[];
-  defaultMinutes: number;
-  guest?: boolean;
-  onSignIn: () => void;
   onShortcuts: () => void;
 }) {
   const planner = untrack(() => props.planner);
@@ -68,7 +64,7 @@ export function PlanView(props: {
       data.todayTasks.some((task) => task.status === "completed") &&
       !props.hints.seen("progress")
     )
-      return props.guest ? "sync" : "progress";
+      return "progress";
     if (nextTaskId() && !everCompleted() && !props.hints.seen("start"))
       return "start";
     if (
@@ -95,9 +91,7 @@ export function PlanView(props: {
           .join("\u0001")
       : "";
   const suggestionKey = () =>
-    props.guest || !day()
-      ? undefined
-      : `${planner.view()}|${day()}|${sourceVersion()}`;
+    day() ? `${planner.view()}|${day()}|${sourceVersion()}` : undefined;
   const [suggested] = createResource(suggestionKey, async (key) => ({
     key,
     items: await props.client.suggestTasks(
@@ -158,18 +152,6 @@ export function PlanView(props: {
   return (
     <>
       <header class="plan-heading">
-        <Show when={props.guest}>
-          <div class="plan-topline">
-            <button
-              type="button"
-              class="text-button plan-signin"
-              aria-label="Sign in to sync"
-              onClick={() => props.onSignIn()}
-            >
-              Sign in
-            </button>
-          </div>
-        </Show>
         <p
           class="plan-summary"
           classList={{
@@ -302,7 +284,6 @@ export function PlanView(props: {
         <TaskForm
           busy={planner.busy()}
           autofocus={firstPlan() && desktop}
-          defaultMinutes={props.defaultMinutes}
           onCreate={create}
         />
       </Show>
@@ -313,7 +294,7 @@ export function PlanView(props: {
             <q>45m</q> to set the estimate.
           </p>
           <div class="starter-list">
-            <For each={props.starters}>
+            <For each={STARTERS}>
               {(starter) => (
                 <button
                   type="button"
@@ -360,24 +341,6 @@ export function PlanView(props: {
               onClick={() => props.hints.dismiss("progress")}
             >
               Got it
-            </button>
-          </aside>
-        </Match>
-        <Match when={hint() === "sync"}>
-          <aside class="hint-card" aria-label="Save your progress">
-            <p>Nice work. Keep this progress on every device.</p>
-            <button
-              type="button"
-              class="primary-button"
-              onClick={() => props.onSignIn()}
-            >
-              Save &amp; sync
-            </button>
-            <button
-              type="button"
-              onClick={() => props.hints.dismiss("progress")}
-            >
-              Not now
             </button>
           </aside>
         </Match>

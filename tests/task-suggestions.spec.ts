@@ -45,9 +45,3 @@ test.describe("signed in", () => {
     await expect(page.getByRole("region", { name: "Suggested from yesterday" })).toHaveCount(0);
   });
 });
-
-test("guests never request AI suggestions", async ({ page, backend }) => {
-  await openPlanner(page);
-  await expect(page.locator(".plan-summary")).toBeVisible();
-  expect(backend.requests.some((request) => request.path.includes("task-suggestions"))).toBe(false);
-});

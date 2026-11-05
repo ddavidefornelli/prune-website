@@ -66,25 +66,5 @@ test.describe("returning visits", () => {
     // card may also appear; it is not onboarding, so it is left out.
     await expect(page.locator(".starters, .hint-card:not(.evening-card)")).toHaveCount(0);
   });
-
-  test("signing in from a guest page resumes that page with a welcome", async ({ page }) => {
-    await page.addInitScript(() => {
-      if (sessionStorage.getItem("resume-seeded")) return;
-      sessionStorage.setItem("resume-seeded", "true");
-      sessionStorage.setItem("prune:resume-view:v1", "tomorrow");
-    });
-    await page.goto("/");
-    await expect(page.locator("#app")).toHaveAttribute("data-view", "tomorrow");
-    await expect(page.getByRole("status").filter({ hasText: "Signed in." })).toBeVisible();
-    await page.reload();
-    await expect(page.locator("#app")).toHaveAttribute("data-view", "today");
-  });
 });
 
-test("guests can sign in from the header and resume where they were", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("navigation").getByRole("button", { name: "Tomorrow", exact: true }).click();
-  await page.getByRole("button", { name: "Sign in to sync", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Email address" })).toBeVisible();
-  expect(await page.evaluate(() => sessionStorage.getItem("prune:resume-view:v1"))).toBe("tomorrow");
-});

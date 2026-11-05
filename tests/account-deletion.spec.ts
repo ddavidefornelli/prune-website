@@ -1,4 +1,4 @@
-import { test, expect, AUTH_KEY, openPlanner, showSignIn } from "./helpers/browser";
+import { test, expect, AUTH_KEY, openPlanner } from "./helpers/browser";
 
 test.use({ signedIn: true });
 
@@ -13,7 +13,7 @@ test("account deletion requires confirmation, flags the account and signs out", 
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
-  await expect(page.getByRole("main", { name: "Today", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
   await expect(page.locator(".profile-email")).toHaveCount(0);
   expect(backend.isDeleted).toBe(true);
   expect(backend.weekly.settings.enabled).toBe(false);
@@ -36,14 +36,13 @@ test("a failed deletion keeps the user signed in and allows retry", async ({ pag
   backend.offline = false;
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
-  await expect(page.getByRole("main", { name: "Today", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
   expect(backend.isDeleted).toBe(true);
 });
 
 test("a deleted account cannot restore a planner session", async ({ page, backend }) => {
   backend.isDeleted = true;
   await page.goto("/");
-  await showSignIn(page);
   await expect(page.getByText("This account has been marked for deletion and can no longer be used.", { exact: true })).toBeVisible();
   expect(backend.requests.some((request) => request.body.p_action === "dashboard")).toBe(false);
   expect(await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY)).toBeNull();

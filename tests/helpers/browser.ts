@@ -9,7 +9,7 @@ export const PROJECT = "https://web-fixture.supabase.co";
 export const USER_ID = "11111111-1111-4111-8111-111111111111";
 export const AUTH_KEY = `prune:auth:${PROJECT}`;
 export const QUEUE_KEY = `pro:planner:v1:${PROJECT}:${USER_ID}`;
-export const user = { id: USER_ID, aud: "authenticated", role: "authenticated", email: "user@example.com", email_confirmed_at: "2026-01-01T00:00:00Z", app_metadata: { provider: "email", providers: ["email"] }, user_metadata: {}, identities: [], created_at: "2026-01-01T00:00:00Z", is_anonymous: false };
+export const user = { id: USER_ID, aud: "authenticated", role: "authenticated", email: "user@example.com", email_confirmed_at: "2026-01-01T00:00:00Z", app_metadata: { provider: "google", providers: ["google"] }, user_metadata: {}, identities: [], created_at: "2026-01-01T00:00:00Z", is_anonymous: false };
 export function session(expiresIn = 3600) {
   const now = Math.floor(Date.now() / 1000);
   const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -36,7 +36,6 @@ export interface Backend {
   isDeleted: boolean;
   loseNextAcknowledgement: boolean;
   malformedAcknowledgement: boolean;
-  failSignIn: boolean;
   /** The Google provider is switched off in the fixture project's Auth settings. */
   googleDisabled: boolean;
   /** The visitor backs out on Google's consent screen. */
@@ -45,7 +44,6 @@ export interface Backend {
   suggestions: TaskSuggestion[];
   protocolVersion: number;
   receipts: Map<string, unknown>;
-  imports: Record<string, any>[];
 }
 
 export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: boolean; firstVisit: boolean }>({
@@ -53,7 +51,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
   expired: [false, { option: true }],
   firstVisit: [false, { option: true }],
   backend: async ({ context, signedIn, expired, firstVisit }, use) => {
-    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, failSignIn: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, receipts: new Map(), imports: [] };
+    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, receipts: new Map() };
     // Seed once per browser context, not on reload/sign-out or each new tab.
     await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey }) => {
       if (localStorage.getItem("prune:test:seeded")) return;
@@ -63,7 +61,6 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       localStorage.setItem("prune:cookies:v1", JSON.stringify({ choice: "rejected", at: Date.now() }));
       if (!firstVisit) {
         localStorage.setItem(onboardingKey, "done");
-        localStorage.setItem("prune:onboarding:v1:guest", "done");
       }
       if (signedIn) {
         localStorage.setItem(privacyKey, JSON.stringify({ version, acknowledgedAt: new Date().toISOString() }));
@@ -73,23 +70,12 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
     await context.route(`${PROJECT}/**`, async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      // Both local preview builds (survey flag off and on) call the fixture project.
-      const origin = /^http:\/\/127\.0\.0\.1:417[34]$/.test(request.headers().origin ?? "") ? request.headers().origin! : "http://127.0.0.1:4173";
-      const headers = { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
+      const headers = { "Access-Control-Allow-Origin": "http://127.0.0.1:4173", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
       const send = async (value: unknown, status = 200) => route.fulfill({ status, headers, contentType: "application/json", body: JSON.stringify(value) });
       if (request.method() === "OPTIONS") { await route.fulfill({ status: 204, headers }); return; }
       const body = request.postDataJSON() ?? {};
       state.requests.push({ path: url.pathname + url.search, body, authorization: request.headers().authorization });
-      if (url.pathname === "/auth/v1/otp") {
-        await send(state.failSignIn ? { msg: "private upstream error" } : {}, state.failSignIn ? 500 : 200);
-        return;
-      }
-      if (url.pathname === "/auth/v1/verify") {
-        const valid = body.email === user.email && body.token === "12345678" && body.type === "email";
-        await send(valid ? session() : { msg: "private upstream error", error_code: "invalid_credentials" }, valid ? 200 : 400);
-        return;
-      }
-      if (url.pathname === "/auth/v1/settings") { await send({ external: { email: true, google: !state.googleDisabled } }); return; }
+      if (url.pathname === "/auth/v1/settings") { await send({ external: { google: !state.googleDisabled } }); return; }
       if (url.pathname === "/auth/v1/authorize") {
         // Stand in for Google and Supabase: return straight to the PKCE callback.
         const callback = new URL(url.searchParams.get("redirect_to")!);
@@ -99,16 +85,6 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
         } else callback.searchParams.set("code", "fixture-oauth-code");
         // WebKit cannot fulfill navigations with a 3xx; an immediate refresh is equivalent here.
         await route.fulfill({ contentType: "text/html", body: `<!doctype html><meta http-equiv="refresh" content="0;url=${callback.toString().replaceAll("&", "&amp;")}">` });
-        return;
-      }
-      if (url.pathname === "/rest/v1/rpc/planner_import_guest") {
-        const payload = body.p_payload;
-        state.imports.push(payload);
-        if (payload.tasks.length) {
-          state.data.todayTasks.push(...payload.tasks);
-          state.data.revision = (state.data.revision ?? 0) + 1;
-        }
-        await send({ imported: true });
         return;
       }
       if (url.pathname === "/auth/v1/user") { await send(user); return; }
@@ -183,15 +159,10 @@ export async function openPlanner(page: Page) {
   await expect(page.locator(".plan-summary")).toBeVisible();
   await expect(page.locator(".task-form .add-task")).toBeEnabled();
 }
-/** Open sign-in through the current guest Overview, not a retired landing route. */
-export async function showSignIn(page: Page) {
-  await page.getByRole("button", { name: "Overview", exact: true }).click();
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Email address" })).toBeVisible();
-}
+/** Signed-out visitors land on sign-in: Google is the only way in. */
 export async function openSignIn(page: Page) {
   await page.goto("/");
-  await showSignIn(page);
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
 }
 export async function visitProfile(page: Page) {
   await page.getByRole("button", { name: "Overview", exact: true }).click();

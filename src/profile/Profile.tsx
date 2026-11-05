@@ -26,11 +26,7 @@ function StatGrid(props: { metrics: readonly (readonly [string, string])[] }) {
   );
 }
 
-export function Profile(props: {
-  email: string;
-  guest?: boolean;
-  planner: PlannerState;
-}) {
+export function Profile(props: { email: string; planner: PlannerState }) {
   const planner = untrack(() => props.planner);
   const stats = createMemo(() => {
     const data = planner.data();
@@ -107,34 +103,30 @@ export function Profile(props: {
           Cookie settings
         </button>
       </div>
-      <Show when={!props.guest}>
-        <footer class="profile-footer">
-          <button
-            type="button"
-            class="delete-account-button"
-            disabled={planner.busy()}
-            onClick={() => {
-              void planner.deleteAccount();
-            }}
-          >
-            {planner.accountAction() === "delete"
-              ? "Deleting account…"
-              : "Delete account"}
-          </button>
-          <button
-            type="button"
-            class="danger-button"
-            disabled={planner.busy()}
-            onClick={() => {
-              void planner.signOut();
-            }}
-          >
-            {planner.accountAction() === "signOut"
-              ? "Signing out…"
-              : "Sign out"}
-          </button>
-        </footer>
-      </Show>
+      <footer class="profile-footer">
+        <button
+          type="button"
+          class="delete-account-button"
+          disabled={planner.busy()}
+          onClick={() => {
+            void planner.deleteAccount();
+          }}
+        >
+          {planner.accountAction() === "delete"
+            ? "Deleting account…"
+            : "Delete account"}
+        </button>
+        <button
+          type="button"
+          class="danger-button"
+          disabled={planner.busy()}
+          onClick={() => {
+            void planner.signOut();
+          }}
+        >
+          {planner.accountAction() === "signOut" ? "Signing out…" : "Sign out"}
+        </button>
+      </footer>
     </section>
   );
 }

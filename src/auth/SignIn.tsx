@@ -1,4 +1,4 @@
-import { batch, createSignal, For, Show } from "solid-js";
+import { batch, createSignal, untrack } from "solid-js";
 import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import type { PlanningClient } from "../planner/api";
 import { errorMessage } from "../planner/errors";
@@ -6,39 +6,25 @@ import {
   hasPrivacyAcknowledgement,
   requirePrivacyAcknowledgement,
 } from "../planner/privacy-state";
-import { isAccount, type Account } from "../planner/types";
-
-const EMAIL_MAX_LENGTH = 254;
-const CODE_LENGTH = 8;
 
 interface SignInProps {
   client: PlanningClient;
   initialError: string;
   configurationError: string;
-  onAuthenticated: (account: Account) => void;
 }
 
-/** No SDK or account access before durable notice acceptance. */
+/**
+ * The home page for signed-out visitors: Google is the only way in.
+ * No SDK or account access before durable notice acceptance.
+ */
 export function SignIn(props: SignInProps) {
   const [acknowledged, setAcknowledged] = createSignal(
     hasPrivacyAcknowledgement(localStorage),
   );
-  const [email, setEmail] = createSignal("");
-  const [code, setCode] = createSignal("");
-  const [activeDigit, setActiveDigit] = createSignal(0);
-  const [sentTo, setSentTo] = createSignal("");
   const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal(props.initialError);
-  let emailInput!: HTMLInputElement;
-  let codeInput!: HTMLInputElement;
+  const [error, setError] = createSignal(untrack(() => props.initialError));
 
-  function acceptNotice(): void {
-    if (acknowledged()) return;
-    requirePrivacyAcknowledgement(localStorage);
-    setAcknowledged(true);
-  }
-
-  async function submit(event: SubmitEvent): Promise<void> {
+  async function continueWithGoogle(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (busy() || props.configurationError) return;
     batch(() => {
@@ -46,120 +32,34 @@ export function SignIn(props: SignInProps) {
       setError("");
     });
     try {
-      acceptNotice();
-      if (!sentTo()) {
-        const address = email().trim();
-        await props.client.sendCode(address);
-        setSentTo(address);
-      } else {
-        const account = await props.client.verifyCode(sentTo(), code().trim());
-        if (!isAccount(account))
-          throw new Error(
-            "Sign-in did not return an account. Please try again.",
-          );
-        setCode("");
-        props.onAuthenticated(account);
-      }
+      requirePrivacyAcknowledgement(localStorage);
+      setAcknowledged(true);
+      await props.client.signInWithGoogle();
+      // The browser is on its way to Google; stay busy until it leaves.
     } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
-      if (sentTo() && codeInput.isConnected) codeInput.focus();
+      batch(() => {
+        setError(errorMessage(cause));
+        setBusy(false);
+      });
     }
   }
 
-  const updateSelection = () =>
-    setActiveDigit(
-      Math.min(codeInput.selectionStart ?? code().length, CODE_LENGTH - 1),
-    );
-
   return (
     <section class="auth-panel" aria-labelledby="signup-title">
-      <h1 id="signup-title" hidden={!!sentTo()}>
+      <h1 id="signup-title">
         DO LESS.
         <br />
         ACHIEVE MORE.
       </h1>
-      <p class="auth-description" hidden={!!sentTo()}>
+      <p class="auth-description">
         Focus on just 3 tasks and understand what's holding you back with the
         free weekly analysis
       </p>
       <form
         class="signup-form"
         aria-busy={busy()}
-        onSubmit={(event) => {
-          void submit(event);
-        }}
+        onSubmit={(event) => void continueWithGoogle(event)}
       >
-        <label>
-          <span class="email-label-spacer">Email address</span>
-          <input
-            ref={(element) => (emailInput = element)}
-            aria-label="Email address"
-            name="email"
-            type="email"
-            autocomplete="email"
-            inputmode="email"
-            autocapitalize="none"
-            spellcheck={false}
-            required
-            maxLength={EMAIL_MAX_LENGTH}
-            placeholder="you@example.com"
-            value={email()}
-            readOnly={!!sentTo()}
-            disabled={busy()}
-            onInput={(event) => setEmail(event.currentTarget.value)}
-          />
-        </label>
-        <p hidden={!sentTo()} class="muted">
-          Check your inbox for your sign-in code. Enter it below to sign in and
-          save your tasks.
-        </p>
-        <label hidden={!sentTo()}>
-          Email code
-          <div class="email-code-boxes">
-            <input
-              ref={(element) => (codeInput = element)}
-              class="otp-input"
-              aria-label="Email code"
-              name="code"
-              type="text"
-              autocomplete="one-time-code"
-              inputmode="numeric"
-              pattern={`[0-9]{${CODE_LENGTH}}`}
-              minLength={CODE_LENGTH}
-              maxLength={CODE_LENGTH}
-              required={!!sentTo()}
-              disabled={busy()}
-              value={code()}
-              onInput={(event) => {
-                const value = event.currentTarget.value
-                  .replace(/\D/g, "")
-                  .slice(0, CODE_LENGTH);
-                event.currentTarget.value = value;
-                setCode(value);
-                updateSelection();
-              }}
-              onFocus={updateSelection}
-              onClick={updateSelection}
-              onKeyUp={updateSelection}
-              onSelect={updateSelection}
-            />
-            <For
-              each={Array.from({ length: CODE_LENGTH }, (_, index) => index)}
-            >
-              {(index) => (
-                <span
-                  class="email-code-digit"
-                  classList={{ "is-active": index === activeDigit() }}
-                  aria-hidden="true"
-                >
-                  {code()[index] ?? ""}
-                </span>
-              )}
-            </For>
-          </div>
-        </label>
         <label class="privacy-acknowledgement" hidden={acknowledged()}>
           <input
             type="checkbox"
@@ -172,34 +72,50 @@ export function SignIn(props: SignInProps) {
           </span>
         </label>
         <button
-          class="auth-submit"
           type="submit"
-          aria-label={sentTo() ? "Verify code" : "Email me a sign-in code"}
+          class="google-signin"
           disabled={busy() || !!props.configurationError}
         >
-          {sentTo() ? "Verify code" : "Email me a sign-in code"}
+          <GoogleMark />
+          {busy() ? "Opening Google…" : "Continue with Google"}
         </button>
-        <Show when={sentTo()}>
-          <button
-            type="button"
-            disabled={busy()}
-            onClick={() => {
-              batch(() => {
-                setSentTo("");
-                setCode("");
-                setActiveDigit(0);
-                setError("");
-              });
-              emailInput.focus();
-            }}
-          >
-            Use a different email
-          </button>
-        </Show>
       </form>
       <p class="error" role="alert">
         {props.configurationError || error()}
       </p>
+      <button
+        type="button"
+        class="privacy-policy-button auth-cookie-settings"
+        onClick={() =>
+          window.dispatchEvent(new Event("prune:preferences:open"))
+        }
+      >
+        Cookie settings
+      </button>
     </section>
+  );
+}
+
+/** Google's multicolour mark, required next to "Continue with Google". */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
   );
 }

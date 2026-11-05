@@ -4,7 +4,6 @@ import {
   onCleanup,
   onMount,
   Show,
-  untrack,
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import { ESTIMATE, MOBILE_QUERY, PLANNER_LIMITS } from "../constants";
@@ -14,17 +13,14 @@ import { EstimateDial } from "./EstimateDial";
 interface TaskFormProps {
   busy: boolean;
   autofocus?: boolean;
-  /** The visitor's focus length from the survey, if they answered it. */
-  defaultMinutes?: number;
   onCreate: (outcome: string, minutes: number) => Promise<boolean>;
 }
 
 export function TaskForm(props: TaskFormProps) {
-  const defaultMinutes = () => props.defaultMinutes ?? ESTIMATE.defaultMinutes;
   const [outcome, setOutcome] = createSignal("");
-  const [minutes, setMinutes] = createSignal<number>(untrack(defaultMinutes));
+  const [minutes, setMinutes] = createSignal<number>(ESTIMATE.defaultMinutes);
   const [mobileMinutes, setMobileMinutes] = createSignal<number>(
-    untrack(defaultMinutes),
+    ESTIMATE.defaultMinutes,
   );
   const [mobile, setMobile] = createSignal(
     window.matchMedia(MOBILE_QUERY).matches,
@@ -46,8 +42,8 @@ export function TaskForm(props: TaskFormProps) {
     if (props.busy) return;
     if (await props.onCreate(parsed().outcome, estimate)) {
       setOutcome("");
-      setMinutes(defaultMinutes());
-      setMobileMinutes(defaultMinutes());
+      setMinutes(ESTIMATE.defaultMinutes);
+      setMobileMinutes(ESTIMATE.defaultMinutes);
       setEstimating(false);
     }
   }

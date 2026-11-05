@@ -162,127 +162,7 @@ textarea:focus {
   min-height: 60dvh;
   isolation: isolate;
 }
-.overview-screen.is-guest {
-  /* Fill the viewport below the navigation without letting the page scroll. */
-  height: calc(100dvh - 184px);
-  min-height: 420px;
-  overflow: hidden;
-}
-.overview-content[inert] {
-  opacity: 0.45;
-  user-select: none;
-  pointer-events: none;
-}
-.overview-signin-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  padding: 32px 16px;
-}
-.overview-signin-prompt {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: min(100%, 26.6667rem);
-  padding: 40px clamp(20px, 6vw, 32px) 32px;
-  background: var(--background);
-}
-.overview-signin-prompt h2 {
-  margin: 0;
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
-  font-size: clamp(1.7778rem, 7vw, 2.3333rem);
-  font-weight: 400;
-  line-height: 1.08;
-  letter-spacing: 0.025em;
-}
-.overview-signin-prompt h2 em {
-  font-style: normal;
-  color: var(--blood-red);
-}
-.overview-signin-includes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 0 0 28px;
-  padding: 0;
-  list-style: none;
-  font-size: 0.6667rem;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-.overview-signin-includes li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.overview-signin-includes li::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  background: var(--border);
-}
-.overview-signin-includes li:last-child {
-  color: var(--text);
-}
-.overview-signin-includes li:last-child::before {
-  background: var(--blood-red);
-}
-.overview-signin-description {
-  margin: 12px 0 16px;
-  font-size: 0.8889rem;
-  line-height: 1.5;
-  color: var(--muted);
-  text-wrap: pretty;
-}
-.overview-signin-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  width: 100%;
-}
-#app .overview-signin-primary {
-  flex: 1 1 160px;
-  min-height: 52px;
-  color: #000;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: var(--blood-red);
-  border-color: var(--blood-red);
-}
-#app .overview-signin-primary:hover:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .overview-signin-prompt {
-    animation: overview-signin-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-}
-@keyframes overview-signin-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-}
-#app .overview-signin-secondary {
-  min-height: 48px;
-  margin-inline: auto;
-  padding-inline: 8px;
-  color: var(--muted);
-  background: transparent;
-  border-color: transparent;
-}
-#app .overview-signin-secondary:hover:not(:disabled) {
-  color: var(--text);
-  background: transparent;
-  border-color: transparent;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
+
 .overview-actions {
   display: flex;
   justify-content: flex-end;
@@ -392,17 +272,7 @@ textarea:focus {
   font-size: 0.7778rem;
   line-height: 1.5;
 }
-.auth-panel .email-label-spacer {
-  visibility: hidden;
-}
-.auth-panel input[type="email"] {
-  width: 100%;
-  min-width: 0;
-  height: 2.8889rem;
-  padding: 12px 16px;
-  font-size: 0.9444rem;
-  line-height: 1.5;
-}
+
 .auth-panel .privacy-acknowledgement {
   display: flex;
   align-items: flex-start;
@@ -418,59 +288,43 @@ textarea:focus {
   min-height: 20px;
   margin: 0;
 }
-.auth-submit {
+
+#app .google-signin {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   width: 100%;
   min-height: 52px;
   padding: 12px 16px;
+  color: #1f1f1f;
   font-size: 0.9444rem;
   font-weight: 550;
   line-height: 1.5;
+  background: #fff;
+  border-color: #fff;
 }
-.email-code-boxes {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: clamp(4px, 1vw, 8px);
+@media (hover: hover) {
+  #app .google-signin:hover:not(:disabled) {
+    background: #e8e8e8;
+    border-color: #e8e8e8;
+  }
 }
-/* One native input preserves paste, autofill, selection and keyboard editing. */
-.auth-panel .email-code-boxes .otp-input {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-  opacity: 0;
-  cursor: text;
-}
-.email-code-digit {
-  display: grid;
-  place-items: center;
-  min-width: 0;
-  aspect-ratio: 1;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--accent);
-  font-size: clamp(1rem, 4vw, 1.4444rem);
-  font-weight: 550;
-  font-variant-numeric: tabular-nums;
-}
-.email-code-boxes:focus-within .email-code-digit.is-active {
-  border-color: var(--accent);
-  outline: 1px solid var(--accent);
-  outline-offset: 2px;
-}
-.email-code-boxes:has(input:disabled) {
-  opacity: 0.5;
+.google-signin svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
 }
 .auth-panel .error {
   margin: 20px 0 0;
   font-size: 0.7222rem;
   overflow-wrap: anywhere;
+}
+.auth-panel .auth-cookie-settings {
+  min-height: 44px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.7222rem;
 }
 
 /* Phone layouts scroll naturally, including when the software keyboard opens. */
@@ -494,14 +348,7 @@ textarea:focus {
   font-style: normal;
   color: var(--blood-red);
 }
-.plan-signin,
-.plan-signin:hover:not(:disabled) {
-  font-size: 0.6667rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  text-decoration-color: var(--blood-red);
-  white-space: nowrap;
-}
+
 .plan-summary {
   margin: 0;
   font-size: clamp(1.2222rem, 3.4vw, 1.6667rem);
@@ -587,12 +434,7 @@ textarea:focus {
 .shortcut-sheet dd {
   margin: 0;
 }
-.plan-topline {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 16px;
-}
+
 .text-button,
 .text-button:hover:not(:disabled) {
   min-height: 32px;
@@ -785,21 +627,7 @@ textarea:focus {
   border: 1px solid var(--border);
   font-family: inherit;
 }
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: max(24px, env(safe-area-inset-bottom));
-  z-index: 10;
-  width: max-content;
-  max-width: calc(100vw - 32px);
-  margin: 0;
-  padding: 12px 18px;
-  transform: translateX(-50%);
-  color: #000;
-  background: var(--text);
-  font-size: 0.7778rem;
-  animation: rise 420ms var(--ease-out) both;
-}
+
 #app[data-focus-running] .navigation-header {
   opacity: 0.18;
   transition: opacity 600ms ease;
@@ -862,7 +690,6 @@ textarea:focus {
   #planner-content > *,
   #app .task-list > .task,
   .hint-card,
-  .toast,
   .quick-entry-chip {
     animation: none;
   }

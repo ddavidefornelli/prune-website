@@ -7,10 +7,7 @@ import type {
   TaskArguments,
 } from "./commands.ts";
 import { WEEKLY_AI_VERSION } from "./constants.ts";
-import type { SurveyImport } from "../survey/model.ts";
 import { errorCode } from "./errors.ts";
-import { GuestStore, type GuestImport } from "./guest.ts";
-import { reportGuestUsage } from "./guest-usage.ts";
 import type { LocalQueue } from "./local-queue.ts";
 import type {
   AuthStatus,
@@ -24,13 +21,11 @@ type SuggestionTarget = "today" | "tomorrow";
 
 interface PlanningClientOptions {
   cloud?: CloudTransport;
-  guest?: boolean;
 }
 
 /** Coordinates account access. Stores and transports own their own persistence. */
 export class PlanningClient {
   private readonly cloud: CloudTransport;
-  private readonly guest: GuestStore | null;
   private readonly timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   private readonly cleanups: (() => void)[] = [];
   private queue: LocalQueue | null = null;
@@ -43,12 +38,8 @@ export class PlanningClient {
   >();
   onQueueChange: () => void = () => {};
 
-  constructor({
-    cloud = new BrowserCloud(),
-    guest = false,
-  }: PlanningClientOptions = {}) {
+  constructor({ cloud = new BrowserCloud() }: PlanningClientOptions = {}) {
     this.cloud = cloud;
-    this.guest = guest ? new GuestStore(localStorage, reportGuestUsage) : null;
     this.cloud.onAccountChange = () => {
       void this.queue?.stop();
       window.location.reload();
@@ -153,7 +144,6 @@ export class PlanningClient {
     args: TaskArguments[Action],
   ): Promise<Task> {
     this.assertOpen();
-    if (this.guest) return this.guest.mutate(action, args, this.timezone);
     if (!this.queue)
       throw new Error("Sign in and load your planner before making changes.");
     return this.queue.enqueue(action, args, this.timezone);
@@ -185,58 +175,9 @@ export class PlanningClient {
     return this.loadAccount(await this.request<AuthStatus>("auth_status"));
   }
 
-  /**
-   * Moves guest tasks, with any survey answers, into the signed-in account.
-   * Answers without tasks are best-effort: they never hold up the planner and
-   * are retried at the next startup. Resolves whether the answers arrived.
-   */
-  async importGuestTasks(survey?: SurveyImport): Promise<boolean> {
-    this.assertOpen();
-    const guest = new GuestStore();
-    const send = (payload: GuestImport) =>
-      this.request<{ imported: boolean }>("import_guest", {
-        payload,
-        accountKey: this.accountKey,
-      });
-    if (!guest.hasTasks()) {
-      if (!survey || !this.accountKey) return false;
-      try {
-        const result = await send({
-          importId: crypto.randomUUID(),
-          tasks: [],
-          stops: [],
-          survey,
-        });
-        return result?.imported === true;
-      } catch {
-        return false;
-      }
-    }
-    if (!this.accountKey)
-      throw new Error("Sign in before syncing guest tasks.");
-    await this.sync();
-    if (this.pendingCount)
-      throw new Error(
-        "Finish syncing existing account changes before importing guest tasks.",
-      );
-    const included = await guest.transfer(this.accountKey, send, survey);
-    await this.sync();
-    return included;
-  }
-
-  async sendCode(email: string): Promise<void> {
-    await this.request("send_code", { email });
-  }
-
   /** Leaves the page for Google; authStatus() completes the return trip. */
   async signInWithGoogle(): Promise<void> {
     await this.request("sign_in_with_google");
-  }
-
-  async verifyCode(email: string, code: string): Promise<AuthStatus> {
-    return this.loadAccount(
-      await this.request<AuthStatus>("verify_code", { email, code }),
-    );
   }
 
   /** Failed online account operations may resume the outbox; confirmed deletion may not. */
@@ -267,7 +208,7 @@ export class PlanningClient {
   }
 
   async generateIfDue(): Promise<void> {
-    if (this.generatingReview || this.guest) return;
+    if (this.generatingReview) return;
     this.generatingReview = true;
     try {
       const overview = await this.weeklyOverview();
@@ -284,7 +225,6 @@ export class PlanningClient {
 
   async dashboard(): Promise<Dashboard> {
     this.assertOpen();
-    if (this.guest) return this.guest.dashboard();
     if (!this.queue) return this.query("dashboard");
     let cached = this.queue.snapshot();
     if (!cached) {
@@ -297,14 +237,12 @@ export class PlanningClient {
 
   async weeklyOverview(): Promise<WeeklyOverview> {
     this.assertOpen();
-    if (this.guest) throw new Error("Sign in to enable weekly analysis.");
     return this.query("weekly_overview");
   }
 
   /** One-way: the server refuses to turn weekly reviews off. */
   async enableWeeklyAi(): Promise<WeeklyOverview> {
     this.assertOpen();
-    if (this.guest) throw new Error("Sign in to enable weekly analysis.");
     return this.query("set_weekly_ai_enabled", {
       enabled: true,
       consentVersion: WEEKLY_AI_VERSION,
@@ -321,7 +259,6 @@ export class PlanningClient {
     sourceVersion = "",
   ): Promise<TaskSuggestion[]> {
     this.assertOpen();
-    if (this.guest) return Promise.resolve([]);
     const key = `${day}:${sourceVersion}`;
     const cached = this.suggestions.get(target);
     if (cached?.key === key) return cached.result;

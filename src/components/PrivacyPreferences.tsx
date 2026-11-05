@@ -97,7 +97,7 @@ export function PrivacyPreferences() {
             permission, Hotjar / Contentsquare uses cookies and similar
             technologies for heatmaps and session recordings to help us improve
             prune. Optional analytics is off until you accept. You can change
-            your choice anytime in Profile → Cookie settings.
+            your choice anytime in Cookie settings.
           </p>
           <PrivacyPolicyButton label="Read our privacy policy" />
           <Show when={error()}>

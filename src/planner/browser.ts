@@ -30,7 +30,7 @@ function authError(error: AuthError): CloudError {
     );
   return new CloudError(
     "auth",
-    "Sign-in could not be completed. Check your email and code, or request a new code and try again.",
+    "Sign-in could not be completed. Please try again.",
   );
 }
 
@@ -157,11 +157,8 @@ export class BrowserCloud implements CloudTransport {
   private async status(): Promise<AuthStatus> {
     const sdk = this.sdk();
     const callback = new URL(window.location.href);
-    // Complete Google redirects started by sign_in_with_google, and
-    // already-issued email-link callbacks.
-    if (
-      ["google", "email"].includes(callback.searchParams.get("oauth") ?? "")
-    ) {
+    // Complete Google redirects started by sign_in_with_google.
+    if (callback.searchParams.get("oauth") === "google") {
       const code = callback.searchParams.get("code");
       const failed = callback.searchParams.has("error");
       for (const key of [
@@ -208,7 +205,7 @@ export class BrowserCloud implements CloudTransport {
     if (!user.email || user.is_anonymous || user.id !== data.session.user.id)
       throw new CloudError(
         "unauthorized",
-        "Sign in with an email account to use prune.",
+        "Sign in with your Google account to use prune.",
       );
     const latest = await sdk.auth.getSession();
     if (latest.data.session?.user.id !== user.id)
@@ -275,14 +272,6 @@ export class BrowserCloud implements CloudTransport {
       case "auth_status":
         result = await this.status();
         break;
-      case "send_code": {
-        const { error } = await this.sdk().auth.signInWithOtp({
-          email: String(args.email),
-        });
-        if (error) throw authError(error);
-        result = null;
-        break;
-      }
       case "sign_in_with_google": {
         const sdk = this.sdk();
         await this.requireGoogle();
@@ -297,30 +286,10 @@ export class BrowserCloud implements CloudTransport {
         if (error || !data.url)
           throw new CloudError(
             "auth",
-            "Google sign-in could not be started. Try again or use email instead.",
+            "Google sign-in could not be started. Please try again.",
           );
         window.location.assign(data.url);
         result = null;
-        break;
-      }
-      case "verify_code": {
-        const { data, error } = await this.sdk().auth.verifyOtp({
-          email: String(args.email),
-          token: String(args.code),
-          type: "email",
-        });
-        if (error) throw authError(error);
-        if (!data.session || !data.user?.email || data.user.is_anonymous)
-          throw new CloudError(
-            "auth",
-            "The sign-in response was incomplete. Please try again.",
-          );
-        this.accountKey = this.key(data.user.id);
-        result = {
-          configured: true,
-          email: data.user.email,
-          accountKey: this.accountKey,
-        };
         break;
       }
       case "sign_out": {
@@ -357,13 +326,6 @@ export class BrowserCloud implements CloudTransport {
         }
         break;
       }
-      case "import_guest":
-        result = await this.post(
-          SUPABASE_ROUTES.importGuest,
-          { p_payload: args.payload },
-          String(args.accountKey),
-        );
-        break;
       case "planner_call": {
         const params = args.args as Record<string, unknown>;
         result = await this.post(

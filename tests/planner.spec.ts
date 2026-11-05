@@ -256,8 +256,8 @@ test("profile stats and local-only sign-out preserve pending work and sign out o
   await expect(page.getByRole("heading", { name: "All time", exact: true })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("main", { name: "Today", exact: true })).toBeVisible();
-  await expect(second.getByRole("main", { name: "Today", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(second.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("Unsynced work is retained");
   await expect(second.locator("body")).not.toContainText("Remember this task");
   expect(await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY)).toBeNull();
@@ -291,10 +291,10 @@ test("mobile task, focus, profile and overview layouts have no page-level horizo
 
 test.describe("expired browser sessions", () => {
   test.use({ expired: true });
-  test("refreshes the session before loading the planner without another email code", async ({ page, backend }) => {
+  test("refreshes the session before loading the planner without another Google sign-in", async ({ page, backend }) => {
     await openPlanner(page);
     expect(backend.requests.some((request) => request.path === "/auth/v1/token?grant_type=refresh_token")).toBe(true);
-    expect(backend.requests.some((request) => request.path === "/auth/v1/otp")).toBe(false);
+    expect(backend.requests.some((request) => request.path.startsWith("/auth/v1/authorize"))).toBe(false);
     const rpc = backend.requests.find((request) => request.path.includes("/rpc/"))!;
     expect(rpc.authorization).toMatch(/^Bearer /);
   });

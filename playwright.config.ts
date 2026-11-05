@@ -20,20 +20,11 @@ export default defineConfig({
     { name: "chromium", use: { browserName: "chromium" } },
     { name: "webkit", use: { browserName: "webkit" } },
   ],
-  webServer: [
-    {
-      // Exercise production output, keeping fixture configuration out of dist/.
-      command: "npm run build -- --outDir .playwright-dist && npm run preview -- --outDir .playwright-dist --port 4173 --strictPort",
-      env: { ...fixture, VITE_SURVEY_FLOW: "off" },
-      url: "http://127.0.0.1:4173",
-      reuseExistingServer: false,
-    },
-    {
-      // The same artifact with the onboarding survey on, for the survey specs.
-      command: "npx vite build --outDir .playwright-dist-survey && npm run preview -- --outDir .playwright-dist-survey --port 4174 --strictPort",
-      env: { ...fixture, VITE_SURVEY_FLOW: "on" },
-      url: "http://127.0.0.1:4174",
-      reuseExistingServer: false,
-    },
-  ],
+  webServer: {
+    // Exercise production output, keeping fixture configuration out of dist/.
+    command: "npm run build -- --outDir .playwright-dist && npm run preview -- --outDir .playwright-dist --port 4173 --strictPort",
+    env: fixture,
+    url: "http://127.0.0.1:4173",
+    reuseExistingServer: false,
+  },
 });

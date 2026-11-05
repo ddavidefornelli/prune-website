@@ -52,14 +52,13 @@ test("production installs the final-artifact CSP plugin", () => {
   assert.equal(typeof plugin.configurePreviewServer, "function");
 });
 
-test("the displayed privacy version matches its gate and accurately describes optional email authentication", () => {
+test("the displayed privacy version matches its gate and describes Google as the only sign-in", () => {
   const policy = readFileSync(new URL("../PRIVACY.md", import.meta.url), "utf8");
   assert.ok(policy.includes(`Version: ${PRIVACY_POLICY_VERSION}`));
-  assert.ok(policy.includes("Supabase handles email magic-link/code authentication"));
-  assert.ok(policy.includes("No guest planner content is sent to Supabase or OpenAI"));
-  assert.ok(policy.includes("transactional email provider"));
+  assert.ok(policy.includes("Google is the only way to sign in on this website, and Supabase handles Google sign-in"));
+  assert.ok(!policy.includes("magic-link"));
   assert.ok(!policy.includes("Supabase handles email-and-password"));
-  assert.ok(!policy.includes("does not send transactional emails"));
+  assert.ok(!/guest|start-up questions|prune:survey/i.test(policy));
 });
 
 test("public support surfaces do not publish a personal email or email contact link", () => {

@@ -21,24 +21,17 @@ test("optional recorder waits for consent, remembers it and stops after withdraw
   const banner = page.getByRole("region", { name: "Cookie preferences" });
   await expect(banner).toBeVisible();
   expect(recorderRequests).toEqual([]);
-  await page.getByRole("textbox", { name: "Outcome", exact: true }).fill("Test task");
-  await page.getByRole("textbox", { name: "Outcome", exact: true }).press("Enter");
-  await expect(page.getByText("Test task", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Skip tour" }).click();
+  // Signed-out visitors land on sign-in, which keeps Cookie settings reachable.
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await page.reload();
   await expect(banner).toHaveCount(0);
   expect(recorderRequests).toEqual([]);
-  await expect(page.getByRole("button", { name: "Cookie settings", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Overview", exact: true }).click();
-  await page.getByRole("button", { name: "Profile", exact: true }).last().click();
   await page.getByRole("button", { name: "Cookie settings", exact: true }).click();
   await page.getByRole("button", { name: "Accept optional", exact: true }).click();
   await expect.poll(() => recorderRequests.length).toBe(1);
   await page.reload();
   await expect.poll(() => recorderRequests.length).toBe(2);
-  await page.getByRole("button", { name: "Overview", exact: true }).click();
-  await page.getByRole("button", { name: "Profile", exact: true }).last().click();
   await page.getByRole("button", { name: "Cookie settings", exact: true }).click();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await expect(banner).toHaveCount(0);

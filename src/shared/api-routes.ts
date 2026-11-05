@@ -1,14 +1,10 @@
 /** Exact backend paths shared by the transport and generated CSP allowlist. */
 export const SUPABASE_ROUTES = {
-  sendCode: "/auth/v1/otp",
-  verifyCode: "/auth/v1/verify",
   user: "/auth/v1/user",
   token: "/auth/v1/token",
   signOut: "/auth/v1/logout",
   authSettings: "/auth/v1/settings",
   planner: "/rest/v1/rpc/planner_call",
-  importGuest: "/rest/v1/rpc/planner_import_guest",
-  guestUsage: "/rest/v1/rpc/guest_record_usage",
   weeklyReview: "/functions/v1/weekly-review",
   taskSuggestions: "/functions/v1/task-suggestions",
 } as const;
