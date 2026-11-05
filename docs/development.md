@@ -1,6 +1,6 @@
 # prune web app: development and operations
 
-A mobile-first daily planner and focus timer, with immediate guest access at `/` and optional account sign-in from **Overview → Sign in**. Behind `VITE_SURVEY_FLOW`, first-time visitors can instead get a short [onboarding survey](#onboarding-survey) that ends in a focus plan and **Continue with Google**. `/download` starts the Mac download.
+A mobile-first daily planner and focus timer. Signed-out visitors land on sign-in at `/`, where **Continue with Google** is the only way in; a new account then gets its first-task prompt and a short tour. `/download` starts the Mac download.
 
 **Launch status:** see [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md) for the security review, test results and remaining hosted launch gates. Passing local tests is not production approval.
 
@@ -24,11 +24,9 @@ VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_LEGACY_ANON_KEY
 
 These are public browser settings, embedded **at build time**. A modern `sb_publishable_…` key or legacy anon key is accepted. Never use a service-role key, `sb_secret_…` key, OpenAI key or other privileged credential. Partial/unsafe configuration fails Vite startup/build; production builds also fail when configuration is entirely missing. An unconfigured development checkout displays a setup error and cannot falsely report successful signup. Do not put real keys into tests.
 
-Visitors can plan immediately without an account, unless a survey build sends them through the [onboarding survey](#onboarding-survey). Guest tasks and stop reasons are saved only in this browser under `prune:guest:v1`; clearing site data loses them. Guest mode does not send planner data to Supabase or OpenAI. Choose **Overview → Sign in** to accept the notice and sign in using an emailed one-time code. Guest tasks transfer to the verified account before the account planner opens. A returning verified session is restored only after this browser has acknowledged the current privacy notice.
+Signed-out visitors see the sign-in screen: the unchecked Terms & Privacy checkbox and **Continue with Google**. There is no guest planner and no email-code form. A returning verified session is restored only after this browser has acknowledged the current privacy notice. An empty new account opens on "What would make today count?" with three starting ideas; once its first task exists, the page tour walks through Today, Tomorrow and Overview and ends by offering to start that task.
 
-Before deploying, apply `supabase/migrations/20261028000100_guest_import.sql` after the previous migrations. Guest import is an authenticated, atomic RPC with a durable import receipt: a failed/ambiguous response retains the guest journal, and retries use the same import identity and payload. Imports do not overwrite existing account tasks. If a planning day has no free slots or the account already has an active task, the import fails without partial writes; the guest copy remains on this device. Once transfer starts, guest edits are frozen and the transfer is bound to that account until completion.
-
-Configure the Supabase email templates to display `{{ .Token }}` for code entry. `/?oauth=google` callbacks complete Google sign-ins started from the survey's Save screen; existing `/?oauth=email` callbacks remain supported for already-issued links. A missing backend import migration must be fixed before guest transfer can complete.
+Earlier builds had a guest planner (`prune:guest:v1`), an onboarding survey (`prune:survey:v1`) and anonymous usage counters. They are gone; apply `supabase/migrations/20261105000300_drop_guest_and_survey.sql` after deploying this client to drop their tables and functions (see [Removed guest and survey backend](#removed-guest-and-survey-backend)). Old guest journals left in visitors' browsers are no longer read or transferred.
 
 ## Features
 
@@ -50,16 +48,15 @@ Configure the Supabase email templates to display `{{ .Token }}` for code entry.
 
 ## Connect the existing backend
 
-Sign-in is Supabase Auth only (email codes and Google). Apply `supabase/migrations/20261105000200_drop_clerk_bridge.sql` to remove the unused Clerk bridge (`planner_clerk_identities` and `planner_call_as`). It refuses to run while any Clerk identity mapping exists: check `select count(*) from public.planner_clerk_identities;` first, and delete those rows only once you are sure. The accounts themselves stay in `auth.users` and can sign in with an email code.
+Sign-in on this website is Supabase Auth with Google only. Apply `supabase/migrations/20261105000200_drop_clerk_bridge.sql` to remove the unused Clerk bridge (`planner_clerk_identities` and `planner_call_as`). It refuses to run while any Clerk identity mapping exists: check `select count(*) from public.planner_clerk_identities;` first, and delete those rows only once you are sure. The accounts themselves stay in `auth.users`.
 
 Apply `supabase/migrations/20261025000100_equal_tasks.sql` after the previous shared and website migrations before deploying this client. It removes the server's most-important-task-first restriction while preserving ownership, today's-task validation, the single-active-task rule, and queue safeguards. This affects all clients on the shared backend. Legacy priority fields/actions remain compatible with existing Mac clients and saved outbox commands; the web UI no longer uses them.
 
 Do **not** reset the Mac app's database or create a parallel account store. Point both clients at the same project. The web transport calls the existing endpoints:
 
 ```text
-/auth/v1/otp, /verify, /user, /token, /logout, /settings
+/auth/v1/user, /token, /logout, /settings
 /rest/v1/rpc/planner_call
-/rest/v1/rpc/guest_record_usage
 /functions/v1/weekly-review
 /functions/v1/task-suggestions
 ```
@@ -68,7 +65,7 @@ Backend source, RLS, transactional planner rules, idempotent receipts, AI quotas
 
 ### Suggestions from the previous day
 
-When Today or Tomorrow has open slots, signed-in users see up to three proposals derived from the **previous day's** tasks (Today from yesterday, Tomorrow from today): unfinished tasks carry over with their remaining estimate, and completed tasks may suggest a clearly implied next step. The `task-suggestions` Edge Function loads both days' tasks server-side (the browser sends only its timezone and `target: "today" | "tomorrow"`) and asks OpenAI (`gpt-4.1-mini`, `store: false`) for structured suggestions, which are clamped and deduplicated before returning. It respects the account's AI preference (`ai_enabled`) and deletion flag, never calls OpenAI when the previous day was empty or the target day is full, and is capped at five attempts per account per target day. Tomorrow's proposals are re-requested when today's tasks change. Guests never call it. To deploy:
+When Today or Tomorrow has open slots, signed-in users see up to three proposals derived from the **previous day's** tasks (Today from yesterday, Tomorrow from today): unfinished tasks carry over with their remaining estimate, and completed tasks may suggest a clearly implied next step. The `task-suggestions` Edge Function loads both days' tasks server-side (the browser sends only its timezone and `target: "today" | "tomorrow"`) and asks OpenAI (`gpt-4.1-mini`, `store: false`) for structured suggestions, which are clamped and deduplicated before returning. It respects the account's AI preference (`ai_enabled`) and deletion flag, never calls OpenAI when the previous day was empty or the target day is full, and is capped at five attempts per account per target day. Tomorrow's proposals are re-requested when today's tasks change. To deploy:
 
 1. Apply `supabase/migrations/20261030000100_task_suggestions.sql` (usage counter + server-only `planner_reserve_suggestion`).
 2. `npx supabase functions deploy task-suggestions` with secrets `OPENAI_API_KEY` and `ALLOWED_ORIGINS` (same values as `weekly-review`). It imports shared code from `server/` and `src/planner/`.
@@ -76,54 +73,9 @@ When Today or Tomorrow has open slots, signed-in users see up to three proposals
 
 If the function is missing or fails, the plan simply shows no suggestions.
 
-### Guest usage totals
+### Removed guest and survey backend
 
-Signed-out use of the planner adds to anonymous daily totals in `public.guest_usage_daily`: `new_guests`, `active_guests` and `returning_guests` (devices, counted once per local day from the guest journal itself, with no extra identifier), `tasks_created`, `tasks_started`, `tasks_completed` and `focus_minutes` (recorded time of completed tasks). Rows hold only a UTC day, a metric and a total; no task text or identifiers are sent. Only production origins report, and a failed report never affects planning. The public key can call the function, so totals are indicative rather than tamper-proof.
-
-1. Apply `supabase/migrations/20261031000100_guest_usage.sql` (table + the anon-callable `guest_record_usage`).
-2. Rebuild this client so the CSP `connect-src` includes the new RPC path.
-
-Read them in the SQL Editor:
-
-```sql
-select day,
-  sum(total) filter (where metric = 'new_guests') as new_guests,
-  sum(total) filter (where metric = 'active_guests') as active_guests,
-  sum(total) filter (where metric = 'returning_guests') as returning_guests,
-  sum(total) filter (where metric = 'tasks_created') as tasks_created,
-  sum(total) filter (where metric = 'tasks_completed') as tasks_completed,
-  sum(total) filter (where metric = 'focus_minutes') as focus_minutes
-from public.guest_usage_daily group by day order by day desc;
-```
-
-### Onboarding survey
-
-`VITE_SURVEY_FLOW` is read **at build time** (set it in Vercel's environment and redeploy):
-
-| Value | Behaviour |
-| --- | --- |
-| `off` (default, also when unset or unknown) | Today's behaviour: everyone opens the guest planner. Nothing new is rendered, stored or counted. |
-| `on` | First-time visitors see the survey. |
-| `split` | Each browser is assigned 50/50 to `survey` or `control` once, and keeps that assignment. |
-
-Only fresh browsers start the survey: no guest journal (`prune:guest:v1`) and no notice acceptance of any version. It cannot be skipped: the planner opens only after **Continue with Google** on **Save your plan**, and a started survey resumes where it was left, including after a reload or a cancelled Google round trip. Finished surveys never return. A skip stored by an earlier build reads as not started, so that browser gets the survey again while it is still fresh. Every question has Back and step progress; only the first name and the week outcome can be left blank. The flow: intro (the sign-in hero), first name, goal, role, focus window, focus length, the three-task rule, derailer, deep-work target, an optional week outcome, a "Building your plan…" checklist whose lines come from `buildPlan`, the plan, and **Save your plan** (the unchecked notice checkbox and Continue with Google; no email or guest option).
-
-`startersFor(answers)` (`src/planner/starters.ts`) picks the three first-run tasks from goal, role, focus length and derailer, and returns today's three starters when nothing was answered. The answered focus length also sets the default estimate for new tasks, capped at 60 minutes. A kept plan is added to the account's Today after sign-in, only into free slots and skipping titles already planned.
-
-**Storage and privacy.** Answers live only in `prune:survey:v1` (with the variant and the funnel events already counted) until sign-in; nothing is sent before then. The first name never leaves the browser. After sign-in, the other answers and a current-week outcome travel inside the existing `planner_import_guest` payload as an optional `survey` object: frozen with the import identity when guest tasks transfer, or sent alone, best-effort, when there are none (a failure never blocks the account planner and retries at the next startup).
-
-1. Apply `supabase/migrations/20261102000100_onboarding_survey.sql` after the previous migrations, **before turning the flag on**. It adds the service-role-only `planner_onboarding` table, re-creates `planner_import_guest` with strict validation of the optional `survey` object (answers alone leave the planner revision untouched), adds the server-only `planner_week_goal(user, week_start)`, and lets `guest_record_usage` count the funnel metrics. Then apply `20261105000100_survey_step_funnel.sql`, which allows the per-question `reached_*` totals; deploy it before a client that sends them, or those events are refused and, already marked as counted, never resent from that browser.
-2. Weekly reviews receive the outcome through the handler's optional `loadWeekGoal` dependency. The hosted `weekly-review` Edge Function lives in `../pro`; pass `loadWeekGoal: (userId, weekStart) => rpc("planner_week_goal", { p_user_id: userId, p_week_start: weekStart })` there and redeploy it. Until then, reviews run exactly as before, without the goal.
-3. Enable Google sign-in (below), then rebuild with the flag.
-
-**Google sign-in.** In the Supabase dashboard, enable **Authentication → Providers → Google** with a Google Cloud OAuth client whose authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Add every served origin's callback, e.g. `https://www.prune.win/?oauth=google`, to **Authentication → URL Configuration → Redirect URLs**. The button first reads the public `/auth/v1/settings`; if Google is disabled it shows "Google sign-in isn't available right now. Please try again later." rather than sending visitors to a Supabase error page. Survey visitors have no other way in, so enable the provider before turning the flag on.
-
-**Funnel.** Each event counts once per browser and variant in `guest_usage_daily`, with no answers: `funnel_control_shown`, `funnel_control_signed_up`, and `funnel_survey_` + `shown`, `started`, `finished`, `plan_shown`, `google_clicked`, `signed_up`, and `reached_` + each question screen after the first (`goal`, `role`, `window`, `length`, `fact`, `derailer`, `target`, `outcome`; *started* stands for the name screen), so the totals show which screen people leave on. Earlier builds also sent `funnel_survey_skipped`; the migration still accepts it, but nothing sends it now. *Shown* is a fresh browser's first eligible visit (the shared denominator); *signed up* is a completed interactive sign-in (email code or Google, new or existing account) from a browser already counted as shown.
-
-```sql
-select day, metric, total from public.guest_usage_daily
-where metric like 'funnel\_%' order by day desc, metric;
-```
+`supabase/migrations/20261105000300_drop_guest_and_survey.sql` drops `guest_record_usage` and `guest_usage_daily` (anonymous totals and the survey funnel), `planner_import_guest` and `planner_guest_imports` (guest import receipts; imported tasks stay in the planner tables), and `planner_week_goal` and `planner_onboarding` (survey answers). It permanently deletes that data, so export anything you want first. Apply it after this client is live, since older open tabs may still call those endpoints until they reload. A hosted `weekly-review` function that still passes `loadWeekGoal` keeps working: the failed lookup reviews the week without a goal. Remove that wiring from `../pro` when convenient. Delete the `VITE_SURVEY_FLOW` variable from Vercel; nothing reads it.
 
 ### Account deletion
 
@@ -140,13 +92,13 @@ order by deleted_at;
 
 Review this list and permanently delete the corresponding **Auth users** via Supabase's administrative tools; deleting only `planner_accounts` does not remove all user data and may allow reprovisioning. No purge scheduler or automatic hard deletion is installed. Keep this migration in the shared backend's deployment history too so subsequent Mac/backend deployments preserve the guard.
 
-### Email-code authentication
+### Google sign-in
 
-Enable Supabase email Auth and configure SMTP for production delivery. Email templates (including Magic Link and Confirm Signup) must display `{{ .Token }}` so users can enter the code on the website, rather than follow a magic link. Keep this aligned with the Mac app’s existing email-code configuration. Auth rate limits, code expiry and email delivery still need hosted smoke tests; do not enable a mandatory CAPTCHA until a matching client flow is added.
+In the Supabase dashboard, enable **Authentication → Providers → Google** with a Google Cloud OAuth client whose authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Add every served origin's callback, e.g. `https://www.prune.win/?oauth=google`, to **Authentication → URL Configuration → Redirect URLs**. Visitors have no other way in, so the provider must stay enabled. The button first reads the public `/auth/v1/settings`; if Google is disabled it shows "Google sign-in isn't available right now. Please try again later." rather than sending visitors to a Supabase error page.
 
-### Authentication callbacks
+Sign-in uses `sign_in_with_google` (PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Supabase links a Google sign-in to an existing account with the same verified email, so accounts created earlier with email codes keep their data when they use the matching Google account.
 
-The Overview sign-in screen uses email codes only. With the survey flag on, its Save screen starts Google sign-in (`sign_in_with_google`, PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` and already-issued `/?oauth=email` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Keep the redirect URLs configured.
+The website no longer requests email codes. Leave the Supabase email provider enabled while the Mac app signs in with email codes; disabling it there would lock Mac users out. Unconfirmed email-only users that never signed in can be listed in **Authentication → Users** and removed by hand if you want a clean list.
 
 ### Weekly AI CORS
 
@@ -224,7 +176,7 @@ After deployment, run `npm run check:production` with the matching public config
 
 ### Privacy before public release
 
-`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. One unchecked sign-in checkbox (on the email form, or on the survey's Save screen before Google) records terms acceptance and privacy acknowledgement (`privacy-web-v12`, which added the per-question survey funnel totals; v11 made weekly reviews impossible to turn off in the app, v10 added the survey, its funnel totals and Google sign-in) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for always-on AI with no in-app opt-out, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
+`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. One unchecked checkbox above **Continue with Google** records terms acceptance and privacy acknowledgement (`privacy-web-v12`; its text now describes Google as the only sign-in and no longer covers the removed guest planner, survey or usage counters, which needed no re-acceptance; v11 made weekly reviews impossible to turn off in the app, v10 added the survey, its funnel totals and Google sign-in) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for always-on AI with no in-app opt-out, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
 
 Apply `supabase/migrations/20261024000100_automatic_weekly_reviews.sql` after the shared backend migrations before deploying this client. It enables reviews for newly provisioned planner accounts and preserves all existing account preferences (including disabled reviews). It affects all clients using this shared backend. Legacy backend `consent_*` fields remain protocol compatibility gates, not evidence of affirmative consent. Do not automatically enable existing disabled accounts from the browser.
 
@@ -244,7 +196,7 @@ npm run test:e2e
 
 Unit tests cover the durable queue, retry identities, ambiguous failures, storage failures, account isolation, timer projection, public-key validation, privacy records, HTTP error classification, profile statistics, onboarding and review timing. `test:reactivity` additionally runs real Solid browser reactivity under Node's `browser` export condition to check keyed reconciliation, memory-only notes, preference races, late responses and lifecycle cleanup. The active UI never renders Mac resource URLs; browser security tests verify that metadata stays inert. Playwright runs Chromium and WebKit, including real touch/mobile contexts, email-code sign-in/invalid codes, refresh/restoration, task/focus workflows, previews, conflicts, multi-tab sign-out and phone/landscape layouts.
 
-Browser tests build production output into ignored `.playwright-dist/` with the survey flag off (never overwriting production `dist/`), and a second build into `.playwright-dist-survey/` with it on for `tests/survey.spec.ts`, and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not send real email, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify real email delivery and code verification, Mac↔web sync, timer conflicts, real review generation and sign-out against the actual hosted project.
+Browser tests build production output into ignored `.playwright-dist/` (never overwriting production `dist/`) and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not reach Google, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify a real Google sign-in round trip, Mac↔web sync, timer conflicts, real review generation and sign-out against the actual hosted project.
 
 ### Hosted release checks (non-destructive)
 
@@ -277,8 +229,7 @@ The checker does not prove authenticated account isolation or backend deployment
 src/
   App.tsx                       Error boundary and download/session route selection
   index.tsx                     The single Solid render root and private analytics URLs
-  auth/                         Session phases, guest transfer and email-code sign-in UI
-  survey/                       Onboarding survey: answers, state model, flag/variant, plan and screens
+  auth/                         Session restore and the Google sign-in screen
   components/                   Native dialog, privacy policy, download page and canvas
   planner/
     Planner.tsx                 Feature composition and navigation/onboarding state
@@ -296,7 +247,7 @@ src/
     constants.ts                UI bounds, estimate ranges, views and polling intervals
     task-model.ts               Pure task-completion and tracked-time rules
     onboarding.ts               Pure, account-scoped eligibility/storage key rules
-    starters.ts                 startersFor(answers): first-run tasks from survey answers
+    starters.ts                 The three first-run starting ideas
     config.ts                   Public-only backend configuration validation
     privacy-state.ts            Versioned, device-local legal acknowledgement
   profile/                      Profile components and pure calendar-based statistics
@@ -327,7 +278,7 @@ CI runs the same quality gates before testing and packaging. Supabase CLI, PGlit
 - Render with JSX and `Show`/`For`/`Switch`; use effects only for external effects, subscriptions and measurements. No manual `replaceChildren` rendering, nested render roots, unsafe HTML sinks or global DOM-based state synchronization.
 - `createPlanner` owns one session's reactive UI state. Store reconciliation preserves task identities, drafts and focused controls during background refresh. Components own local form drafts; focus notes remain memory-only and reset when the active task changes.
 - Controllers, dialogs, the canvas and navigation/tour measurements register cleanup with their Solid owner. Session disposal also stops the outbox, auth refresh and browser subscriptions; late startup/read responses cannot initialize a disposed client.
-- `PlanningClient` coordinates account access, typed queries and task mutations; `GuestStore`, `LocalQueue` and the transport own their respective storage/network details. Persisted snapshot versions, storage keys, idempotency identities and the shared RPC contract are deliberately unchanged. Legacy queue projection branches must remain while saved commands or supported Mac clients can use them.
+- `PlanningClient` coordinates account access, typed queries and task mutations; `LocalQueue` and the transport own their respective storage/network details. Persisted snapshot versions, storage keys, idempotency identities and the shared RPC contract are deliberately unchanged. Legacy queue projection branches must remain while saved commands or supported Mac clients can use them.
 - Weekly AI state is independent of task mutation state. Preference writes invalidate older reads, and pending-review polling stops when its screen is hidden or its owner is disposed.
 - Backend/schema cleanup must consider **all** clients. See [the database review](database-review.md): no table or column was safe to drop, and no hosted schema or user data was changed.
 

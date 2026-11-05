@@ -3,13 +3,12 @@
 ## Responsibilities
 
 - **UI components** render and collect input. Small Solid state factories own reactive state and lifecycle cleanup; they are not classes because Solid tracks accessors and ownership, not class property mutation.
-- **`createSession`** manages explicit restoration/transfer phases. It ignores late responses after disposal and prevents duplicate guest transfers. `Session.tsx` renders those phases; `App.tsx` only selects the route and error boundary.
-- **`PlanningClient`** coordinates authenticated access, typed RPC queries and task mutations. Queries are never mistaken for outbox writes. The constructor takes named options (`{ cloud }`, `{ guest: true }`).
+- **`createSession`** restores a saved session or completes a Google redirect once at startup, and ignores late responses after disposal. `Session.tsx` renders loading, sign-in or the planner; `App.tsx` only selects the route and error boundary.
+- **`PlanningClient`** coordinates authenticated access, typed RPC queries and task mutations. Queries are never mistaken for outbox writes. The constructor takes named options (`{ cloud }`).
 - **`BrowserCloud` / `api-fetch.ts`** separate Supabase authentication from bounded HTTP I/O.
 - **`createAccountQueue`** supplies browser locks, account-scoped storage keys, online/storage listeners and queue-protocol negotiation.
 - **`LocalQueue`** owns atomic snapshot/outbox persistence, serialized sends, acknowledgement validation, conflicts and retry backoff.
-- **`GuestStore`** owns the device-local journal and confirmed account transfer. Dashboard replay clones once rather than cloning every intermediate dashboard. Mutations return the projected task directly, including completion of an older active task.
-- **`task-projection.ts` / `dashboard.ts`** contain rendering-independent mutation replay, task selection and day rollover. The guest store and authenticated outbox use the same rules.
+- **`task-projection.ts` / `dashboard.ts`** contain rendering-independent mutation replay, task selection and day rollover. The authenticated outbox uses them.
 - **`server/http.ts`** owns safe API errors and bounded request/response reads. Gateway code no longer imports HTTP primitives from the AI provider implementation.
 
 ## Shared contracts and constants
@@ -20,13 +19,12 @@ Classes are used for stateful storage/network clients. Pure projections, formatt
 
 ## Removed or reduced
 
-- Unused Google/magic-link initiation methods in the active Supabase client. Already-issued callback links still complete.
+- Guest mode (`GuestStore`, guest import and usage counters), the onboarding survey, and email-code sign-in. Google is the only sign-in, and only `/?oauth=google` callbacks complete.
 - Implementation-module type re-exports and private component helper exports.
 - Duplicate task-selection, day-rollover, error-code inspection, queue-stop recovery and retry scheduling logic.
 - Redundant loading branches and the nested session-rendering tree.
 - Duplicate sign-out/deletion UI orchestration and verbose DOM-reference assignment callbacks. Confirmation wording, busy guards, failure reporting and reload behavior remain unchanged.
 - Clock-driven profile-history recomputation: live focus totals now read only today's plan. History totals are accumulated in one pass, and streaks walk consecutive runs without sorting.
-- The second guest-journal storage read/JSON parse during each mutation. Projection reuses the state already loaded under the guest lock, without modifying the saved base or journal format.
 - Retired account-bar/privacy-warning CSS, overridden layout declarations, and the unreferenced `public/prune-logo.png` asset. A temporary before/after browser audit compared rendered styles for Today, Tomorrow, Overview, Profile, Focus and the pause dialog at seven widths in Chromium and WebKit. The navigation now clips its moving selection background to prevent transient horizontal overflow when resizing from desktop to phone widths.
 - Stale browser expectations for signup-first navigation, a retired logo/header, the old sign-in button label and direct Profile navigation. Shared fixtures use an explicit optional-analytics opt-out so the cookie banner cannot intercept unrelated workflow clicks; dedicated cookie tests still exercise real first-visit consent behavior.
 

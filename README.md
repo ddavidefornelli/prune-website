@@ -14,4 +14,4 @@ It works on your phone, in the browser, and on Mac.
 
 Try it at [prune.win](https://www.prune.win).
 
-Setup, configuration, deployment, the onboarding survey flag and testing are documented in [docs/development.md](docs/development.md).
+Setup, configuration, Google sign-in, deployment and testing are documented in [docs/development.md](docs/development.md).
