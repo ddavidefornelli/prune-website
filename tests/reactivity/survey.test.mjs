@@ -51,7 +51,11 @@ test("answers advance one step per submit, and a stale or repeated submit is ign
   assert.deepEqual(reports, [
     { funnel_survey_shown: 1 },
     { funnel_survey_started: 1 },
+    { funnel_survey_reached_goal: 1 },
+    { funnel_survey_reached_role: 1 },
   ]);
+  flow.answer("goal", { goal: "study" });
+  assert.equal(reports.length, 4, "going back and forward counts nothing new");
 });
 
 test("finishing the questions dates the outcome, and keeping the plan waits for a planner", async (t) => {
@@ -87,8 +91,11 @@ test("finishing the questions dates the outcome, and keeping the plan waits for 
     weekGoal: "Launch",
     weekStart: "2026-11-02",
   });
-  assert.deepEqual(reports.slice(-2), [
+  assert.deepEqual(reports.slice(1), [
     { funnel_survey_started: 1 },
+    ...["goal", "role", "window", "length", "fact", "derailer", "target", "outcome"].map(
+      (step) => ({ [`funnel_survey_reached_${step}`]: 1 }),
+    ),
     { funnel_survey_finished: 1 },
   ]);
   flow.signedIn(true, true);

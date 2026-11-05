@@ -33,12 +33,12 @@ test("production survey visits count each funnel step once, never answers, under
   await page.getByRole("button", { name: "Skip, just let me plan" }).click();
   await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
   const metrics = (event: string) => ({ path: "/rest/v1/rpc/guest_record_usage", p_metrics: { [`funnel_survey_${event}`]: 1 } });
-  await expect.poll(() => counted).toEqual([metrics("shown"), metrics("started"), metrics("skipped")]);
+  await expect.poll(() => counted).toEqual([metrics("shown"), metrics("started"), metrics("reached_goal"), metrics("reached_role"), metrics("skipped")]);
   expect(JSON.stringify(counted)).not.toMatch(/Ada|ship/);
   // Coming back counts nothing new for this browser.
   await page.reload();
   await expect(page.locator(".plan-summary")).toBeVisible();
   await page.waitForTimeout(300);
-  expect(counted).toHaveLength(3);
+  expect(counted).toHaveLength(5);
   expect(await page.evaluate(() => (window as any).__violations ?? [])).toEqual([]);
 });

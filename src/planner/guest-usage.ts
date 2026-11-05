@@ -17,6 +17,15 @@ export const FUNNEL_METRICS = [
   "funnel_survey_google_clicked",
   "funnel_survey_signed_up",
   "funnel_survey_skipped",
+  // Each question screen after the first ("started" covers the name step).
+  "funnel_survey_reached_goal",
+  "funnel_survey_reached_role",
+  "funnel_survey_reached_window",
+  "funnel_survey_reached_length",
+  "funnel_survey_reached_fact",
+  "funnel_survey_reached_derailer",
+  "funnel_survey_reached_target",
+  "funnel_survey_reached_outcome",
 ] as const;
 export type FunnelMetric = (typeof FUNNEL_METRICS)[number];
 export type GuestMetric =

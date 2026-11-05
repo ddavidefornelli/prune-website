@@ -9,6 +9,7 @@ import {
   finishAsGuest,
   finishSignedIn,
   keepPlan,
+  reachedEvent,
   readSurvey,
   skip,
   start,
@@ -102,6 +103,8 @@ export function createSurvey(options: SurveyOptions) {
       if (state().step !== from) return;
       update((current) => answer(current, patch, now()));
       if (from === "outcome") track("finished");
+      const reached = reachedEvent(state().step);
+      if (reached) track(reached);
     },
     back: () => update(back, "back"),
     showPlan: () => update((current) => ({ ...current, step: "plan" })),

@@ -19,7 +19,7 @@ async function fixture() {
     create table public.planner_stops(user_id uuid not null, task_id uuid not null, reason text not null check(length(reason) between 1 and 1000), stopped_at bigint not null, stopped_on date not null, foreign key(user_id, task_id) references public.planner_tasks(user_id, id));
     set test.uid = '${user}';
   `);
-  for (const name of ['20261028000100_guest_import.sql', '20261031000100_guest_usage.sql', '20261102000100_onboarding_survey.sql'])
+  for (const name of ['20261028000100_guest_import.sql', '20261031000100_guest_usage.sql', '20261102000100_onboarding_survey.sql', '20261105000100_survey_step_funnel.sql'])
     await db.exec(migration(name));
   return db;
 }
@@ -97,9 +97,10 @@ test('funnel totals join the anonymous counter with the same bounds', async () =
     const record = (metrics) => db.exec(`set role anon; select public.guest_record_usage('${JSON.stringify(metrics)}'::jsonb); reset role;`);
     await record({ funnel_survey_shown: 1, funnel_survey_started: 1 });
     await record({ funnel_control_shown: 1, tasks_created: 1, focus_minutes: 25 });
+    await record({ funnel_survey_reached_goal: 1, funnel_survey_reached_outcome: 1 });
     const totals = Object.fromEntries((await db.query('select metric, total::int as total from guest_usage_daily')).rows.map((row) => [row.metric, row.total]));
-    assert.deepEqual(totals, { funnel_survey_shown: 1, funnel_survey_started: 1, funnel_control_shown: 1, tasks_created: 1, focus_minutes: 25 });
-    for (const metrics of [{ funnel_survey_shown: 2 }, { funnel_survey_goal: 1 }, { funnel_survey_shown: 'ship' }]) {
+    assert.deepEqual(totals, { funnel_survey_shown: 1, funnel_survey_started: 1, funnel_control_shown: 1, tasks_created: 1, focus_minutes: 25, funnel_survey_reached_goal: 1, funnel_survey_reached_outcome: 1 });
+    for (const metrics of [{ funnel_survey_shown: 2 }, { funnel_survey_goal: 1 }, { funnel_survey_shown: 'ship' }, { funnel_survey_reached_name: 1 }, { funnel_survey_reached_outcome: 2 }]) {
       await db.exec('reset role');
       await assert.rejects(record(metrics), /Invalid guest usage/, JSON.stringify(metrics));
     }

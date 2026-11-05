@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   answer, assignVariant, back, buildPlan, countEvent, emptySurvey, finishAsGuest, finishSignedIn, isFreshVisitor,
-  keepPlan, nextStep, parseFlag, parseSurvey, previousStep, questionNumber, readSurvey, skip, start, STEPS,
+  keepPlan, nextStep, parseFlag, parseSurvey, previousStep, questionNumber, reachedEvent, readSurvey, skip, start, STEPS,
   SURVEY_KEY, surveyImport, surveyVisible, tasksToAdd, updateSurvey, weekStartOf, writeSurvey,
 } from "../src/survey/model.ts";
 
@@ -183,7 +183,7 @@ test("funnel events count once per browser and variant, without answers", () => 
   assert.deepEqual(result.usage, { funnel_survey_shown: 1 });
   state = result.state;
   assert.deepEqual(countEvent(state, "shown").usage, {});
-  for (const event of ["started", "finished", "plan_shown", "google_clicked", "signed_up", "skipped"]) {
+  for (const event of ["started", "finished", "plan_shown", "google_clicked", "signed_up", "skipped", "reached_goal", "reached_outcome"]) {
     result = countEvent(state, event);
     assert.deepEqual(result.usage, { [`funnel_survey_${event}`]: 1 });
     state = result.state;
@@ -194,4 +194,13 @@ test("funnel events count once per browser and variant, without answers", () => 
   assert.deepEqual(countEvent(control.state, "started").usage, {}, "the control group has no survey to start");
   assert.deepEqual(countEvent(control.state, "signed_up").usage, { funnel_control_signed_up: 1 });
   assert.deepEqual(countEvent(emptySurvey(), "shown").usage, {}, "nothing is counted while the flow is off");
+});
+
+test("each question screen after the first has its own reached event", () => {
+  assert.deepEqual(
+    STEPS.map(reachedEvent).filter(Boolean),
+    ["goal", "role", "window", "length", "fact", "derailer", "target", "outcome"].map((step) => `reached_${step}`),
+  );
+  for (const step of ["intro", "name", "building", "plan", "save"]) assert.equal(reachedEvent(step), null, step);
+  assert.deepEqual(countEvent({ ...emptySurvey(), variant: "control" }, "reached_goal").usage, {}, "the control group has no questions");
 });

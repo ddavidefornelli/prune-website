@@ -65,7 +65,15 @@ export type FunnelEvent =
   | "plan_shown"
   | "google_clicked"
   | "signed_up"
-  | "skipped";
+  | "skipped"
+  | `reached_${Exclude<(typeof QUESTION_STEPS)[number], "name">}`;
+
+/** The event for arriving on a question screen; "started" stands for the first. */
+export function reachedEvent(step: SurveyStep): FunnelEvent | null {
+  return step !== "name" && (QUESTION_STEPS as readonly string[]).includes(step)
+    ? (`reached_${step}` as FunnelEvent)
+    : null;
+}
 
 export interface SurveyState {
   version: 1;
