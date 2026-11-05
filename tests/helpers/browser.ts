@@ -53,7 +53,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
   backend: async ({ context, signedIn, expired, firstVisit }, use) => {
     const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, receipts: new Map() };
     // Seed once per browser context, not on reload/sign-out or each new tab.
-    await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey }) => {
+    await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey, tourKey }) => {
       if (localStorage.getItem("prune:test:seeded")) return;
       localStorage.setItem("prune:test:seeded", "true");
       // Most workflows are returning visits. Dedicated cookie/onboarding specs
@@ -61,12 +61,13 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       localStorage.setItem("prune:cookies:v1", JSON.stringify({ choice: "rejected", at: Date.now() }));
       if (!firstVisit) {
         localStorage.setItem(onboardingKey, "done");
+        localStorage.setItem(tourKey, "done");
       }
       if (signedIn) {
         localStorage.setItem(privacyKey, JSON.stringify({ version, acknowledgedAt: new Date().toISOString() }));
         localStorage.setItem(authKey, JSON.stringify(initialSession));
       }
-    }, { signedIn, initialSession: session(expired ? -10 : 3600), authKey: AUTH_KEY, privacyKey: PRIVACY_ACKNOWLEDGEMENT_KEY, version: PRIVACY_POLICY_VERSION, firstVisit, onboardingKey: `prune:onboarding:v1:${PROJECT}:${USER_ID}` });
+    }, { signedIn, initialSession: session(expired ? -10 : 3600), authKey: AUTH_KEY, privacyKey: PRIVACY_ACKNOWLEDGEMENT_KEY, version: PRIVACY_POLICY_VERSION, firstVisit, onboardingKey: `prune:onboarding:v1:${PROJECT}:${USER_ID}`, tourKey: `prune:tour:v1:${PROJECT}:${USER_ID}` });
     await context.route(`${PROJECT}/**`, async (route) => {
       const request = route.request();
       const url = new URL(request.url());

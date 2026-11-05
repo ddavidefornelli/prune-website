@@ -7,6 +7,8 @@ test.describe("first run", () => {
     test(`plans inline and teaches focus just in time at ${width}px`, async ({ page, backend }) => {
       await page.setViewportSize({ width, height: 844 });
       await openPlanner(page);
+      // The page tour opens first (tests/tour.spec.ts); the first-run prompt waits behind it.
+      await page.locator(".tour-popup").getByRole("button", { name: "Skip tour" }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
       const input = page.getByRole("textbox", { name: "Outcome", exact: true });
@@ -27,7 +29,6 @@ test.describe("first run", () => {
       await page.getByRole("region", { name: "Starting ideas" })
         .getByRole("button", { name: /Plan the week ahead/ }).click();
       await synced(page);
-      await page.locator(".tour-popup").getByRole("button", { name: "Skip tour" }).click();
       await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
       expect(backend.data.todayTasks).toHaveLength(1);
       expect(backend.data.todayTasks[0]!.estimatedMinutes).toBe(30);

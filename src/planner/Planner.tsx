@@ -20,7 +20,12 @@ import { ShortcutSheet } from "./components/ShortcutSheet";
 import { VIEW_LABELS } from "./constants";
 import { createPlanner } from "./create-planner";
 import { createHints } from "./hints";
-import { onboardingKey, shouldOfferOnboarding } from "./onboarding";
+import {
+  onboardingKey,
+  shouldOfferOnboarding,
+  shouldOfferTour,
+  tourKey,
+} from "./onboarding";
 import { createShortcuts } from "./shortcuts";
 import type { Account } from "./types";
 
@@ -46,6 +51,15 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     }
   }
 
+  function finishTour(): void {
+    setTour(false);
+    try {
+      localStorage.setItem(tourKey(props.account.accountKey), "done");
+    } catch {
+      /* It is simply offered again on the next load. */
+    }
+  }
+
   /** The tour's last stop starts the first planned task, as its button would. */
   async function startFirstTask(): Promise<void> {
     const task = planner.data()?.todayTasks.find((t) => t.status === "planned");
@@ -62,14 +76,13 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     const data = planner.data();
     if (!data || firstRunChecked) return;
     firstRunChecked = true;
-    setFirstRun(
-      shouldOfferOnboarding(data, props.account.accountKey, localStorage),
-    );
+    const account = props.account.accountKey;
+    setFirstRun(shouldOfferOnboarding(data, account, localStorage));
+    // Right after sign-in, once per account and device.
+    setTour(shouldOfferTour(data, account, localStorage));
   });
   createEffect(() => {
-    if (!firstRun() || !planner.data()?.todayTasks.length) return;
-    finishFirstRun();
-    setTour(true);
+    if (firstRun() && planner.data()?.todayTasks.length) finishFirstRun();
   });
   createEffect(() => {
     const view = planner.view();
@@ -154,12 +167,24 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
         </main>
         <Show when={tour()}>
           <PlannerTour
+            hasTask={
+              !!planner.data()?.todayTasks.some((t) => t.status === "planned")
+            }
             onVisit={planner.visit}
             onDone={(started) => {
-              setTour(false);
+              finishTour();
               if (!started) planner.visit("today");
             }}
             onStart={startFirstTask}
+            onAdd={() => {
+              finishTour();
+              planner.visit("today");
+              queueMicrotask(() =>
+                document
+                  .querySelector<HTMLInputElement>(".task-form input")
+                  ?.focus(),
+              );
+            }}
           />
         </Show>
         <Show when={shortcuts()}>

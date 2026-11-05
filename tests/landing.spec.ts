@@ -20,7 +20,7 @@ test("signed-out visitors land on Google sign-in, and nothing else lets them in"
 test.describe("a first sign-in", () => {
   test.use({ firstVisit: true });
 
-  test("needs the notice, signs in with Google, then asks for the first task before the tour", async ({ page, backend }) => {
+  test("needs the notice, signs in with Google, then opens the tour before the first task", async ({ page, backend }) => {
     await openSignIn(page);
     const google = page.getByRole("button", GOOGLE);
     await google.click();
@@ -40,11 +40,14 @@ test.describe("a first sign-in", () => {
     expect(authorize.searchParams.get("code_challenge_method")).toBe("s256");
     expect(backend.requests.some((request) => request.path === "/auth/v1/token?grant_type=pkce" && request.body.auth_code === "fixture-oauth-code")).toBe(true);
 
-    // An empty account opens on the first-task prompt; picking one starts the tour.
+    // A new account lands in the tour, then on the first-task prompt behind it.
+    const tour = page.locator(".tour-popup");
+    await expect(tour.getByRole("heading")).toHaveText("Three tasks a day");
+    await tour.getByRole("button", { name: "Skip tour" }).click();
     await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
     await page.getByRole("region", { name: "Starting ideas" }).getByRole("button", { name: /Plan the week ahead/ }).click();
-    await expect(page.locator(".tour-popup")).toBeVisible();
-    await expect(page.locator(".tour-popup")).toContainText("Your task is here");
+    await expect(page.getByRole("button", { name: "Edit task title: Plan the week ahead" })).toBeVisible();
+    await expect(tour).toHaveCount(0);
 
     await page.reload();
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();

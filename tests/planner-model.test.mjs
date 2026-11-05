@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isDayComplete, trackedSeconds } from "../src/planner/task-model.ts";
-import { onboardingKey, shouldOfferOnboarding } from "../src/planner/onboarding.ts";
+import { onboardingKey, shouldOfferOnboarding, shouldOfferTour, tourKey } from "../src/planner/onboarding.ts";
 import { profileStats, todayFocusSeconds } from "../src/profile/profile-stats.ts";
 import { reviewCountdown } from "../src/reviews/review-countdown.ts";
 import { averageTaskTiming, completedTaskTimings } from "../src/shared/task-timing.ts";
@@ -79,6 +79,19 @@ test("onboarding is scoped to an account and never offered over existing history
   data.completions = [{ day: data.today, count: 1 }];
   assert.equal(shouldOfferOnboarding(data, "bob", storage), false);
   assert.equal(shouldOfferOnboarding(dashboard(), "alice", { getItem() { throw new Error("Storage unavailable"); } }), true);
+});
+
+test("the tour is offered once per account, with or without tasks, never over a running timer", () => {
+  const { storage } = persistence();
+  const data = dashboard();
+  assert.equal(shouldOfferTour(data, "alice", storage), true);
+  data.completions = [{ day: data.today, count: 4 }];
+  assert.equal(shouldOfferTour(data, "alice", storage), true, "existing accounts get it too");
+  storage.setItem(tourKey("alice"), "done");
+  assert.equal(shouldOfferTour(data, "alice", storage), false);
+  assert.equal(shouldOfferTour(data, "bob", storage), true);
+  assert.equal(shouldOfferTour({ ...dashboard(), activeTask: { id: "t" } }, "bob", storage), false);
+  assert.equal(shouldOfferTour(dashboard(), "bob", { getItem() { throw new Error("Storage unavailable"); } }), false);
 });
 
 test("review countdown honors the server instant, clamps overdue values and rejects invalid dates", () => {

@@ -5,6 +5,7 @@ import {
   onCleanup,
   onMount,
   Show,
+  untrack,
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import type { PlannerView } from "../constants";
@@ -12,24 +13,14 @@ import { errorMessage } from "../errors";
 
 export type TourView = Exclude<PlannerView, "profile" | "focus">;
 
-const STOPS: readonly {
+interface Stop {
   view: TourView;
   target: string;
   title: string;
   text: string;
-}[] = [
-  {
-    view: "today",
-    target: ".task .editable-title",
-    title: "Your task is here",
-    text: "Tap the title to edit it. Keep today to three tasks.",
-  },
-  {
-    view: "today",
-    target: ".task .task-estimate",
-    title: "Adjust your estimate",
-    text: "Turn this dial to change the minutes.",
-  },
+}
+
+const AROUND: readonly Stop[] = [
   {
     view: "tomorrow",
     target: "nav button[aria-current]",
@@ -42,6 +33,23 @@ const STOPS: readonly {
     title: "See your progress",
     text: "Your activity and weekly reviews live here.",
   },
+];
+
+/** With a planned task: point at it, then end by starting its timer. */
+const WITH_TASK: readonly Stop[] = [
+  {
+    view: "today",
+    target: ".task .editable-title",
+    title: "Your task is here",
+    text: "Tap the title to edit it. Keep today to three tasks.",
+  },
+  {
+    view: "today",
+    target: ".task .task-estimate",
+    title: "Adjust your estimate",
+    text: "Turn this dial to change the minutes.",
+  },
+  ...AROUND,
   {
     view: "today",
     target: ".task > button",
@@ -50,10 +58,31 @@ const STOPS: readonly {
   },
 ];
 
+/** A new, empty planner: explain the rule, then end at the task form. */
+const EMPTY: readonly Stop[] = [
+  {
+    view: "today",
+    target: ".plan-heading",
+    title: "Three tasks a day",
+    text: "That’s the whole rule. Fewer tasks, more focus.",
+  },
+  ...AROUND,
+  {
+    view: "today",
+    target: ".task-form",
+    title: "Add your first task",
+    text: "Write one, or pick an idea below. Add a time like 45m to set the estimate.",
+  },
+];
+
 interface PlannerTourProps {
+  /** Read once: whether Today has a planned task to point at and start. */
+  hasTask: boolean;
   onVisit: (view: TourView) => void;
   onDone: (started: boolean) => void;
   onStart: () => Promise<void>;
+  /** The empty tour's last action: close and put the cursor in the task form. */
+  onAdd: () => void;
 }
 
 /** Only measurement/positioning is imperative; coach-mark content stays reactive. */
@@ -62,8 +91,10 @@ export function PlannerTour(props: PlannerTourProps) {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
   const headingId = createUniqueId();
-  const stop = () => STOPS[index()]!;
-  const last = () => index() === STOPS.length - 1;
+  const hasTask = untrack(() => props.hasTask);
+  const stops = hasTask ? WITH_TASK : EMPTY;
+  const stop = () => stops[index()]!;
+  const last = () => index() === stops.length - 1;
   let popup!: HTMLElement;
   let highlight!: HTMLDivElement;
   let arrow!: HTMLSpanElement;
@@ -176,7 +207,7 @@ export function PlannerTour(props: PlannerTourProps) {
       >
         <div class="tour-top">
           <span class="tour-step">
-            {index() + 1} / {STOPS.length}
+            {index() + 1} / {stops.length}
           </span>
           <button type="button" disabled={busy()} onClick={finish}>
             Skip tour
@@ -217,19 +248,32 @@ export function PlannerTour(props: PlannerTourProps) {
               </button>
             }
           >
-            <button type="button" disabled={busy()} onClick={finish}>
-              Not now
-            </button>
-            <button
-              type="button"
-              class="tour-primary"
-              disabled={busy()}
-              onClick={() => {
-                void start();
-              }}
+            <Show
+              when={hasTask}
+              fallback={
+                <button
+                  type="button"
+                  class="tour-primary"
+                  onClick={() => props.onAdd()}
+                >
+                  Add my first task
+                </button>
+              }
             >
-              Start focusing
-            </button>
+              <button type="button" disabled={busy()} onClick={finish}>
+                Not now
+              </button>
+              <button
+                type="button"
+                class="tour-primary"
+                disabled={busy()}
+                onClick={() => {
+                  void start();
+                }}
+              >
+                Start focusing
+              </button>
+            </Show>
           </Show>
         </div>
       </section>

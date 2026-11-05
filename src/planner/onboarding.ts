@@ -21,3 +21,23 @@ export function shouldOfferOnboarding(
     !data.completions.some((day) => day.count > 0)
   );
 }
+
+export const tourKey = (accountKey: string) => `prune:tour:v1:${accountKey}`;
+
+/**
+ * Every account gets the page tour once per device, right after sign-in,
+ * whether or not it has tasks. Never over a running timer: views are locked.
+ */
+export function shouldOfferTour(
+  data: Dashboard,
+  accountKey: string,
+  storage: Pick<Storage, "getItem">,
+): boolean {
+  if (data.activeTask) return false;
+  try {
+    return !storage.getItem(tourKey(accountKey));
+  } catch {
+    // Without storage it would reappear on every load; skip it instead.
+    return false;
+  }
+}
