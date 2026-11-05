@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("visitors can plan and reload without authentication or cloud requests", async ({ page }) => {
   const cloudRequests: string[] = [];
   page.on("request", (request) => {
-    if (request.url().includes("supabase.co") || request.url().includes("/api/planner")) cloudRequests.push(request.url());
+    if (request.url().includes("supabase.co")) cloudRequests.push(request.url());
   });
   await page.goto("/");
   await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");

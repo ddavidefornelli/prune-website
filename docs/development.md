@@ -50,6 +50,8 @@ Configure the Supabase email templates to display `{{ .Token }}` for code entry.
 
 ## Connect the existing backend
 
+Sign-in is Supabase Auth only (email codes and Google). Apply `supabase/migrations/20261105000200_drop_clerk_bridge.sql` to remove the unused Clerk bridge (`planner_clerk_identities` and `planner_call_as`). It refuses to run while any Clerk identity mapping exists: check `select count(*) from public.planner_clerk_identities;` first, and delete those rows only once you are sure. The accounts themselves stay in `auth.users` and can sign in with an email code.
+
 Apply `supabase/migrations/20261025000100_equal_tasks.sql` after the previous shared and website migrations before deploying this client. It removes the server's most-important-task-first restriction while preserving ownership, today's-task validation, the single-active-task rule, and queue safeguards. This affects all clients on the shared backend. Legacy priority fields/actions remain compatible with existing Mac clients and saved outbox commands; the web UI no longer uses them.
 
 Do **not** reset the Mac app's database or create a parallel account store. Point both clients at the same project. The web transport calls the existing endpoints:
@@ -111,7 +113,7 @@ Only fresh browsers start the survey: no guest journal (`prune:guest:v1`) and no
 **Storage and privacy.** Answers live only in `prune:survey:v1` (with the variant and the funnel events already counted) until sign-in; nothing is sent before then. The first name never leaves the browser. After sign-in, the other answers and a current-week outcome travel inside the existing `planner_import_guest` payload as an optional `survey` object: frozen with the import identity when guest tasks transfer, or sent alone, best-effort, when there are none (a failure never blocks the account planner and retries at the next startup).
 
 1. Apply `supabase/migrations/20261102000100_onboarding_survey.sql` after the previous migrations, **before turning the flag on**. It adds the service-role-only `planner_onboarding` table, re-creates `planner_import_guest` with strict validation of the optional `survey` object (answers alone leave the planner revision untouched), adds the server-only `planner_week_goal(user, week_start)`, and lets `guest_record_usage` count the funnel metrics. Then apply `20261105000100_survey_step_funnel.sql`, which allows the per-question `reached_*` totals; deploy it before a client that sends them, or those events are refused and, already marked as counted, never resent from that browser.
-2. Weekly reviews receive the outcome through the handler's optional `loadWeekGoal` dependency, which `server/planner-runtime.ts` wires to `planner_week_goal`. The hosted `weekly-review` Edge Function lives in `../pro`; pass the same `loadWeekGoal: (userId, weekStart) => rpc("planner_week_goal", { p_user_id: userId, p_week_start: weekStart })` there and redeploy it. Until then, reviews run exactly as before, without the goal.
+2. Weekly reviews receive the outcome through the handler's optional `loadWeekGoal` dependency. The hosted `weekly-review` Edge Function lives in `../pro`; pass `loadWeekGoal: (userId, weekStart) => rpc("planner_week_goal", { p_user_id: userId, p_week_start: weekStart })` there and redeploy it. Until then, reviews run exactly as before, without the goal.
 3. Enable Google sign-in (below), then rebuild with the flag.
 
 **Google sign-in.** In the Supabase dashboard, enable **Authentication → Providers → Google** with a Google Cloud OAuth client whose authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Add every served origin's callback, e.g. `https://www.prune.win/?oauth=google`, to **Authentication → URL Configuration → Redirect URLs**. The button first reads the public `/auth/v1/settings`; if Google is disabled it shows "Google sign-in isn't available right now. Please try again later." rather than sending visitors to a Supabase error page. Survey visitors have no other way in, so enable the provider before turning the flag on.
@@ -144,7 +146,7 @@ Enable Supabase email Auth and configure SMTP for production delivery. Email tem
 
 ### Authentication callbacks
 
-The Overview sign-in screen uses email codes only. With the survey flag on, its Save screen starts Google sign-in (`sign_in_with_google`, PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` and already-issued `/?oauth=email` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Keep the redirect URLs configured. The unfinished Clerk transport is not selected by the current app.
+The Overview sign-in screen uses email codes only. With the survey flag on, its Save screen starts Google sign-in (`sign_in_with_google`, PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` and already-issued `/?oauth=email` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Keep the redirect URLs configured.
 
 ### Weekly AI CORS
 
@@ -303,7 +305,6 @@ src/
   styles/                       Base component styles and mobile-first web layout
 server/
   http.ts                       Shared bounded reads and explicitly safe API errors
-  planner-handler.ts            Validated, account-scoped gateway dispatch
   weekly-review/                Review validation, provider requests and quota orchestration
   task-suggestions/             Previous-day task proposals: handler, OpenAI request, output validation
 ```
@@ -313,13 +314,13 @@ See [refactoring notes](refactoring.md) for the cleanup boundaries and compatibi
 ### Code quality
 
 ```sh
-npm run check          # Strict typecheck (including server/API), ESLint + Solid rules, formatting
-npm run format         # Format maintained frontend, server and API source
+npm run check          # Strict typecheck (including server), ESLint + Solid rules, formatting
+npm run format         # Format maintained frontend and server source
 npm run test:unit      # Domain/queue/security tests and Solid lifecycle tests
 npm run test:e2e       # Production-artifact Chromium + WebKit workflows
 ```
 
-CI runs the same quality gates before testing and packaging. Supabase CLI, PGlite, formatting, linting and server-build tools are development dependencies. Dependencies referenced by the existing in-progress Clerk frontend/backend code are explicitly declared, so a clean `npm ci` does not rely on extraneous local packages. `package.json` overrides `minimatch` to `^11.0.1` (advisory GHSA-g3hv-75wg-m249) because eslint and typescript-eslint still declare `^10`; remove the override once they accept 11. **This refactor does not switch the active Supabase transport to Clerk or deploy its bridge migration.** Existing Clerk/backend source is preserved; its frontend files are excluded from bulk formatting.
+CI runs the same quality gates before testing and packaging. Supabase CLI, PGlite, formatting, linting and server-build tools are development dependencies. `package.json` overrides `minimatch` to `^11.0.1` (advisory GHSA-g3hv-75wg-m249) because eslint and typescript-eslint still declare `^10`; remove the override once they accept 11.
 
 ### Component and data boundaries
 

@@ -21,8 +21,6 @@ Read these first and follow their conventions (SolidJS signals/stores, one rende
 - `server/task-suggestions/` (existing AI task suggestions)
 - `tests/landing.spec.ts`, `tests/first-run.spec.ts`, `tests/guest.spec.ts`, `tests/no-trackers.test.mjs`, `tests/helpers/`
 
-Ignore `src/planner/clerk-cloud.ts`. It is unused Clerk code.
-
 The existing sign-in page (heading "DO LESS. ACHIEVE MORE.") is the entry point. Reuse its look and copy for the survey intro rather than inventing a new style.
 
 ## The flow

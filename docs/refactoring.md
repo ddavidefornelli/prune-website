@@ -5,7 +5,7 @@
 - **UI components** render and collect input. Small Solid state factories own reactive state and lifecycle cleanup; they are not classes because Solid tracks accessors and ownership, not class property mutation.
 - **`createSession`** manages explicit restoration/transfer phases. It ignores late responses after disposal and prevents duplicate guest transfers. `Session.tsx` renders those phases; `App.tsx` only selects the route and error boundary.
 - **`PlanningClient`** coordinates authenticated access, typed RPC queries and task mutations. Queries are never mistaken for outbox writes. The constructor takes named options (`{ cloud }`, `{ guest: true }`).
-- **`BrowserCloud` / `api-fetch.ts`** separate Supabase authentication from bounded HTTP I/O. Both the current transport and the in-progress Clerk transport use the same HTTP helper, without importing one another.
+- **`BrowserCloud` / `api-fetch.ts`** separate Supabase authentication from bounded HTTP I/O.
 - **`createAccountQueue`** supplies browser locks, account-scoped storage keys, online/storage listeners and queue-protocol negotiation.
 - **`LocalQueue`** owns atomic snapshot/outbox persistence, serialized sends, acknowledgement validation, conflicts and retry backoff.
 - **`GuestStore`** owns the device-local journal and confirmed account transfer. Dashboard replay clones once rather than cloning every intermediate dashboard. Mutations return the projected task directly, including completion of an older active task.
@@ -36,9 +36,8 @@ Classes are used for stateful storage/network clients. Pure projections, formatt
 - The dashboard's time-independent signature guard. Benchmarking showed that unconditionally reconciling unchanged history is slower; a shorter implementation would not be an optimization here.
 - Legacy priority/resource/pause projection commands: existing saved outboxes may still contain them.
 - Mac-only resource metadata and shared response fields such as `isPriority` and `canPlanTomorrow`.
-- Existing Clerk integration/build source and its dependencies. It is unfinished integration work, not evidence that its associated database records can be dropped. Only imports affected by the HTTP/type extraction were updated in its frontend transport.
 - All database migrations and account deletion/retention semantics. See [the database review](database-review.md).
 
 ## Checks
 
-`npm run check` now lints and checks formatting for `src`, `server` and `api` (with the pre-existing Clerk frontend formatting exclusions retained). TypeScript already covers those directories plus scripts and tests. Unit tests cover the extracted HTTP/projection modules, unordered/duplicate completion history and single-read guest mutations; Solid lifecycle tests cover session races, client disposal, protocol negotiation, deletion recovery, account-action confirmations and guest network isolation. Playwright also verifies that profile clock ticks do not reparse completion history. It exercises the production artifact against local intercepted fixtures, not hosted accounts or paid services.
+`npm run check` now lints and checks formatting for `src` and `server`. TypeScript already covers those directories plus scripts and tests. Unit tests cover the extracted HTTP/projection modules, unordered/duplicate completion history and single-read guest mutations; Solid lifecycle tests cover session races, client disposal, protocol negotiation, deletion recovery, account-action confirmations and guest network isolation. Playwright also verifies that profile clock ticks do not reparse completion history. It exercises the production artifact against local intercepted fixtures, not hosted accounts or paid services.

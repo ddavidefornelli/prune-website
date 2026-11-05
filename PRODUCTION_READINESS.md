@@ -10,7 +10,7 @@ No deployment, remote SQL changes, real email delivery, account creation/deletio
 
 ## SolidJS refactor follow-up (local only)
 
-The imperative planner UI has been replaced with Solid components and lifecycle-managed reactive controllers. TypeScript, the shared RPC/storage protocol, account isolation and CSP/SRI enforcement are retained. Existing in-progress Clerk/backend source was preserved; the active authentication transport remains Supabase.
+The imperative planner UI has been replaced with Solid components and lifecycle-managed reactive controllers. TypeScript, the shared RPC/storage protocol, account isolation and CSP/SRI enforcement are retained. The unused Clerk transport and its bridge were later removed; authentication is Supabase only.
 
 After a clean `npm ci`, the refactored checkout passed:
 
@@ -20,7 +20,7 @@ After a clean `npm ci`, the refactored checkout passed:
 | `npm run test:unit` | **109 domain/queue/security tests + 8 Solid lifecycle/race tests passed.** |
 | `npm run test:e2e` | **126 passed** across Chromium/WebKit, including background draft/focus preservation and failed durable-save rollback. |
 | Production build and isolated release packaging | **PASS; 62 artifact security assertions passed.** Packaging used a temporary output directory, not the existing Vercel deployable. |
-| Dependency audit | **0 known vulnerabilities** at installation/audit time. The preserved Clerk dependency tree emits an upstream `crypto-js` deprecation warning. |
+| Dependency audit | **0 known vulnerabilities** at installation/audit time. |
 
 No hosted probes, deployments or database changes were performed for this refactor. [The database review](docs/database-review.md) explains why the shared schema has no proven-safe table/column removals. These local results do **not** supersede hosted launch gates or constitute production/security approval. The observations below are historical and were not rerun against the live service.
 

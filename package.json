@@ -10,9 +10,9 @@
     "dev": "vite --host 127.0.0.1",
     "build": "npm run typecheck && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src server api",
-    "format": "prettier --write src server api",
-    "format:check": "prettier --check src server api",
+    "lint": "eslint src server",
+    "format": "prettier --write src server",
+    "format:check": "prettier --check src server",
     "check": "npm run typecheck && npm run lint && npm run format:check",
     "build:vercel": "node --experimental-strip-types scripts/build-release.mjs",
     "check:deployment": "node --experimental-strip-types scripts/check-deployment.mjs",
@@ -24,8 +24,6 @@
     "check:production": "node --experimental-strip-types scripts/check-production.mjs"
   },
   "dependencies": {
-    "@clerk/backend": "^3.26.4",
-    "@clerk/clerk-js": "^6.42.0",
     "@contentsquare/tag-sdk": "^1.1.0",
     "@supabase/supabase-js": "^2.118.0",
     "@vercel/analytics": "^2.0.1",

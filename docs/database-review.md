@@ -20,7 +20,7 @@ The web app and Mac app share a Supabase schema. The base schema lives in `../pr
 | `ai_usage` | Daily/monthly aggregate request limits used by scheduled reviews and Mac previews. |
 | `ai_review_requests` | Scheduled generation, per-account quotas, request leases, preference revisions and retention. |
 | `ai_review_previews` | Mac preview quotas and leases. The website has no preview UI, but the shared backend still implements it. |
-| `planner_clerk_identities` | Existing in-progress Clerk bridge migration: maps Clerk identities to established planner UUIDs. Not selected by the current web transport, but not obsolete data. |
+| `planner_clerk_identities` | Dropped, with `planner_call_as`, by `20261105000200_drop_clerk_bridge.sql` once the Clerk transport was removed. The migration refuses to run while any mapping remains. |
 
 ## Fields that may look redundant
 

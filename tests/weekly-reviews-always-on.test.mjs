@@ -31,13 +31,13 @@ async function fixture() {
       return (select jsonb_build_object('action', p_action, 'enabled', ai_enabled) from public.planner_accounts where user_id = auth.uid());
     end $$;
   `);
-  for (const name of ['20261024000200_soft_delete_accounts.sql', '20261027000100_clerk_bridge.sql', '20261103000100_weekly_reviews_always_on.sql'])
+  for (const name of ['20261024000200_soft_delete_accounts.sql', '20261103000100_weekly_reviews_always_on.sql'])
     await db.exec(migration(name));
   await asOwner(db);
   return db;
 }
 
-test('owners can turn weekly reviews on but never off, through either client path', async () => {
+test('owners can turn weekly reviews on but never off', async () => {
   const db = await fixture();
   try {
     assert.deepEqual((await call(db, 'dashboard')).rows[0].result, { action: 'dashboard', enabled: true });
@@ -48,10 +48,6 @@ test('owners can turn weekly reviews on but never off, through either client pat
     await db.exec(`update public.planner_accounts set ai_enabled = false where user_id = '${owner}'`);
     assert.deepEqual((await call(db, 'set_weekly_ai_enabled', { enabled: true })).rows[0].result, { action: 'set_weekly_ai_enabled', enabled: true });
     await assert.rejects(call(db, 'set_weekly_ai_enabled', { enabled: false }), refused);
-    // The Clerk web gateway dispatches through the same guard.
-    await db.query(`select set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
-    await assert.rejects(db.query(`select public.planner_call_as('${owner}', 'set_weekly_ai_enabled', '{"enabled":false}')`), refused);
-    assert.equal(await enabled(db), true);
   } finally { await db.close(); }
 });
 
@@ -72,5 +68,23 @@ test('the replaced guard keeps authenticated-only access and a private dispatche
       has_function_privilege('anon', 'public.planner_call(text,jsonb,text)', 'EXECUTE') as anon,
       has_function_privilege('authenticated', 'public.planner_call_active(text,jsonb,text)', 'EXECUTE') as dispatcher`);
     assert.deepEqual(rows[0], { authenticated: true, anon: false, dispatcher: false });
+  } finally { await db.close(); }
+});
+
+test('the Clerk bridge drops cleanly, but never while identity mappings remain', async () => {
+  const db = await fixture();
+  try {
+    await db.exec('reset role');
+    await db.exec(migration('20261027000100_clerk_bridge.sql'));
+    await db.exec(`insert into public.planner_clerk_identities values ('user_clerk', '${owner}', now())`);
+    await assert.rejects(db.exec(migration('20261105000200_drop_clerk_bridge.sql')), /still has rows/);
+    await db.exec('rollback');
+    assert.ok((await db.query(`select to_regclass('public.planner_clerk_identities') as t`)).rows[0].t, 'a refused drop changes nothing');
+    await db.exec('delete from public.planner_clerk_identities');
+    await db.exec(migration('20261105000200_drop_clerk_bridge.sql'));
+    const { rows } = await db.query(`select to_regclass('public.planner_clerk_identities') as t,
+      to_regprocedure('public.planner_call_as(uuid,text,jsonb,text)') as f`);
+    assert.deepEqual(rows[0], { t: null, f: null });
+    await db.exec(migration('20261105000200_drop_clerk_bridge.sql'));
   } finally { await db.close(); }
 });
