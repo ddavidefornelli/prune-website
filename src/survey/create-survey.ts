@@ -6,12 +6,10 @@ import {
   assignVariant,
   back,
   countEvent,
-  finishAsGuest,
   finishSignedIn,
   keepPlan,
   reachedEvent,
   readSurvey,
-  skip,
   start,
   surveyImport,
   surveyVisible,
@@ -109,14 +107,6 @@ export function createSurvey(options: SurveyOptions) {
     back: () => update(back, "back"),
     showPlan: () => update((current) => ({ ...current, step: "plan" })),
     keepPlan: () => update(keepPlan),
-    skip() {
-      track("skipped");
-      update(skip);
-    },
-    /** "Not now", or leaving the email form opened from the survey. */
-    finishAsGuest() {
-      if (visible()) update(finishAsGuest);
-    },
     importPayload: () => surveyImport(readSurvey(storage), now()),
     signedIn(interactive: boolean, imported: boolean) {
       update((current) => {

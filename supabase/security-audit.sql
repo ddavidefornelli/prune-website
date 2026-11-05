@@ -77,12 +77,14 @@ join pg_catalog.pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and p.proname = 'guest_record_usage';
 
 -- 5. Queue protocol and latest UI rules must actually be deployed.
--- Expected: true/true. Missing functions return false rather than applying anything.
+-- Expected: true/true/true. Missing functions return false rather than applying anything.
 select
   coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
     like '%queue_protocol%', false) as queue_protocol_installed,
   coalesce(pg_get_functiondef(to_regprocedure('public.planner_execute(text,jsonb,text)'))
-    like '%''canPlanTomorrow'', true%', false) as immediate_tomorrow_installed;
+    like '%''canPlanTomorrow'', true%', false) as immediate_tomorrow_installed,
+  coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
+    like '%cannot be turned off%', false) as weekly_reviews_always_on;
 
 -- 6. Never permit unlimited development AI on production.
 -- Expected: development_unlimited=false, conservative bounded budgets.

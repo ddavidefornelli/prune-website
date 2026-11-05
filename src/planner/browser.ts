@@ -150,7 +150,7 @@ export class BrowserCloud implements CloudTransport {
     if (!response.ok || settings?.external?.google !== true)
       throw new CloudError(
         "auth",
-        "Google sign-in isn't available right now. Use email instead.",
+        "Google sign-in isn't available right now. Please try again later.",
       );
   }
 

@@ -27,6 +27,8 @@ test.describe("first run", () => {
       await page.getByRole("region", { name: "Starting ideas" })
         .getByRole("button", { name: /Plan the week ahead/ }).click();
       await synced(page);
+      await page.locator(".tour-popup").getByRole("button", { name: "Skip tour" }).click();
+      await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
       expect(backend.data.todayTasks).toHaveLength(1);
       expect(backend.data.todayTasks[0]!.estimatedMinutes).toBe(30);
       expect(backend.data.activeTask).toBeNull();

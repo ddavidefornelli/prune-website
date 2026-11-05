@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  answer, assignVariant, back, buildPlan, countEvent, emptySurvey, finishAsGuest, finishSignedIn, isFreshVisitor,
-  keepPlan, nextStep, parseFlag, parseSurvey, previousStep, questionNumber, reachedEvent, readSurvey, skip, start, STEPS,
+  answer, assignVariant, back, buildPlan, countEvent, emptySurvey, finishSignedIn, isFreshVisitor,
+  keepPlan, nextStep, parseFlag, parseSurvey, previousStep, questionNumber, reachedEvent, readSurvey, start, STEPS,
   SURVEY_KEY, surveyImport, surveyVisible, tasksToAdd, updateSurvey, weekStartOf, writeSurvey,
 } from "../src/survey/model.ts";
 
@@ -96,32 +96,32 @@ test("a refused storage write keeps the flow going for this page", () => {
   assert.equal(isFreshVisitor(broken), false, "unknown storage is never treated as a first visit");
 });
 
-test("only fresh visitors start the questions, and finished or skipped flows never return", () => {
+test("only fresh visitors start the questions, finished flows never return, and an earlier skip no longer counts", () => {
   const storage = memory();
   assert.equal(isFreshVisitor(storage), true);
   storage.setItem("prune:privacy:acknowledgement", JSON.stringify({ version: "privacy-old" }));
   assert.equal(isFreshVisitor(storage), false, "any earlier notice acceptance means a returning visitor");
   const fresh = memory();
   fresh.setItem("prune:guest:v1", "{}");
-  assert.equal(isFreshVisitor(fresh), false, "existing guest plans skip the questions");
+  assert.equal(isFreshVisitor(fresh), false, "existing guest plans go straight to the planner");
   const state = { ...emptySurvey(), variant: "survey" };
   assert.equal(surveyVisible(state, true), true);
   assert.equal(surveyVisible(state, false), false);
   assert.equal(surveyVisible(start(state), false), true, "a started flow resumes");
   assert.equal(surveyVisible({ ...state, variant: "control" }, true), false);
   assert.equal(surveyVisible({ ...state, variant: null }, true), false);
-  assert.equal(surveyVisible(skip(start(state)), true), false);
-  assert.equal(surveyVisible(finishAsGuest(start(state)), true), false);
   assert.equal(surveyVisible(finishSignedIn(start(state)), true), false);
   assert.equal(finishSignedIn(state).status, "new", "signing in elsewhere does not finish an unstarted flow");
+  const skipped = parseSurvey(JSON.stringify({ ...start(state), status: "skipped" }));
+  assert.equal(skipped.status, "new", "a skip stored by an earlier build reads as not started");
+  assert.equal(surveyVisible(skipped, true), true, "so a still-fresh browser gets the questions again");
+  assert.equal(surveyVisible(skipped, false), false);
 });
 
 test("keeping the plan waits for the next planner and is never re-added", () => {
   const state = start({ ...emptySurvey(), answers });
   assert.deepEqual([keepPlan(state).step, keepPlan(state).plan], ["save", "pending"]);
-  assert.equal(finishAsGuest(state).plan, "pending");
   assert.equal(keepPlan({ ...state, plan: "applied" }).plan, "applied");
-  assert.equal(finishAsGuest({ ...state, plan: "applied" }).plan, "applied");
 });
 
 test("the plan echoes the answers it was computed from", () => {
@@ -183,11 +183,12 @@ test("funnel events count once per browser and variant, without answers", () => 
   assert.deepEqual(result.usage, { funnel_survey_shown: 1 });
   state = result.state;
   assert.deepEqual(countEvent(state, "shown").usage, {});
-  for (const event of ["started", "finished", "plan_shown", "google_clicked", "signed_up", "skipped", "reached_goal", "reached_outcome"]) {
+  for (const event of ["started", "finished", "plan_shown", "google_clicked", "signed_up", "reached_goal", "reached_outcome"]) {
     result = countEvent(state, event);
     assert.deepEqual(result.usage, { [`funnel_survey_${event}`]: 1 });
     state = result.state;
   }
+  assert.deepEqual(countEvent(state, "skipped").usage, {}, "there is no skip left to count");
   assert.doesNotMatch(JSON.stringify(state.counted), /Ada|ship|engineer|phone/);
   const control = countEvent({ ...emptySurvey(), variant: "control" }, "shown");
   assert.deepEqual(control.usage, { funnel_control_shown: 1 });

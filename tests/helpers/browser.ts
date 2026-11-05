@@ -135,8 +135,9 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (action === "dashboard") { await send({ ...state.data, serverNow: Math.floor(Date.now() / 1000) }); return; }
       if (action === "weekly_overview") { await send(state.weekly); return; }
       if (action === "set_weekly_ai_enabled") {
-        state.weekly.settings.enabled = args.enabled;
-        state.weekly.status = args.enabled ? "up_to_date" : "disabled";
+        if (args.enabled !== true) { await send({ code: "PT400", message: "Weekly reviews are part of prune and cannot be turned off." }, 400); return; }
+        state.weekly.settings.enabled = true;
+        state.weekly.status = "up_to_date";
         await send(state.weekly);
         return;
       }

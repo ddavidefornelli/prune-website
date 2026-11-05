@@ -165,7 +165,7 @@ test("guest planning and review checks never use the cloud transport", async (t)
   await guest.create("Local only", data.today, 15);
   await guest.generateIfDue();
   await assert.rejects(guest.weeklyOverview(), /Sign in/);
-  await assert.rejects(guest.setWeeklyAiEnabled(true), /Sign in/);
+  await assert.rejects(guest.enableWeeklyAi(), /Sign in/);
   assert.equal(f.calls.length, 0);
   assert.equal((await guest.dashboard()).todayTasks[0].outcome, "Local only");
 });

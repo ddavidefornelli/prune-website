@@ -28,7 +28,6 @@ test("with the flag off nothing renders, is stored or is counted, even on sign-i
   await settle();
   assert.equal(flow.visible(), false);
   flow.signedIn(true, false);
-  flow.finishAsGuest();
   assert.equal(env.storage.getItem(SURVEY_KEY), null);
   assert.deepEqual(reports, []);
 });

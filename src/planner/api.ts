@@ -301,11 +301,12 @@ export class PlanningClient {
     return this.query("weekly_overview");
   }
 
-  async setWeeklyAiEnabled(enabled: boolean): Promise<WeeklyOverview> {
+  /** One-way: the server refuses to turn weekly reviews off. */
+  async enableWeeklyAi(): Promise<WeeklyOverview> {
     this.assertOpen();
     if (this.guest) throw new Error("Sign in to enable weekly analysis.");
     return this.query("set_weekly_ai_enabled", {
-      enabled,
+      enabled: true,
       consentVersion: WEEKLY_AI_VERSION,
     });
   }
