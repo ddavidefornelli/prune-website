@@ -7,10 +7,12 @@ import {
   type JSX,
 } from "solid-js";
 import {
-  calendarYear,
+  CALENDAR_MONTHS,
+  calendarMonth,
   MONTHS,
+  WEEKDAYS,
   type CalendarDay,
-  type CalendarYear,
+  type CalendarMonth,
   type Completion,
 } from "../activity-calendar-model";
 import { PLANNER_LIMITS } from "../constants";
@@ -71,8 +73,8 @@ function ActivityDay(props: {
       count={props.day.count}
       class={`${props.day.future ? "is-future" : ""}${props.day.day === props.today ? " is-today" : ""}`}
       style={{
-        "grid-row": props.day.row + 2,
-        "grid-column": props.day.week + 1,
+        "grid-row": props.day.week + 2,
+        "grid-column": props.day.column + 1,
       }}
       title={label()}
       role="listitem"
@@ -85,9 +87,8 @@ function ActivityDay(props: {
 
 /** Owns roving focus; date calculation and day presentation stay independent. */
 function ActivityGrid(props: {
-  calendar: CalendarYear;
+  calendar: CalendarMonth;
   today: string;
-  startMonth: number;
   labelledBy: string;
 }) {
   const [focusedDay, setFocusedDay] = createSignal<string>();
@@ -100,23 +101,6 @@ function ActivityGrid(props: {
       days.find((day) => day.day === focusedDay())?.day ?? days.at(-1)?.day
     );
   });
-  const months = createMemo(() => {
-    const startMonth = props.startMonth;
-    const calendar = props.calendar;
-    return Array.from({ length: 12 }, (_, index) => {
-      const month = (startMonth + index) % 12;
-      const first = calendar.days.find((day) => day.month === month)!;
-      const next =
-        index < 11
-          ? calendar.days.find((day) => day.month === (month + 1) % 12)
-          : undefined;
-      return {
-        month,
-        week: first.week,
-        span: (next?.week ?? calendar.weeks) - first.week,
-      };
-    });
-  });
   const navigate: JSX.EventHandler<HTMLDivElement, KeyboardEvent> = (event) => {
     const cells = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>(
@@ -126,7 +110,7 @@ function ActivityGrid(props: {
     const index = cells.indexOf(event.target as HTMLElement);
     if (index < 0) return;
     const delta = (
-      { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 } as Record<
+      { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 } as Record<
         string,
         number
       >
@@ -147,19 +131,14 @@ function ActivityGrid(props: {
   return (
     <div
       class="activity-grid"
-      style={{ "--weeks": props.calendar.weeks }}
       role="list"
       aria-labelledby={props.labelledBy}
       onKeyDown={navigate}
     >
-      <For each={months()}>
-        {(month) => (
-          <span
-            class="activity-month"
-            style={{ "grid-column": `${month.week + 1} / span ${month.span}` }}
-            aria-hidden="true"
-          >
-            {MONTHS[month.month]}
+      <For each={WEEKDAYS}>
+        {(weekday) => (
+          <span class="activity-weekday" aria-hidden="true">
+            {weekday}
           </span>
         )}
       </For>
@@ -178,28 +157,50 @@ function ActivityGrid(props: {
 
 export function ActivityCalendar(props: ActivityCalendarProps) {
   const headingId = createUniqueId();
-  const year = () => Number(props.today.slice(0, 4));
-  const startMonth = () => Number(props.today.slice(5, 7)) - 1;
+  // 0 is the current month; earlier months are negative.
+  const [offset, setOffset] = createSignal(0);
   const calendar = createMemo(() =>
-    calendarYear(year(), props.today, props.completions, startMonth()),
+    calendarMonth(props.today, props.completions, offset()),
   );
+  const monthName = (calendar: CalendarMonth) =>
+    `${MONTHS[calendar.month]} ${calendar.year}`;
   const heading = () =>
-    `${calendar().total.toLocaleString()} ${calendar().total === 1 ? "task" : "tasks"} completed in ${MONTHS[startMonth()]} ${year()} – ${MONTHS[(startMonth() + 11) % 12]} ${startMonth() === 0 ? year() : year() + 1}`;
+    `${calendar().total.toLocaleString()} ${calendar().total === 1 ? "task" : "tasks"} completed in ${monthName(calendar())}`;
+  const earliest = -(CALENDAR_MONTHS - 1);
   return (
     <section class="activity-calendar" aria-label="Task completion history">
       <div class="activity-chart">
-        <h2 class="activity-heading" id={headingId}>
-          {heading()}
-        </h2>
-        <div class="activity-card">
-          <div class="activity-scroll">
-            <ActivityGrid
-              calendar={calendar()}
-              today={props.today}
-              startMonth={startMonth()}
-              labelledBy={headingId}
-            />
+        <div class="activity-header">
+          <h2 class="activity-heading" id={headingId} aria-live="polite">
+            {heading()}
+          </h2>
+          <div class="activity-pager">
+            <button
+              type="button"
+              class="activity-page"
+              aria-label="Previous month"
+              disabled={offset() <= earliest}
+              onClick={() => setOffset((value) => Math.max(earliest, value - 1))}
+            >
+              {"‹"}
+            </button>
+            <button
+              type="button"
+              class="activity-page"
+              aria-label="Next month"
+              disabled={offset() >= 0}
+              onClick={() => setOffset((value) => Math.min(0, value + 1))}
+            >
+              {"›"}
+            </button>
           </div>
+        </div>
+        <div class="activity-card">
+          <ActivityGrid
+            calendar={calendar()}
+            today={props.today}
+            labelledBy={headingId}
+          />
           <div class="activity-footer">
             <ActivityLegend />
           </div>

@@ -652,16 +652,47 @@ textarea {
   }
 }
 .activity-calendar {
+  max-width: 480px;
   margin-top: 28px;
 }
 .activity-chart {
   min-width: 0;
 }
-.activity-heading {
+.activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 0 12px;
+}
+.activity-heading {
+  margin: 0;
   font-size: 0.8889rem;
   font-weight: 400;
   letter-spacing: 0;
+}
+.activity-pager {
+  display: flex;
+  gap: 4px;
+}
+#app .activity-page {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+}
+#app .activity-page:hover:not(:disabled) {
+  border-color: var(--text);
+}
+#app .activity-page:disabled {
+  opacity: 0.35;
 }
 .activity-card {
   padding: 16px;
@@ -669,44 +700,40 @@ textarea {
   border-radius: 0;
   background: var(--surface);
 }
-.activity-scroll {
-  overflow-x: auto;
-  padding: 3px;
-}
+/* Same month grid as the landing page preview: Monday first, wide cells. */
 .activity-grid {
   display: grid;
-  grid-template-columns: repeat(var(--weeks), minmax(10px, 1fr));
-  grid-template-rows: 18px repeat(7, auto);
-  gap: 3px;
-  min-width: calc(var(--weeks) * 13px - 3px);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
 }
-.activity-month {
+.activity-weekday {
   grid-row: 1;
   color: var(--muted);
-  font-size: 0.6111rem;
-  line-height: 1;
-  align-self: start;
+  font-size: 0.5556rem;
+  line-height: 1.6;
+  text-align: center;
 }
 .activity-day {
   display: block;
-  aspect-ratio: 1;
+  aspect-ratio: 1.7;
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid #1f1d1b;
   border-radius: 0;
-  background: var(--surface);
+  background: #141312;
 }
 .activity-level-1 {
-  background: #655d4f;
+  background: rgb(212 83 91 / 0.18);
 }
 .activity-level-2 {
-  background: var(--taupe);
+  background: rgb(212 83 91 / 0.42);
 }
 .activity-level-3 {
-  background: var(--text);
+  background: rgb(212 83 91 / 0.85);
 }
 .activity-day.is-future {
   background: transparent;
-  border-color: var(--surface);
+  border-color: #1a1918;
 }
 .activity-day.is-today {
   outline: 1px solid #ffffff70;
@@ -731,8 +758,9 @@ textarea {
   gap: 4px;
 }
 .activity-legend .activity-day {
-  width: 11px;
-  height: 11px;
+  width: 17px;
+  height: 10px;
+  aspect-ratio: auto;
 }
 .activity-legend > span:first-child {
   margin-right: 4px;
