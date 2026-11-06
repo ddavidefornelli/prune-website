@@ -722,14 +722,18 @@ textarea {
   border-radius: 0;
   background: #141312;
 }
+/* Solid reds: translucent ones turned muddy over the grey card. */
 .activity-level-1 {
-  background: rgb(212 83 91 / 0.18);
+  background: #6e1a24;
+  border-color: #7d1f2a;
 }
 .activity-level-2 {
-  background: rgb(212 83 91 / 0.42);
+  background: #bb2a39;
+  border-color: #c9303f;
 }
 .activity-level-3 {
-  background: rgb(212 83 91 / 0.85);
+  background: #ff3b4e;
+  border-color: #ff5566;
 }
 .activity-day.is-future {
   background: transparent;
