@@ -46,11 +46,12 @@ export function SignIn(props: SignInProps) {
 
   return (
     <section class="auth-panel" aria-labelledby="signup-title">
-      <p class="auth-hook">Twenty tasks on your list, none finished?</p>
       <h1 id="signup-title">
-        DO LESS.
+        TWENTY TASKS
         <br />
-        ACHIEVE MORE.
+        ON YOUR LIST,
+        <br />
+        NONE FINISHED?
       </h1>
       <p class="auth-description">
         Focus on just 3 tasks and understand what's holding you back with the

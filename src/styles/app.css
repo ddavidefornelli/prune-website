@@ -244,13 +244,6 @@ textarea:focus {
   text-align: left;
   letter-spacing: 0.01em;
 }
-.auth-hook {
-  margin: 0 0 12px;
-  text-align: left;
-  color: var(--muted);
-  font-size: 0.8889rem;
-  line-height: 1.4;
-}
 .auth-panel h1 {
   max-width: none;
   margin: 0;
