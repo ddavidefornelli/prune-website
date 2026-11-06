@@ -777,6 +777,82 @@ textarea {
     padding: 12px;
   }
 }
+/* Month facts: a row under the calendar on phones, a column beside it on laptops. */
+.activity-calendar.has-stats {
+  max-width: none;
+}
+.activity-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.activity-stat {
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.activity-stat:first-child {
+  border-left: 2px solid var(--blood-red);
+}
+.activity-stat dt {
+  color: var(--muted);
+  font-size: 0.5556rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.activity-stat dd {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.activity-stat strong {
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.activity-stat dd span {
+  color: var(--muted);
+  font-size: 0.6111rem;
+  line-height: 1.4;
+}
+.activity-stats[aria-busy="true"] strong {
+  color: var(--muted);
+}
+@media (min-width: 900px) {
+  .activity-calendar.has-stats {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(240px, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 24px;
+  }
+  .activity-calendar.has-stats .activity-chart {
+    display: contents;
+  }
+  .activity-calendar.has-stats .activity-header {
+    grid-area: 1 / 1;
+  }
+  .activity-calendar.has-stats .activity-card {
+    grid-area: 2 / 1;
+  }
+  .activity-calendar.has-stats .activity-stats {
+    grid-area: 2 / 2;
+    grid-template-columns: none;
+    grid-auto-rows: 1fr;
+    margin: 0;
+  }
+  .activity-stat {
+    padding: 18px 20px;
+  }
+  .activity-stat strong {
+    font-size: 2rem;
+  }
+}
 .weekly-overview {
   margin-top: 40px;
   padding-top: 28px;

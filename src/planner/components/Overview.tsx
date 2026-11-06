@@ -1,14 +1,17 @@
 import { untrack } from "solid-js";
 import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
 import { WeeklyReview } from "../../reviews/WeeklyReview";
+import type { PlanningClient } from "../api";
 import type { PlannerState } from "../create-planner";
 import { ActivityCalendar } from "./ActivityCalendar";
 
 export function Overview(props: {
   planner: PlannerState;
+  client: PlanningClient;
   review: WeeklyReviewState;
 }) {
   const planner = untrack(() => props.planner);
+  const client = untrack(() => props.client);
   return (
     <div class="overview-screen">
       <div class="overview-content">
@@ -26,6 +29,8 @@ export function Overview(props: {
         <ActivityCalendar
           today={planner.data()!.today}
           completions={planner.data()!.completions}
+          loadStats={(month) => client.monthStats(month)}
+          version={planner.data()!.revision}
         />
         <WeeklyReview review={props.review} now={planner.clock()} />
       </div>

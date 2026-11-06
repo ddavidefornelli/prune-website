@@ -71,14 +71,16 @@ select
   to_regclass('public.planner_onboarding') is null as survey_answers_removed;
 
 -- 5. Queue protocol and latest UI rules must actually be deployed.
--- Expected: true/true/true. Missing functions return false rather than applying anything.
+-- Expected: true for every column. Missing functions return false rather than applying anything.
 select
   coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
     like '%queue_protocol%', false) as queue_protocol_installed,
   coalesce(pg_get_functiondef(to_regprocedure('public.planner_execute(text,jsonb,text)'))
     like '%''canPlanTomorrow'', true%', false) as immediate_tomorrow_installed,
   coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
-    like '%cannot be turned off%', false) as weekly_reviews_always_on;
+    like '%cannot be turned off%', false) as weekly_reviews_always_on,
+  coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
+    like '%month_stats%', false) as month_stats_installed;
 
 -- 6. Never permit unlimited development AI on production.
 -- Expected: development_unlimited=false, conservative bounded budgets.

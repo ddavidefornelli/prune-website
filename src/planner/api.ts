@@ -12,6 +12,7 @@ import type { LocalQueue } from "./local-queue.ts";
 import type {
   AuthStatus,
   Dashboard,
+  MonthStats,
   Task,
   TaskSuggestion,
   WeeklyOverview,
@@ -233,6 +234,12 @@ export class PlanningClient {
     } else void this.queue.sync();
     if (!cached) throw new Error(this.queue.status);
     return cached;
+  }
+
+  /** `month` is YYYY-MM. Read-only and never queued: offline, the stats are simply absent. */
+  async monthStats(month: string): Promise<MonthStats> {
+    this.assertOpen();
+    return this.query("month_stats", { month });
   }
 
   async weeklyOverview(): Promise<WeeklyOverview> {

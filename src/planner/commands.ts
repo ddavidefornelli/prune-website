@@ -1,4 +1,4 @@
-import type { Dashboard, WeeklyOverview } from "./types.ts";
+import type { Dashboard, MonthStats, WeeklyOverview } from "./types.ts";
 
 /** Non-queued RPC results; destructive account operations must stay online. */
 export interface PlannerQueries {
@@ -7,6 +7,7 @@ export interface PlannerQueries {
   delete_account: { isDeleted: boolean };
   weekly_overview: WeeklyOverview;
   set_weekly_ai_enabled: WeeklyOverview;
+  month_stats: MonthStats;
 }
 
 /** Commands sent by the web UI, plus legacy commands kept for saved outboxes. */

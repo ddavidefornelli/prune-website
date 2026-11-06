@@ -1,8 +1,10 @@
 import {
   createMemo,
+  createResource,
   createSignal,
   createUniqueId,
   For,
+  Show,
   splitProps,
   type JSX,
 } from "solid-js";
@@ -16,10 +18,16 @@ import {
   type Completion,
 } from "../activity-calendar-model";
 import { PLANNER_LIMITS } from "../constants";
+import { formatMinutes } from "../quick-entry";
+import type { MonthStats } from "../types";
 
 interface ActivityCalendarProps {
   today: string;
   completions: readonly Completion[];
+  /** Loads server-side stats for a YYYY-MM month; without it no stats are shown. */
+  loadStats?: (month: string) => Promise<MonthStats>;
+  /** Changes whenever the planner's data does, so the stats follow new work. */
+  version?: unknown;
 }
 
 const dateLabel = new Intl.DateTimeFormat("en", {
@@ -155,6 +163,60 @@ function ActivityGrid(props: {
   );
 }
 
+function ActivityStat(props: { value: string; label: string; detail: string }) {
+  return (
+    <div class="activity-stat">
+      <dt>{props.label}</dt>
+      <dd>
+        <strong>{props.value}</strong>
+        <span>{props.detail}</span>
+      </dd>
+    </div>
+  );
+}
+
+/** Three month facts beside the grid: finished share, focus time, active days. */
+function ActivityStats(props: {
+  calendar: CalendarMonth;
+  stats: MonthStats | undefined;
+}) {
+  const activeDays = () =>
+    props.calendar.days.filter((day) => day.count > 0).length;
+  const elapsedDays = () =>
+    props.calendar.days.filter((day) => !day.future).length;
+  const share = () => {
+    const stats = props.stats;
+    if (!stats) return "\u2014";
+    if (!stats.planned) return "0%";
+    return `${Math.round((stats.completed / stats.planned) * 100)}%`;
+  };
+  return (
+    <dl class="activity-stats" aria-busy={props.stats ? undefined : "true"}>
+      <ActivityStat
+        label="Tasks finished"
+        value={share()}
+        detail={
+          props.stats
+            ? props.stats.planned
+              ? `${props.stats.completed} of ${props.stats.planned} planned`
+              : "Nothing planned yet"
+            : "Loading"
+        }
+      />
+      <ActivityStat
+        label="Time focused"
+        value={props.stats ? formatMinutes(props.stats.focusSeconds) : "\u2014"}
+        detail={props.stats ? "In focus sessions" : "Loading"}
+      />
+      <ActivityStat
+        label="Active days"
+        value={String(activeDays())}
+        detail={`of ${elapsedDays()} so far`}
+      />
+    </dl>
+  );
+}
+
 export function ActivityCalendar(props: ActivityCalendarProps) {
   const headingId = createUniqueId();
   // 0 is the current month; earlier months are negative.
@@ -167,8 +229,26 @@ export function ActivityCalendar(props: ActivityCalendarProps) {
   const heading = () =>
     `${calendar().total.toLocaleString()} ${calendar().total === 1 ? "task" : "tasks"} completed in ${monthName(calendar())}`;
   const earliest = -(CALENDAR_MONTHS - 1);
+  const monthKey = () =>
+    `${calendar().year}-${String(calendar().month + 1).padStart(2, "0")}`;
+  // Keyed on the month and the planner's data, so finishing a task refreshes it.
+  const [stats] = createResource(
+    () =>
+      props.loadStats && {
+        month: monthKey(),
+        version: props.version,
+        total: calendar().total,
+      },
+    ({ month }) => props.loadStats!(month),
+  );
+  // An unmigrated or offline backend just leaves the stats out.
+  const showStats = () => !!props.loadStats && !stats.error;
   return (
-    <section class="activity-calendar" aria-label="Task completion history">
+    <section
+      class="activity-calendar"
+      classList={{ "has-stats": showStats() }}
+      aria-label="Task completion history"
+    >
       <div class="activity-chart">
         <div class="activity-header">
           <h2 class="activity-heading" id={headingId} aria-live="polite">
@@ -180,7 +260,9 @@ export function ActivityCalendar(props: ActivityCalendarProps) {
               class="activity-page"
               aria-label="Previous month"
               disabled={offset() <= earliest}
-              onClick={() => setOffset((value) => Math.max(earliest, value - 1))}
+              onClick={() =>
+                setOffset((value) => Math.max(earliest, value - 1))
+              }
             >
               {"‹"}
             </button>
@@ -206,6 +288,16 @@ export function ActivityCalendar(props: ActivityCalendarProps) {
           </div>
         </div>
       </div>
+      <Show when={showStats()}>
+        <ActivityStats
+          calendar={calendar()}
+          stats={
+            !stats.error && stats.latest?.month === monthKey()
+              ? stats.latest
+              : undefined
+          }
+        />
+      </Show>
     </section>
   );
 }

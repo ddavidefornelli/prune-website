@@ -147,7 +147,11 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                 />
               </Match>
               <Match when={planner.view() === "habits"}>
-                <Overview planner={planner} review={review} />
+                <Overview
+                  planner={planner}
+                  client={props.client}
+                  review={review}
+                />
               </Match>
               <Match
                 when={

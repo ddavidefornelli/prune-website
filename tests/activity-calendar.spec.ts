@@ -48,3 +48,32 @@ test("calendar preserves accessible labels and roving focus across Overview and 
     await expect(calendar).toHaveCount(1);
   }
 });
+
+test("Overview shows the month's finished share, focus time and active days, and pages with the calendar", async ({ page, backend }) => {
+  backend.data.completions = [{ day: backend.data.today, count: 2 }];
+  backend.monthStats = { planned: 4, completed: 3, focusSeconds: 5400 };
+  await openPlanner(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
+  const calendar = page.getByRole("region", { name: "Task completion history" });
+  const stats = calendar.locator(".activity-stats");
+  await expect(stats).toContainText("75%");
+  await expect(stats).toContainText("3 of 4 planned");
+  await expect(stats).toContainText("1 h 30 min");
+  await expect(stats.locator(".activity-stat").nth(2).locator("strong")).toHaveText("1");
+  const month = backend.data.today.slice(0, 7);
+  expect(backend.requests.some((request) => request.body.p_action === "month_stats" && request.body.p_args.month === month)).toBe(true);
+  backend.monthStats = { planned: 0, completed: 0, focusSeconds: 0 };
+  await calendar.getByRole("button", { name: "Previous month" }).click();
+  await expect(stats).toContainText("Nothing planned yet");
+  await expect(stats.locator(".activity-stat").nth(2).locator("strong")).toHaveText("0");
+});
+
+test("Overview leaves the stats out when the backend has no month_stats yet", async ({ page, backend }) => {
+  backend.monthStats = null;
+  await openPlanner(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
+  const calendar = page.getByRole("region", { name: "Task completion history" });
+  await expect(calendar.locator('[aria-current="date"]')).toBeVisible();
+  await expect(calendar.locator(".activity-stats")).toHaveCount(0);
+  await expect(calendar).not.toHaveClass(/has-stats/);
+});

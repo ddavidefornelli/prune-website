@@ -76,6 +76,15 @@ export interface WeeklyReview {
   };
 }
 
+/** A month of the owner's own tasks, counted on the server. */
+export interface MonthStats {
+  month: string;
+  /** Tasks planned for days so far, plus any of today's already finished. */
+  planned: number;
+  completed: number;
+  focusSeconds: number;
+}
+
 export interface WeeklyOverview {
   developmentUnlimited?: boolean;
   settings: { enabled: boolean };
