@@ -656,21 +656,31 @@ textarea:focus {
 }
 /* Completed cards stay opaque so the full-strength background never washes them out. */
 #app .task-list > .task.is-completed {
-  background: var(--background);
+  align-items: center;
+  background: var(--surface);
   border-color: var(--border);
 }
-#app .task.is-completed .editable-title {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
+#app .task.is-completed .task-title-text {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
-#app .task.is-completed .editable-title::before {
-  content: "\2713";
-  flex: none;
-  color: var(--blood-red);
+#app .task-done {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
 }
-#app .task.is-completed .task-details > p {
-  padding-left: 26px;
+#app .task-done .estimate-ring-progress {
+  stroke: var(--blood-red);
+}
+#app .task-done-check {
+  font-size: 0.7778rem;
+  line-height: 1;
   color: var(--muted);
 }
 @keyframes rise {

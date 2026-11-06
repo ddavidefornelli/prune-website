@@ -15,6 +15,7 @@ import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
 import type { Hints } from "../hints";
 import { STARTERS } from "../starters";
 import { formatDuration, previousDay } from "../time";
+import { DoneBadge } from "./DoneBadge";
 import { EstimateDial } from "./EstimateDial";
 import { TaskForm } from "./TaskForm";
 import { TaskTitle } from "./TaskTitle";
@@ -202,8 +203,8 @@ export function PlanView(props: {
                 />
                 <Show
                   when={
-                    task.status === "completed" ||
-                    (tomorrow() && task.status !== "planned")
+                    task.status !== "planned" &&
+                    (tomorrow() || task.status !== "completed")
                   }
                 >
                   <p class="muted">
@@ -213,6 +214,12 @@ export function PlanView(props: {
                   </p>
                 </Show>
               </div>
+              <Show when={!tomorrow() && task.status === "completed"}>
+                <DoneBadge
+                  actualSeconds={task.actualSeconds}
+                  estimatedMinutes={task.estimatedMinutes}
+                />
+              </Show>
               <Show when={task.status === "planned"}>
                 <EstimateDial
                   class="task-estimate"
