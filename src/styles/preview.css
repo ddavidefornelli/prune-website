@@ -316,10 +316,9 @@
   }
 }
 @media (min-width: 760px) {
-  /* TickTick's hero screenshot is ~1.4:1. */
-  /* Height from width without aspect-ratio, whose min-height would widen it. */
+  /* Just taller than the tallest mock screen (Focus), so no band sits empty. */
   .device-screen {
-    height: clamp(30rem, (100vw - 40px) / 1.45, 40rem);
+    height: 32rem;
   }
 }
 @media (min-width: 980px) {
