@@ -163,7 +163,7 @@ export async function openPlanner(page: Page) {
 /** Signed-out visitors land on sign-in: Google is the only way in. */
 export async function openSignIn(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
 }
 export async function visitProfile(page: Page) {
   await page.getByRole("button", { name: "Overview", exact: true }).click();

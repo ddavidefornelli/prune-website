@@ -22,7 +22,7 @@ test("optional recorder waits for consent, remembers it and stops after withdraw
   await expect(banner).toBeVisible();
   expect(recorderRequests).toEqual([]);
   // Signed-out visitors land on sign-in, which keeps Cookie settings reachable.
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await page.reload();
   await expect(banner).toHaveCount(0);

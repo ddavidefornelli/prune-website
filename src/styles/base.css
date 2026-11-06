@@ -10,7 +10,9 @@
 
 @font-face {
   font-family: "Space Grotesk";
-  src: url("/fonts/space-grotesk-variable.ttf") format("truetype");
+  src:
+    url("/fonts/space-grotesk-variable.woff2") format("woff2"),
+    url("/fonts/space-grotesk-variable.ttf") format("truetype");
   font-style: normal;
   font-weight: 300 700;
   font-display: swap;
@@ -71,23 +73,6 @@ h1 {
 .privacy-policy-button:hover:not(:disabled) {
   background: transparent;
   color: var(--text);
-}
-.privacy-acknowledgement {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  color: inherit;
-  font-size: 0.8333rem;
-  line-height: 1.6;
-  cursor: pointer;
-}
-.privacy-acknowledgement input {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
-  accent-color: var(--accent);
-  cursor: pointer;
 }
 .privacy-dialog {
   width: min(45.5556rem, calc(100vw - 32px));

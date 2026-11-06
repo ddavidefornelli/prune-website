@@ -18,7 +18,7 @@ export const CONTENTSQUARE_IMAGES = ["https://*.contentsquare.net"];
 // and images to upload them, so replays keep rendering after a deploy removes
 // the old hashed assets. Static paths only: not 'self', which includes /api/.
 export const CONTENTSQUARE_RESOURCES = PRODUCTION_ORIGINS.flatMap((origin) =>
-  ["/assets/", "/fonts/", "/prune-background.png", "/prune-background-mask.png", "/favicon.png", "/apple-touch-icon.png"].map((path) => `${origin}${path}`));
+  ["/assets/", "/fonts/", "/prune-background.png", "/prune-background.webp", "/prune-background-mask.png", "/favicon.png", "/apple-touch-icon.png"].map((path) => `${origin}${path}`));
 
 export function integrity(content: string | Uint8Array): string {
   return `sha384-${createHash("sha384").update(content).digest("base64")}`;

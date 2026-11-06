@@ -4,13 +4,12 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 
 test("touch-first signup and policy remain usable on a phone", async ({ page }, info) => {
   await openSignIn(page);
-  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Continue with Google" }).first()).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: `test-results/${info.project.name}-mobile-signup.png`, fullPage: true });
-  await page.getByRole("button", { name: "Terms & Privacy", exact: true }).first().tap();
+  await page.getByRole("button", { name: "Terms of Service", exact: true }).first().tap();
   await expect(page.getByRole("dialog")).toBeInViewport({ ratio: 1 });
   await page.getByRole("button", { name: "Close privacy policy" }).tap();
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Continue with Google" }).tap();
+  await page.getByRole("button", { name: "Continue with Google" }).first().tap();
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

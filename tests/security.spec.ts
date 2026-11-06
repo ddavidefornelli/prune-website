@@ -246,7 +246,7 @@ test("a tampered local session identity cannot unlock another account's cached p
     localStorage.setItem(queueKey, JSON.stringify({ version: 1, base: cached, savedAt: Date.now() / 1000, pending: [], blocked: null }));
   }, { authKey: AUTH_KEY, queueKey: QUEUE_KEY.replace(USER_ID, otherId), otherId, cached });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText(privateTitle);
   expect(backend.requests.some((request) => request.path === "/auth/v1/user")).toBe(true);
   expect(backend.requests.some((request) => request.path.includes("/rpc/"))).toBe(false);
@@ -259,7 +259,7 @@ test("a server-rejected saved session never displays the account cache", async (
   await context.route(`${PROJECT}/auth/v1/user`, (route) => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ msg: "Sensitive upstream diagnostic", code: "bad_jwt" }) }));
   backend.requests.length = 0;
   await page.reload();
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText("A private cached outcome");
   await expect(page.locator("body")).not.toContainText("Sensitive upstream diagnostic");
   expect(backend.requests.some((request) => request.path.includes("/rpc/"))).toBe(false);
@@ -274,9 +274,9 @@ test("sign-out and browser back do not restore the planner or credentials", asyn
   await expect(page.getByRole("navigation")).toBeVisible();
   await visitProfile(page);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText("A private signed-out task");
   expect(await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY)).toBeNull();
   // This is intentional recovery behavior, not encryption/erasure of site data.

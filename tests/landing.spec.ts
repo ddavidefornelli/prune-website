@@ -7,8 +7,11 @@ test("signed-out visitors land on Google sign-in, and nothing else lets them in"
   await page.goto("/");
   await expect(page).toHaveTitle("prune — Your day. Three priorities.");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("TWENTY TASKSON YOUR LIST,NONE FINISHED?");
-  await expect(page.getByRole("checkbox")).not.toBeChecked();
-  await expect(page.getByRole("button", GOOGLE)).toBeVisible();
+  // No checkbox: pressing Continue with Google is the acceptance, stated next to it.
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await expect(page.locator(".landing-hero").getByText("By signing up, you agree to our Terms of Service and Privacy Policy.")).toBeVisible();
+  await expect(page.getByRole("button", GOOGLE)).toHaveCount(2);
+  await expect(page.getByRole("button", GOOGLE).first()).toBeVisible();
   // Email codes and the guest planner are gone on purpose: Google is the only way in.
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /email|without an account/i })).toHaveCount(0);
@@ -20,15 +23,9 @@ test("signed-out visitors land on Google sign-in, and nothing else lets them in"
 test.describe("a first sign-in", () => {
   test.use({ firstVisit: true });
 
-  test("needs the notice, signs in with Google, then opens the tour before the first task", async ({ page, backend }) => {
+  test("records the notice, signs in with Google, then opens the tour before the first task", async ({ page, backend }) => {
     await openSignIn(page);
-    const google = page.getByRole("button", GOOGLE);
-    await google.click();
-    // The unchecked notice blocks sign-in.
-    await expect(page).toHaveURL("http://127.0.0.1:4173/");
-    expect(backend.requests).toEqual([]);
-    await page.getByRole("checkbox").check();
-    await google.click();
+    await page.getByRole("button", GOOGLE).first().click();
 
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
     await expect(page).toHaveURL("http://127.0.0.1:4173/");
@@ -72,24 +69,20 @@ test("an existing Google callback exchanges the code and removes it from the URL
 test("a cancelled Google sign-in returns to sign-in without private parameters", async ({ page, backend }) => {
   backend.googleCancelled = true;
   await openSignIn(page);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", GOOGLE).click();
+  await page.getByRole("button", GOOGLE).first().click();
   await expect(page.getByRole("alert")).toContainText("Sign-in was cancelled");
   await expect(page.locator("body")).not.toContainText("private-diagnostic");
   await expect(page).toHaveURL("http://127.0.0.1:4173/");
-  // The notice was accepted on the way out, so only the button remains.
-  await expect(page.getByRole("checkbox")).toHaveCount(0);
-  await expect(page.getByRole("button", GOOGLE)).toBeEnabled();
+  await expect(page.getByRole("button", GOOGLE).first()).toBeEnabled();
   expect(backend.requests.filter((request) => request.path.startsWith("/auth/v1/token"))).toEqual([]);
 });
 
 test("a disabled Google provider fails with a clear message instead of leaving the site", async ({ page, backend }) => {
   backend.googleDisabled = true;
   await openSignIn(page);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", GOOGLE).click();
+  await page.getByRole("button", GOOGLE).first().click();
   await expect(page.getByRole("alert")).toHaveText("Google sign-in isn't available right now. Please try again later.");
-  await expect(page.getByRole("button", GOOGLE)).toBeEnabled();
+  await expect(page.getByRole("button", GOOGLE).first()).toBeEnabled();
   await expect(page).toHaveURL("http://127.0.0.1:4173/");
   expect(backend.requests.map((request) => request.path)).toEqual(["/auth/v1/settings"]);
 });
@@ -103,8 +96,7 @@ test("privacy storage failure sends no account request and does not claim signup
     };
   });
   await openSignIn(page);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", GOOGLE).click();
+  await page.getByRole("button", GOOGLE).first().click();
   await expect(page.getByRole("alert")).toContainText("No sign-in request was sent");
   expect(backend.requests).toHaveLength(0);
 });
@@ -115,8 +107,7 @@ test("an outdated notice gates saved sessions and the full policy is available b
     localStorage.setItem(privacyKey, JSON.stringify({ version: "privacy-old", acknowledgedAt: new Date().toISOString() }));
   }, { authKey: AUTH_KEY, savedSession: session(), privacyKey: PRIVACY_ACKNOWLEDGEMENT_KEY });
   await openSignIn(page);
-  await expect(page.getByRole("checkbox")).not.toBeChecked();
-  await page.getByRole("button", { name: "Terms & Privacy", exact: true }).first().click();
+  await page.getByRole("button", { name: "Privacy Policy", exact: true }).first().click();
   await expect(page.getByRole("dialog")).toContainText("browser's localStorage");
   await expect(page.getByRole("dialog")).toContainText("not macOS Keychain");
   await page.getByRole("button", { name: "Close privacy policy" }).click();
@@ -142,10 +133,35 @@ test("signup fits narrow phones and scrolls naturally in short landscape windows
   ]) {
     await page.setViewportSize(viewport);
     expect(await page.evaluate(() => document.documentElement.scrollWidth), `No overflow at ${viewport.width}×${viewport.height}`).toBeLessThanOrEqual(viewport.width);
-    const google = page.getByRole("button", GOOGLE);
+    const google = page.getByRole("button", GOOGLE).first();
     await google.evaluate((button) => button.scrollIntoView({ block: "center" }));
     await expect(google).toBeInViewport({ ratio: 1 });
     expect((await google.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await page.evaluate(() => window.scrollTo(0, 0));
   }
+});
+
+test("the landing stays light: decodable compressed artwork, no planner mask", async ({ page }) => {
+  const requested: string[] = [];
+  page.on("request", (request) => requested.push(new URL(request.url()).pathname));
+  await openSignIn(page);
+  // An encoder can emit a file one engine decodes as solid black; check real pixels.
+  const mean = await page.evaluate(async () => {
+    const image = new Image();
+    image.src = "/prune-background.webp";
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d")!;
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) sum += data[i];
+    return sum / (data.length / 4);
+  });
+  expect(mean).toBeGreaterThan(40);
+  await expect.poll(() => requested.includes("/prune-background.webp") || requested.includes("/prune-background.png")).toBe(true);
+  expect(requested).not.toContain("/prune-background-mask.png");
+  expect(requested.filter((path) => path.endsWith(".ttf"))).not.toContain("/fonts/space-grotesk-variable.ttf");
 });

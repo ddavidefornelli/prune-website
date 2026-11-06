@@ -1,4 +1,5 @@
 @import "./base.css";
+@import "./preview.css";
 
 :root {
   -webkit-text-size-adjust: 100%;
@@ -24,9 +25,19 @@ body::before {
   content: "";
   background: url("/prune-background.png") center / auto
     clamp(70svh, 50vw, 100svh) no-repeat;
+  /* ~125 KB instead of 1.6 MB; browsers without image-set types keep the PNG. */
+  background-image: image-set(
+    url("/prune-background.webp") type("image/webp"),
+    url("/prune-background.png") type("image/png")
+  );
   filter: grayscale(1);
   opacity: 0.05;
   transition: opacity 0.8s ease;
+}
+/* Decoration waits for first render, so it never competes with the app's
+   own script for bandwidth on slow connections. */
+body:has(#root:empty)::before {
+  background-image: none;
 }
 body:has(#app[data-completion-level="1"]) {
   --pixel-opacity: 0.32;
@@ -273,20 +284,14 @@ textarea:focus {
   line-height: 1.5;
 }
 
-.auth-panel .privacy-acknowledgement {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.7778rem;
+.auth-panel .signup-terms {
+  margin: 14px 0 0;
   color: var(--muted);
-  line-height: 1.7;
+  font-size: 0.7222rem;
+  line-height: 1.6;
 }
-.auth-panel .privacy-acknowledgement input {
-  width: 20px;
-  min-width: 20px;
-  height: 20px;
-  min-height: 20px;
-  margin: 0;
+.auth-panel .signup-terms .privacy-policy-button {
+  color: var(--text);
 }
 
 #app .google-signin {
@@ -319,12 +324,6 @@ textarea:focus {
   margin: 20px 0 0;
   font-size: 0.7222rem;
   overflow-wrap: anywhere;
-}
-.auth-panel .auth-cookie-settings {
-  min-height: 44px;
-  margin-top: 12px;
-  color: var(--muted);
-  font-size: 0.7222rem;
 }
 
 /* Phone layouts scroll naturally, including when the software keyboard opens. */

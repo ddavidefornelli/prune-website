@@ -1,11 +1,9 @@
 import { batch, createSignal, untrack } from "solid-js";
 import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
+import { ProductPreview } from "../components/ProductPreview";
 import type { PlanningClient } from "../planner/api";
 import { errorMessage } from "../planner/errors";
-import {
-  hasPrivacyAcknowledgement,
-  requirePrivacyAcknowledgement,
-} from "../planner/privacy-state";
+import { requirePrivacyAcknowledgement } from "../planner/privacy-state";
 
 interface SignInProps {
   client: PlanningClient;
@@ -14,26 +12,27 @@ interface SignInProps {
 }
 
 /**
- * The home page for signed-out visitors: Google is the only way in.
- * No SDK or account access before durable notice acceptance.
+ * The home page for signed-out visitors: Google is the only way in, from the
+ * hero or from the bottom of the product preview. Pressing either is the
+ * acceptance: the notice is stored before any SDK or account access, and a
+ * storage failure stops sign-in.
  */
 export function SignIn(props: SignInProps) {
-  const [acknowledged, setAcknowledged] = createSignal(
-    hasPrivacyAcknowledgement(localStorage),
-  );
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal(untrack(() => props.initialError));
+  // Which button was pressed last, so a failure also shows next to it.
+  const [source, setSource] = createSignal<"hero" | "bottom">("hero");
+  const unavailable = () => busy() || !!props.configurationError;
 
-  async function continueWithGoogle(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    if (busy() || props.configurationError) return;
+  async function continueWithGoogle(from: "hero" | "bottom"): Promise<void> {
+    if (unavailable()) return;
     batch(() => {
+      setSource(from);
       setBusy(true);
       setError("");
     });
     try {
       requirePrivacyAcknowledgement(localStorage);
-      setAcknowledged(true);
       await props.client.signInWithGoogle();
       // The browser is on its way to Google; stay busy until it leaves.
     } catch (cause) {
@@ -44,57 +43,86 @@ export function SignIn(props: SignInProps) {
     }
   }
 
+  const label = () => (busy() ? "Opening Google…" : "Continue with Google");
+
   return (
-    <section class="auth-panel" aria-labelledby="signup-title">
-      <h1 id="signup-title">
-        TWENTY TASKS
-        <br />
-        ON YOUR LIST,
-        <br />
-        NONE FINISHED?
-      </h1>
-      <p class="auth-description">
-        Focus on just 3 tasks and understand what's holding you back with the
-        free weekly analysis
-      </p>
-      <form
-        class="signup-form"
-        aria-busy={busy()}
-        onSubmit={(event) => void continueWithGoogle(event)}
-      >
-        <label class="privacy-acknowledgement" hidden={acknowledged()}>
-          <input
-            type="checkbox"
-            name="privacy"
-            required={!acknowledged()}
-            disabled={busy()}
-          />
-          <span>
-            I accept the <PrivacyPolicyButton />.
-          </span>
-        </label>
-        <button
-          type="submit"
-          class="google-signin"
-          disabled={busy() || !!props.configurationError}
-        >
-          <GoogleMark />
-          {busy() ? "Opening Google…" : "Continue with Google"}
-        </button>
-      </form>
-      <p class="error" role="alert">
-        {props.configurationError || error()}
-      </p>
-      <button
-        type="button"
-        class="privacy-policy-button auth-cookie-settings"
-        onClick={() =>
-          window.dispatchEvent(new Event("prune:preferences:open"))
+    <>
+      <div class="landing-hero">
+        <section class="auth-panel" aria-labelledby="signup-title">
+          <h1 id="signup-title">
+            TWENTY TASKS
+            <br />
+            ON YOUR LIST,
+            <br />
+            NONE FINISHED?
+          </h1>
+          <p class="auth-description">
+            Focus on just 3 tasks and understand what's holding you back with
+            the free weekly analysis
+          </p>
+          <form
+            class="signup-form"
+            aria-busy={busy()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void continueWithGoogle("hero");
+            }}
+          >
+            <button
+              type="submit"
+              class="google-signin"
+              disabled={unavailable()}
+            >
+              <GoogleMark />
+              {label()}
+            </button>
+          </form>
+          <SignupTerms />
+          <p class="error" role="alert">
+            {props.configurationError || error()}
+          </p>
+        </section>
+      </div>
+      <ProductPreview
+        action={
+          <div class="auth-panel preview-signup">
+            <button
+              type="button"
+              class="google-signin"
+              disabled={unavailable()}
+              onClick={() => void continueWithGoogle("bottom")}
+            >
+              <GoogleMark />
+              {label()}
+            </button>
+            <SignupTerms />
+            {/* The hero's alert announces it; this copy is visual only. */}
+            <p class="error">{source() === "bottom" ? error() : ""}</p>
+          </div>
         }
-      >
-        Cookie settings
-      </button>
-    </section>
+      />
+      <footer class="landing-footer">
+        <button
+          type="button"
+          class="privacy-policy-button"
+          onClick={() =>
+            window.dispatchEvent(new Event("prune:preferences:open"))
+          }
+        >
+          Cookie settings
+        </button>
+      </footer>
+    </>
+  );
+}
+
+function SignupTerms() {
+  return (
+    <p class="signup-terms">
+      By signing up, you agree to our{" "}
+      <PrivacyPolicyButton label="Terms of Service" /> and{" "}
+      <PrivacyPolicyButton label="Privacy Policy" />.
+    </p>
   );
 }
 

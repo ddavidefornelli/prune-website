@@ -13,7 +13,7 @@ test("account deletion requires confirmation, flags the account and signs out", 
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   await expect(page.locator(".profile-email")).toHaveCount(0);
   expect(backend.isDeleted).toBe(true);
   expect(backend.weekly.settings.enabled).toBe(false);
@@ -36,7 +36,7 @@ test("a failed deletion keeps the user signed in and allows retry", async ({ pag
   backend.offline = false;
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
   expect(backend.isDeleted).toBe(true);
 });
 

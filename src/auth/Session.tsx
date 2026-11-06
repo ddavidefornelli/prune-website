@@ -1,6 +1,5 @@
 import { Match, Switch } from "solid-js";
 import { LoadingIndicator } from "../components/LoadingIndicator";
-import PixelBackground from "../components/PixelBackground";
 import { PlanningClient } from "../planner/api";
 import { Planner } from "../planner/Planner";
 import { createSession } from "./create-session";
@@ -19,8 +18,9 @@ export function Session() {
         {(account) => <Planner client={client} account={account()} />}
       </Match>
       <Match when={session.phase() === "ready"}>
-        <PixelBackground completionLevel={0} />
-        <div id="app">
+        {/* No pixel layer here: at level 0 it draws nothing, yet its 1.2 MB
+            mask would be fetched. The CSS artwork still shows behind. */}
+        <div id="app" class="is-landing">
           <SignIn
             client={client}
             initialError={session.initialError()}

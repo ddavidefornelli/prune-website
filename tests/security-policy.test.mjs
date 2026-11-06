@@ -28,7 +28,7 @@ test("CSP and SRI use hashes of exact emitted bytes, with explicit managed analy
   assert.ok(built.html.indexOf("http-equiv=") < built.html.indexOf("<script"));
   assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" "));
   // Replay may read static files from the site, never its same-origin API.
-  assert.ok(CONTENTSQUARE_RESOURCES.every((source) => /^https:\/\/(?:www\.)?prune\.win\/(?:assets\/|fonts\/|[\w-]+\.png)$/.test(source)));
+  assert.ok(CONTENTSQUARE_RESOURCES.every((source) => /^https:\/\/(?:www\.)?prune\.win\/(?:assets\/|fonts\/|[\w-]+\.(?:png|webp))$/.test(source)));
   assert.ok(!csp["connect-src"].split(" ").includes("'self'"));
   assert.equal(csp["img-src"], `'self' ${CONTENTSQUARE_IMAGES.join(" ")}`);
   for (const sources of Object.values(csp)) {
