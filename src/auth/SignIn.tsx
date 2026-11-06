@@ -46,6 +46,7 @@ export function SignIn(props: SignInProps) {
 
   return (
     <section class="auth-panel" aria-labelledby="signup-title">
+      <p class="auth-hook">Twenty tasks on your list, none finished?</p>
       <h1 id="signup-title">
         DO LESS.
         <br />

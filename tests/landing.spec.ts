@@ -6,6 +6,7 @@ const GOOGLE = { name: "Continue with Google", exact: true } as const;
 test("signed-out visitors land on Google sign-in, and nothing else lets them in", async ({ page, backend }) => {
   await page.goto("/");
   await expect(page).toHaveTitle("prune — Your day. Three priorities.");
+  await expect(page.getByText("Twenty tasks on your list, none finished?")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("DO LESS.ACHIEVE MORE.");
   await expect(page.getByRole("checkbox")).not.toBeChecked();
   await expect(page.getByRole("button", GOOGLE)).toBeVisible();
