@@ -1,0 +1,624 @@
+/* First-run tour: a full-screen welcome in three scenes, centered on the
+   planner's own artwork. The planner stays hidden behind it, then fades in.
+   Mobile first: one column with the button in thumb reach; on larger screens
+   everything gathers into a single centered block. */
+
+#app[data-touring] > :not(.planner-tour-dialog) {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #app[data-tour-reveal] > :not(.planner-tour-dialog) {
+    animation: tour-reveal 800ms var(--ease-out) backwards;
+  }
+}
+@keyframes tour-reveal {
+  from {
+    opacity: 0;
+  }
+}
+
+.planner-tour-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+}
+.planner-tour-dialog::backdrop {
+  background: transparent;
+}
+
+.tour {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  width: min(100%, 30rem);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: max(8px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  text-align: center;
+  /* Falling rows and the text shadow may poke past the edges; never scroll. */
+  overflow-x: clip;
+  /* Vertical scrolling stays native; horizontal swipes change the scene. */
+  touch-action: pan-y;
+}
+
+/* Back · progress · Skip */
+.tour-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.tour-bar > :first-child {
+  justify-self: start;
+}
+.tour-bar > :last-child {
+  justify-self: end;
+}
+.tour-bar button,
+.tour-bar button:hover:not(:disabled) {
+  min-height: 44px;
+  padding: 10px 4px;
+  color: var(--muted);
+  font-size: 0.7778rem;
+  background: transparent;
+  border-color: transparent;
+}
+@media (hover: hover) {
+  .tour-bar button:hover:not(:disabled) {
+    color: var(--text);
+  }
+}
+/* Three scenes, drawn as the planner's three slots: done, current, next. */
+.tour-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1.75rem);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tour-progress li {
+  height: 2px;
+  background: var(--border);
+  transition: background-color 500ms var(--ease-out);
+}
+.tour-progress .is-done {
+  background: var(--text);
+}
+.tour-progress .is-current {
+  background: var(--blood-red);
+}
+
+.tour-body {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(20px, 4.5svh, 40px);
+  min-width: 0;
+  padding-block: 4px;
+}
+/* A fixed box the scenes scale into, so no viewport can crop them. */
+.tour-stage {
+  container-type: size;
+  display: grid;
+  place-items: center;
+  width: min(100%, 20rem);
+  height: clamp(12.5rem, 40svh, 19rem);
+}
+.tour-copy {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+}
+.tour-caption {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 12px;
+  visibility: hidden;
+}
+.tour-caption.is-current {
+  visibility: visible;
+}
+/* Focus lands here on open only so screen readers start at the words. */
+.tour-caption h2:focus-visible {
+  outline: none;
+}
+/* Once the background lights up, a soft shadow keeps the words readable. */
+.tour-copy::before {
+  content: "";
+  position: absolute;
+  inset: -32px -48px;
+  z-index: -1;
+  background: radial-gradient(closest-side, #000 50%, transparent);
+  opacity: 0;
+  transition: opacity 900ms ease;
+  pointer-events: none;
+}
+#app:not([data-completion-level="0"]) .tour-copy::before {
+  opacity: 0.92;
+}
+.tour-copy h2 {
+  margin: 0;
+  font-family: "Pixelta", "Space Grotesk", sans-serif;
+  font-size: clamp(2.1rem, 10.5vw, 2.8rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.tour-copy p {
+  max-width: 29ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8889rem;
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
+.tour-actions {
+  display: grid;
+  gap: 10px;
+}
+.tour-actions .error {
+  margin: 0;
+  font-size: 0.7778rem;
+  text-align: left;
+}
+.tour-primary,
+.tour-primary:hover:not(:disabled) {
+  width: 100%;
+  min-height: 54px;
+  padding: 14px 20px;
+  color: #000;
+  font-size: 0.9444rem;
+  font-weight: 550;
+  background: var(--text);
+  border-color: var(--text);
+}
+@media (hover: hover) {
+  .tour-primary:hover:not(:disabled) {
+    background: #fff;
+    border-color: #fff;
+  }
+}
+
+/* Laptops: one centered block, the button right under the words. */
+@media (min-width: 760px) and (min-height: 620px) {
+  .tour {
+    grid-template-rows: none;
+    align-content: center;
+    gap: clamp(24px, 4.5vh, 44px);
+    width: min(100%, 34rem);
+  }
+  .tour-body {
+    gap: clamp(28px, 4.5vh, 44px);
+  }
+  .tour-stage {
+    width: min(100%, 23rem);
+    height: clamp(17rem, 42vh, 22rem);
+  }
+  .tour-copy h2 {
+    max-width: none;
+    font-size: clamp(2.6rem, 3.6vw, 3.4rem);
+  }
+  .tour-primary {
+    justify-self: center;
+    width: min(100%, 19rem);
+  }
+}
+/* Phones on their side: picture beside the words. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .tour {
+    width: min(100%, 52rem);
+  }
+  .tour-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 32px;
+  }
+  .tour-stage {
+    height: min(52svh, 15rem);
+  }
+  .tour-copy h2 {
+    max-width: none;
+    font-size: 1.9rem;
+  }
+  .tour-primary {
+    justify-self: center;
+    width: min(100%, 19rem);
+  }
+}
+
+/* Each scene arrives from the side it was swiped from. */
+@media (prefers-reduced-motion: no-preference) {
+  .tour-stage > *,
+  .tour-caption.is-current > * {
+    animation: tour-scene-in 560ms var(--ease-out) backwards;
+  }
+  .tour-caption.is-current > p {
+    animation-delay: 80ms;
+  }
+}
+@keyframes tour-scene-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--direction, 1) * 28px));
+  }
+}
+
+/* ---------- Pieces of the planner, drawn small inside a scene ---------- */
+
+.scene-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.scene-slots li {
+  height: 2px;
+  background: var(--border);
+  transition: background-color 500ms var(--ease-out) calc(var(--i) * 140ms);
+}
+.scene-slots .is-planned {
+  background: color-mix(in srgb, var(--text) 45%, var(--border));
+}
+.scene-slots .is-done {
+  background: var(--text);
+  transition-delay: 0ms;
+}
+.scene-task-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-dial {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.4em;
+  aspect-ratio: 1;
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+}
+.mini-dial svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.mini-dial circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.mini-dial-track {
+  stroke: var(--border);
+}
+.mini-dial-value {
+  stroke: var(--text);
+  stroke-dasharray: 60;
+  stroke-dashoffset: calc(60 - var(--m));
+  transition:
+    stroke-dashoffset 700ms var(--ease-out),
+    stroke 300ms ease;
+}
+.mini-dial.is-done .mini-dial-value {
+  stroke: var(--blood-red);
+}
+.mini-dial.is-done > span {
+  color: var(--muted);
+}
+
+/* ---------- 1 · The prune ---------- */
+
+.prune-scene {
+  display: grid;
+  align-content: center;
+  gap: 5cqh;
+  width: 100%;
+  height: 100%;
+}
+.prune-scene-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  font-size: clamp(0.5rem, 3.9cqh, 0.8333rem);
+  line-height: 1.25;
+  text-align: left;
+  list-style: none;
+  transition: font-size 600ms var(--ease-out) 300ms;
+}
+/* Fewer tasks, more room: the three that stay grow into the freed space. */
+.prune-scene[data-phase="2"] .prune-scene-list {
+  font-size: clamp(0.6111rem, 4.9cqh, 1rem);
+}
+.prune-scene-list li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75em;
+  padding: 0.5em 0.85em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.prune-scene-list li + li {
+  margin-top: 0.42em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .prune-scene-list li {
+    animation: scene-row-in 460ms var(--ease-out) backwards;
+    animation-delay: calc(120ms + var(--i) * 60ms);
+  }
+}
+@keyframes scene-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.8em);
+  }
+}
+/* The cut: a red slash through every row that doesn't make the day… */
+.prune-scene-list .is-cut {
+  max-height: 3em;
+  overflow: hidden;
+  transition:
+    color 220ms ease calc(var(--k) * 130ms),
+    opacity 380ms ease-in calc(var(--k) * 70ms),
+    transform 460ms cubic-bezier(0.5, 0, 0.75, 0) calc(var(--k) * 70ms),
+    max-height 480ms var(--ease-out) calc(220ms + var(--k) * 70ms),
+    margin 480ms var(--ease-out) calc(220ms + var(--k) * 70ms),
+    padding 480ms var(--ease-out) calc(220ms + var(--k) * 70ms),
+    border-width 480ms var(--ease-out) calc(220ms + var(--k) * 70ms);
+}
+.prune-scene-list .is-cut::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.4em;
+  right: 0.4em;
+  height: 2px;
+  background: var(--blood-red);
+  transform: rotate(-1.5deg) scaleX(0);
+  transform-origin: left center;
+  transition: transform 300ms var(--ease-out) calc(var(--k) * 130ms);
+}
+.prune-scene:not([data-phase="0"]) .is-cut {
+  color: var(--muted);
+}
+.prune-scene:not([data-phase="0"]) .is-cut::after {
+  transform: rotate(-1.5deg) scaleX(1);
+}
+/* …then the cut rows drop away and the gaps close. */
+.prune-scene[data-phase="2"] .is-cut {
+  max-height: 0;
+  margin-top: 0;
+  padding-block: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: translateY(1.4em) rotate(var(--tilt));
+}
+/* The three that stay become real tasks, with their estimates. */
+.prune-scene-list .is-kept {
+  transition:
+    padding 520ms var(--ease-out) 300ms,
+    margin 520ms var(--ease-out) 300ms,
+    border-color 520ms ease 300ms;
+}
+.prune-scene[data-phase="2"] .is-kept {
+  padding-block: 0.85em;
+  border-color: color-mix(in srgb, var(--text) 50%, var(--border));
+}
+.prune-scene[data-phase="2"] .is-kept:not(:first-child) {
+  margin-top: 0.7em;
+}
+.prune-scene-list .mini-dial {
+  width: 0;
+  opacity: 0;
+  transition:
+    width 520ms var(--ease-out) 300ms,
+    opacity 300ms ease 520ms;
+}
+.prune-scene[data-phase="2"] .mini-dial {
+  width: 2.4em;
+  opacity: 1;
+}
+.prune-scene:not([data-phase="2"]) .mini-dial-value {
+  stroke-dashoffset: 60;
+}
+.prune-scene-list .mini-dial-value {
+  transition: stroke-dashoffset 900ms var(--ease-out) 650ms;
+}
+
+/* ---------- 2 · One timer ---------- */
+
+.focus-scene {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4.5cqh;
+  width: 100%;
+  height: 100%;
+}
+.focus-scene-title {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: "Pixelta", "Space Grotesk", sans-serif;
+  font-size: clamp(0.9rem, 7.5cqh, 1.5rem);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.focus-scene-timer {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  height: 52cqh;
+  aspect-ratio: 1;
+}
+.focus-scene-timer svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.focus-scene-timer circle {
+  fill: none;
+  stroke-width: 5;
+}
+.focus-scene-track {
+  stroke: var(--border);
+}
+.focus-scene-progress {
+  stroke: var(--text);
+  transition: stroke 400ms ease;
+}
+.focus-scene-digits {
+  font-size: clamp(0.8rem, 7.5cqh, 1.5rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.focus-scene-hint {
+  margin-top: 0.3em;
+  color: var(--muted);
+  font-size: clamp(0.5rem, 3.6cqh, 0.6667rem);
+}
+.focus-scene.is-paused .focus-scene-progress {
+  stroke: var(--muted);
+}
+/* What the planner asks when the timer stops, answered in one line. */
+.focus-scene-note {
+  display: grid;
+  gap: 0.2em;
+  width: min(100%, 16em);
+  margin: 0;
+  padding: 0.7em 1em;
+  font-size: clamp(0.5556rem, 4.4cqh, 0.8333rem);
+  line-height: 1.35;
+  text-align: left;
+  background: var(--surface);
+  border-left: 2px solid var(--blood-red);
+  opacity: 0;
+  transform: translateY(0.6em);
+  transition:
+    opacity 450ms var(--ease-out),
+    transform 450ms var(--ease-out);
+}
+.focus-scene.is-paused .focus-scene-note {
+  opacity: 1;
+  transform: none;
+}
+.focus-scene-note span {
+  color: var(--muted);
+}
+.focus-scene-note b {
+  min-height: 1.35em;
+  font-weight: 450;
+}
+.focus-scene-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--text);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .focus-scene-progress {
+    animation: focus-ring-in 1200ms var(--ease-out) 250ms backwards;
+  }
+  .focus-scene.is-paused .focus-scene-digits {
+    animation: focus-paused 1.4s steps(1) infinite;
+  }
+  .focus-scene-caret {
+    animation: caret 1s steps(1) infinite;
+  }
+}
+@keyframes focus-ring-in {
+  from {
+    stroke-dashoffset: 1000;
+  }
+}
+@keyframes focus-paused {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- 3 · Finish and light it up ---------- */
+
+.light-scene {
+  display: grid;
+  align-content: center;
+  gap: 4.5cqh;
+  width: 100%;
+  height: 100%;
+  text-align: left;
+}
+.light-scene-summary {
+  margin: 0;
+  font-size: clamp(0.7rem, 6cqh, 1.1rem);
+  font-weight: 300;
+  line-height: 1.2;
+}
+.light-scene-list {
+  display: grid;
+  gap: 0.7em;
+  margin: 0;
+  padding: 0;
+  font-size: clamp(0.5556rem, 4.8cqh, 0.8889rem);
+  line-height: 1.25;
+  list-style: none;
+}
+.light-scene-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75em;
+  padding: 0.75em 0.9em;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text) 50%, var(--border));
+  transition: border-color 500ms ease;
+}
+.light-scene-list li.is-done {
+  border-color: var(--border);
+}
+.light-scene-list .scene-task-title {
+  transition: color 300ms ease;
+}
+.light-scene-list .is-done .scene-task-title {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .light-scene-list li.is-done {
+    animation: light-done 900ms var(--ease-out);
+  }
+}
+@keyframes light-done {
+  25% {
+    border-color: var(--blood-red);
+    box-shadow:
+      0 0 0 1px var(--blood-red),
+      0 0 28px rgb(212 83 91 / 0.45);
+  }
+}
