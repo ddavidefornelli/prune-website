@@ -57,8 +57,8 @@ export function SignIn(props: SignInProps) {
             NONE FINISHED?
           </h1>
           <p class="auth-description">
-            Focus on just 3 tasks and understand what's holding you back with
-            the free weekly analysis
+            Time is limited. <strong>Stop wasting time</strong> on stuff that
+            doesn't move you forward.
           </p>
           <form
             class="signup-form"
