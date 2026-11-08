@@ -78,38 +78,39 @@
   outline: 2px solid var(--text);
   outline-offset: 3px;
 }
+/* Too narrow for the corner card to clear the button: the banner becomes a
+   slim strip below the page, so it can never cover anything. */
+@media (max-width: 1023px) {
+  #root:has(.landing) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+  }
+  #root:has(.landing) > #app {
+    flex: 1 0 auto;
+    min-height: 0;
+  }
+  #root:has(.landing) > .cookie-banner {
+    position: static;
+    flex: none;
+    width: auto;
+    padding: 0.5rem max(16px, env(safe-area-inset-right))
+      max(0.5rem, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    border-width: 1px 0 0;
+  }
+}
+
 /* Phones: everything on one screen, no scrolling. The page and the cookie
    banner share the screen's height, and the demo takes whatever is left. */
 @media (max-width: 699px) and (orientation: portrait) {
   #root:has(.landing) {
-    display: flex;
-    flex-direction: column;
     height: 100svh;
     overflow: hidden;
   }
   #root:has(.landing) > #app {
     flex: 1 1 0;
-    min-height: 0;
     padding-block: 10px;
-  }
-  #root:has(.landing) > .cookie-banner {
-    position: static;
-    flex: none;
-    gap: 0.5rem;
-    padding-block: 0.625rem max(0.625rem, env(safe-area-inset-bottom));
-    max-height: 60svh;
-  }
-  #root:has(.landing) .cookie-copy h2,
-  #root:has(.landing) .cookie-copy p,
-  #root:has(.landing) .cookie-copy button {
-    margin-block: 0 0.25rem;
-    font-size: 0.6389rem;
-    line-height: 1.35;
-  }
-  #root:has(.landing) .cookie-actions button {
-    padding: 4px 0.5rem;
-    white-space: nowrap;
-    font-size: 0.7222rem;
   }
   .landing {
     grid-template-rows: auto auto minmax(0, 1fr) auto;

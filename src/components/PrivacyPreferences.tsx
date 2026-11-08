@@ -91,13 +91,10 @@ export function PrivacyPreferences() {
     <Show when={open()}>
       <section class="cookie-banner" aria-label="Cookie preferences">
         <div class="cookie-copy">
-          <h2>YOUR PRIVACY, YOUR CHOICE</h2>
           <p>
-            We use essential storage to keep your planner working. With your
-            permission, Hotjar / Contentsquare uses cookies and similar
-            technologies for heatmaps and session recordings to help us improve
-            prune. Optional analytics is off until you accept. You can change
-            your choice anytime in Cookie settings.
+            Optional cookies for heatmaps and session recordings (Hotjar /
+            Contentsquare) stay off unless you accept. Change this anytime in
+            Cookie settings.
           </p>
           <PrivacyPolicyButton label="Read our privacy policy" />
           <Show when={error()}>

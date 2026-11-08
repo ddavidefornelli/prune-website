@@ -199,7 +199,7 @@ for (const banner of [false, true]) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     if (banner) await page.addInitScript(() => localStorage.removeItem("prune:cookies:v1"));
     for (const viewport of [
-      { width: 280, height: 653 }, { width: 320, height: 568 }, { width: 360, height: 640 },
+      { width: 280, height: 568 }, { width: 320, height: 568 }, { width: 360, height: 640 },
       { width: 375, height: 667 }, { width: 390, height: 844 }, { width: 430, height: 932 },
     ]) {
       await page.setViewportSize(viewport);
@@ -236,6 +236,36 @@ for (const banner of [false, true]) {
     }
   });
 }
+
+test("the cookie banner is a small corner card that never covers the button", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => localStorage.removeItem("prune:cookies:v1"));
+  for (const viewport of [
+    { width: 1920, height: 1080 }, { width: 1440, height: 900 }, { width: 1280, height: 720 },
+    { width: 1024, height: 768 }, { width: 1023, height: 768 }, { width: 768, height: 1024 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const banner = page.getByRole("region", { name: "Cookie preferences" });
+    await expect(banner).toBeVisible();
+    const size = `${viewport.width}×${viewport.height}`;
+    const link = page.getByRole("link", { name: "Get started", exact: true });
+    await link.scrollIntoViewIfNeeded();
+    const cta = (await link.boundingBox())!;
+    const card = (await banner.boundingBox())!;
+    const overlaps = cta.x < card.x + card.width && card.x < cta.x + cta.width && cta.y < card.y + card.height && card.y < cta.y + cta.height;
+    expect(overlaps, `Banner clear of the button at ${size}`).toBe(false);
+    if (viewport.width >= 1024) {
+      expect(card.x + card.width, `Corner card at ${size}`).toBeGreaterThan(viewport.width - 24);
+      expect(card.y + card.height, `Corner card at ${size}`).toBeGreaterThan(viewport.height - 24);
+      expect(card.width, `Small card at ${size}`).toBeLessThanOrEqual(320);
+      expect(card.height, `Small card at ${size}`).toBeLessThanOrEqual(200);
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "Reject optional", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Cookie preferences" })).toHaveCount(0);
+});
 
 test("the landing stays light: decodable compressed artwork, no planner mask", async ({ page }) => {
   const requested: string[] = [];
