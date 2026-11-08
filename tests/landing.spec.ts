@@ -6,7 +6,7 @@ const GOOGLE = { name: "Continue with Google", exact: true } as const;
 test("signed-out visitors land on Google sign-in, and nothing else lets them in", async ({ page, backend }) => {
   await page.goto("/");
   await expect(page).toHaveTitle("prune — Your day. Three priorities.");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("TWENTY TASKSON YOUR LIST,NONE FINISHED?");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("DO LESS.ACHIEVE MORE.");
   // No checkbox: pressing Continue with Google is the acceptance, stated next to it.
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   await expect(page.locator(".landing-hero").getByText("By signing up, you agree to our Terms of Service and Privacy Policy.")).toBeVisible();

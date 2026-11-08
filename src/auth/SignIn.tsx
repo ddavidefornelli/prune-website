@@ -50,11 +50,9 @@ export function SignIn(props: SignInProps) {
       <div class="landing-hero">
         <section class="auth-panel" aria-labelledby="signup-title">
           <h1 id="signup-title">
-            TWENTY TASKS
+            DO LESS.
             <br />
-            ON YOUR LIST,
-            <br />
-            NONE FINISHED?
+            ACHIEVE MORE.
           </h1>
           <p class="auth-description">
             Time is limited. <strong>Stop wasting time</strong> on stuff that
