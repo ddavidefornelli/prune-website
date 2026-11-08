@@ -256,8 +256,8 @@ test("profile stats and local-only sign-out preserve pending work and sign out o
   await expect(page.getByRole("heading", { name: "All time", exact: true })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
-  await expect(second.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
+  await expect(second.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("Unsynced work is retained");
   await expect(second.locator("body")).not.toContainText("Remember this task");
   expect(await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY)).toBeNull();

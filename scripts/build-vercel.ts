@@ -30,8 +30,8 @@ export function buildVercel(source = "dist", destination = ".vercel/output"): vo
     routes: [
       { src: "/(.*)", headers, continue: true },
       // Never cache HTML independently from the deployment's hash policy.
-      { src: "^/(?:index\\.html|download/?)?$", headers: { "Cache-Control": "no-store" }, continue: true },
-      { src: "^/download/?$", dest: "/index.html" },
+      { src: "^/(?:index\\.html|download/?|login/?)?$", headers: { "Cache-Control": "no-store" }, continue: true },
+      { src: "^/(?:download|login)/?$", dest: "/index.html" },
       { handle: "filesystem" },
     ],
   };

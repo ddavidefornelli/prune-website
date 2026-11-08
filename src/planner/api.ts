@@ -177,6 +177,16 @@ export class PlanningClient {
   }
 
   /** Leaves the page for Google; authStatus() completes the return trip. */
+  async sendCode(email: string): Promise<void> {
+    await this.request("send_code", { email });
+  }
+
+  async verifyCode(email: string, code: string): Promise<AuthStatus> {
+    return this.loadAccount(
+      await this.request<AuthStatus>("verify_code", { email, code }),
+    );
+  }
+
   async signInWithGoogle(): Promise<void> {
     await this.request("sign_in_with_google");
   }

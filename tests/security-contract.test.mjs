@@ -52,10 +52,11 @@ test("production installs the final-artifact CSP plugin", () => {
   assert.equal(typeof plugin.configurePreviewServer, "function");
 });
 
-test("the displayed privacy version matches its gate and describes Google as the only sign-in", () => {
+test("the displayed privacy version matches its gate and describes both sign-in methods", () => {
   const policy = readFileSync(new URL("../PRIVACY.md", import.meta.url), "utf8");
   assert.ok(policy.includes(`Version: ${PRIVACY_POLICY_VERSION}`));
-  assert.ok(policy.includes("Google is the only way to sign in on this website, and Supabase handles Google sign-in"));
+  assert.ok(policy.includes("Supabase handles sign-in with an emailed code and with Google"));
+  assert.ok(!policy.includes("Google is the only way to sign in"));
   assert.ok(!policy.includes("magic-link"));
   assert.ok(!policy.includes("Supabase handles email-and-password"));
   assert.ok(!/guest|start-up questions|prune:survey/i.test(policy));

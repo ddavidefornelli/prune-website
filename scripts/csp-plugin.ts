@@ -45,7 +45,7 @@ export function productionCsp(apiOrigin: string | null): Plugin {
       server.middlewares.use((request, response, next) => {
         for (const [name, value] of Object.entries(headers)) response.setHeader(name, String(value));
         const path = request.url?.split("?")[0] ?? "/";
-        if (["GET", "HEAD"].includes(request.method ?? "") && /^\/(?:index\.html|download\/?)?$/.test(path)) {
+        if (["GET", "HEAD"].includes(request.method ?? "") && /^\/(?:index\.html|download\/?|login\/?)?$/.test(path)) {
           // Serve the exact document ourselves: Vite's HTML middleware would
           // overwrite Cache-Control with no-cache rather than no-store.
           response.setHeader("Cache-Control", "no-store");

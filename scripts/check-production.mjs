@@ -253,7 +253,7 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
     canonical = new URL(home.url).origin;
     if (home.redirected) add("WARN", "site:canonical", "Website redirect followed", `Checking final HTTPS origin ${canonical}; use it as PRUNE_SITE_URL.`, "Prefer the canonical origin in links and AI CORS configuration.");
     await safely("site/:inspection", "/: document inspection", () => inspectDocument(home, "/", canonical));
-    for (const path of ["/download", "/download/", "/index.html"]) {
+    for (const path of ["/download", "/download/", "/login", "/login/", "/index.html"]) {
       await safely(`site${path}:inspection`, `${path}: document inspection`, async () => {
         const page = await request(`${canonical}${path}`, { followRedirects: true, lockedOrigin: canonical, maxBytes: 2 * 1024 * 1024 });
         await inspectDocument(page, path, canonical);

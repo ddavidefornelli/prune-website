@@ -1,15 +1,191 @@
-/* Signed-out landing: the sign-in hero fills the first screen, the product
-   preview scrolls up beneath it. Every mock screen is HTML, not an image. */
+/* Signed-out landing: title, subtitle, one demonstration, one call to action,
+   all on the first screen. The mock screens are HTML, not images. */
 
-.landing-hero {
-  /* TickTick proportions: the product screen starts ~55% down the first screen. */
-  padding-top: clamp(24px, 6svh, 72px);
+.landing {
+  display: grid;
+  flex: 1;
+  align-content: center;
+  justify-items: center;
+  padding-block: clamp(8px, 2svh, 24px);
+  text-align: center;
 }
-.landing-hero .auth-panel {
-  margin: 0 auto;
+.landing h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(2.4rem, 7.2vw, 6rem);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: 0.025em;
+}
+.landing-subtitle {
+  max-width: 100%;
+  margin: clamp(10px, 2svh, 20px) 0 clamp(18px, 3.5svh, 36px);
+  color: var(--text);
+  font-size: clamp(1rem, 1.6vw, 1.3333rem);
+  font-weight: 550;
+  line-height: 1.3;
+}
+/* The demo keeps its natural layout and is scaled as a whole: about 60% of a
+   desktop screen, 16:9, with the call to action still on the first screen. */
+.landing .product-preview {
+  --demo-zoom: 0.82;
+  width: 100%;
+}
+.landing .showcase-stage {
+  width: min(100%, 48rem);
+}
+.landing .device-browser {
+  zoom: var(--demo-zoom);
+  /* Neutral and dimmed, so the call to action is the one bright thing here. */
+  filter: grayscale(1) brightness(0.62);
+}
+@media (max-height: 860px) {
+  .landing .product-preview {
+    --demo-zoom: 0.68;
+  }
+  .landing .showcase-stage {
+    width: min(100%, 40rem);
+  }
+}
+@media (max-width: 699px) {
+  .landing .product-preview {
+    --demo-zoom: 0.72;
+  }
+}
+.landing-cta {
+  display: grid;
+  place-items: center;
+  width: min(100%, 22rem);
+  min-height: 56px;
+  margin-top: clamp(20px, 4svh, 40px);
+  color: #000;
+  font-size: 1.0556rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--blood-red);
+  border: 1px solid var(--blood-red);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+@media (hover: hover) {
+  .landing-cta:hover {
+    background: #e2666e;
+    border-color: #e2666e;
+  }
+}
+.landing-cta:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+/* Phones: everything on one screen, no scrolling. The page and the cookie
+   banner share the screen's height, and the demo takes whatever is left. */
+@media (max-width: 699px) and (orientation: portrait) {
+  #root:has(.landing) {
+    display: flex;
+    flex-direction: column;
+    height: 100svh;
+    overflow: hidden;
+  }
+  #root:has(.landing) > #app {
+    flex: 1 1 0;
+    min-height: 0;
+    padding-block: 10px;
+  }
+  #root:has(.landing) > .cookie-banner {
+    position: static;
+    flex: none;
+    gap: 0.5rem;
+    padding-block: 0.625rem max(0.625rem, env(safe-area-inset-bottom));
+    max-height: 60svh;
+  }
+  #root:has(.landing) .cookie-copy h2,
+  #root:has(.landing) .cookie-copy p,
+  #root:has(.landing) .cookie-copy button {
+    margin-block: 0 0.25rem;
+    font-size: 0.6389rem;
+    line-height: 1.35;
+  }
+  #root:has(.landing) .cookie-actions button {
+    padding: 4px 0.5rem;
+    white-space: nowrap;
+    font-size: 0.7222rem;
+  }
+  .landing {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    align-content: stretch;
+    min-height: 0;
+    padding-block: 0;
+  }
+  .landing h1 {
+    font-size: clamp(1.7rem, min(11.5vw, 5.4svh), 2.4rem);
+  }
+  .landing-subtitle {
+    margin-block: clamp(4px, 1svh, 12px) clamp(8px, 1.8svh, 18px);
+    font-size: clamp(0.8333rem, 2.3svh, 1rem);
+  }
+  .landing .product-preview,
+  .landing .showcase,
+  .landing .showcase-stage,
+  .landing .device-browser,
+  .landing .device-screen {
+    height: 100%;
+    min-height: 0;
+  }
+  .landing-cta {
+    min-height: 48px;
+    margin-top: clamp(8px, 1.8svh, 20px);
+  }
+}
+@media (min-width: 700px) {
+  .landing-break {
+    display: none;
+  }
+}
+
+/* The login page: back link, centred panel, cookie settings at the bottom. */
+.login {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.login-back {
+  align-self: flex-start;
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: 0.8333rem;
+  text-decoration: none;
+}
+.login .auth-panel h1 {
+  margin-bottom: 28px;
 }
 .auth-panel .error:empty {
   margin: 0;
+}
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--muted);
+  font-size: 0.7778rem;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+.login-sent {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8889rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.login-sent strong {
+  color: var(--text);
+  font-weight: 550;
 }
 
 .visually-hidden {
@@ -24,25 +200,12 @@
   border: 0;
 }
 
-/* ---------- Section frame ---------- */
+/* ---------- Showcase frame ---------- */
 
 .product-preview {
-  --preview-gap: clamp(72px, 12vw, 160px);
-  display: grid;
-  gap: var(--preview-gap);
-  padding-block: clamp(24px, 3vw, 32px) 48px;
   scroll-margin-top: 24px;
   letter-spacing: 0.01em;
 }
-.product-preview h2,
-.product-preview h3 {
-  margin: 0;
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
-  font-weight: 400;
-  line-height: 1.04;
-  letter-spacing: 0.025em;
-}
-.preview-eyebrow,
 .mock-up-next {
   margin: 0;
   color: var(--blood-red);
@@ -50,55 +213,12 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
-.preview-intro {
-  display: grid;
-  justify-items: center;
-  gap: 20px;
-  max-width: 36rem;
-  margin-inline: auto;
-  text-align: center;
-}
-.preview-intro h2 {
-  font-size: clamp(2.2rem, 7vw, 3.6rem);
-}
-.preview-intro > p:last-child {
-  max-width: 30rem;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.8889rem;
-  line-height: 1.6;
-}
-
-/* Scroll reveal: blocks rise once, then their loops run only while on screen. */
-.reveal {
-  opacity: 0;
-  transform: translateY(48px);
-  transition:
-    opacity 900ms ease,
-    transform 1100ms var(--ease-out);
-}
-.reveal.is-revealed {
-  opacity: 1;
-  transform: none;
-}
-.reveal:not([data-in-view]),
-.reveal:not([data-in-view]) * {
-  animation-play-state: paused !important;
-}
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
   .product-preview *,
   .product-preview *::before,
   .product-preview *::after {
     animation: none !important;
     transition: none !important;
-  }
-  .feature .review-line {
-    opacity: 1;
   }
 }
 
@@ -128,9 +248,7 @@
   overflow: hidden;
   background: #050505;
   border: 1px solid var(--border);
-  box-shadow:
-    0 40px 120px -40px rgb(212 83 91 / 0.35),
-    0 0 0 6px rgb(255 255 255 / 0.015);
+  box-shadow: 0 0 0 6px rgb(255 255 255 / 0.015);
 }
 /* The planner's own navigation, same look as the app's: an ivory block slides
    under the selected page. It is the switcher, so it stays clickable. */
@@ -214,9 +332,7 @@
   position: relative;
   height: 31rem;
   padding: 24px 20px;
-  background:
-    radial-gradient(ellipse at 50% 120%, rgb(212 83 91 / 0.1), transparent 60%),
-    #000;
+  background: #000;
 }
 .screen-panel {
   position: absolute;
@@ -265,56 +381,6 @@
   }
 }
 
-/* Phone floats over the browser's corner, always in Focus. */
-.device-phone {
-  position: absolute;
-  right: 12px;
-  bottom: -3rem;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  width: 11.5rem;
-  padding: 34px 14px 18px;
-  background: #050505;
-  border: 1px solid #4a4640;
-  border-radius: 30px;
-  box-shadow:
-    0 30px 80px -20px #000,
-    0 0 0 5px #111;
-}
-.phone-notch {
-  position: absolute;
-  top: 10px;
-  width: 54px;
-  height: 14px;
-  background: #111;
-  border-radius: 10px;
-}
-.phone-title {
-  margin: 0;
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
-  font-size: 0.8889rem;
-  text-align: center;
-}
-.device-phone .mock-timer {
-  width: 8.5rem;
-}
-.device-phone .timer-digits {
-  font-size: 1.1111rem;
-}
-.device-phone .timer-hint {
-  display: none;
-}
-.device-phone .mock-button {
-  width: 100%;
-  font-size: 0.6111rem;
-}
-@media (min-width: 980px) {
-  .device-phone {
-    display: flex;
-  }
-}
 @media (min-width: 760px) {
   /* Just taller than the tallest mock screen (Focus), so no band sits empty. */
   .device-screen {
@@ -325,21 +391,6 @@
   .device-screen .screen-column {
     width: min(100%, 27rem);
     font-size: 0.85rem;
-  }
-}
-@media (min-width: 1180px) {
-  .device-phone {
-    right: -1.5rem;
-  }
-}
-@media (min-width: 980px) and (prefers-reduced-motion: no-preference) {
-  .showcase[data-in-view] .device-phone {
-    animation: phone-float 6s ease-in-out infinite;
-  }
-}
-@keyframes phone-float {
-  50% {
-    transform: translateY(-12px);
   }
 }
 
@@ -649,8 +700,7 @@
 .calendar-cell.level-3 {
   background: rgb(212 83 91 / 0.85);
 }
-.screen-panel.is-active .calendar-cell,
-.feature.is-revealed .calendar-cell {
+.screen-panel.is-active .calendar-cell {
   animation: cell-pop 500ms var(--ease-out) both;
   animation-delay: calc(300ms + var(--i) * 22ms);
 }
@@ -661,332 +711,6 @@
   }
 }
 
-/* ---------- Feature rows ---------- */
-
-.feature-rows {
-  display: grid;
-  gap: clamp(28px, 6vw, 72px);
-}
-.feature {
-  /* Not rendered until near the viewport, which matters on slow phones. */
-  content-visibility: auto;
-  contain-intrinsic-block-size: auto 640px;
-  display: grid;
-  align-items: center;
-  gap: clamp(28px, 5vw, 64px);
-  padding: clamp(24px, 5vw, 56px);
-  background: rgb(14 14 13 / 0.88);
-  border: 1px solid var(--border);
-}
-.feature-copy {
-  display: grid;
-  gap: 18px;
-  max-width: 24rem;
-}
-.feature-index {
-  color: var(--muted);
-}
-.feature h3 {
-  font-size: clamp(1.9rem, 5vw, 2.7rem);
-}
-.feature-copy > p:last-child {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.8889rem;
-  line-height: 1.6;
-}
-.feature-visual {
-  /* The looping animations below change layout; keep it inside this box. */
-  contain: layout paint;
-  display: grid;
-  place-items: center;
-  min-height: 20rem;
-  margin: 0;
-  padding: clamp(20px, 4vw, 36px);
-  background: #000;
-  border: 1px solid var(--border);
-}
-.feature-visual > div {
-  width: min(100%, 22rem);
-}
-@media (min-width: 860px) {
-  .feature {
-    grid-template-columns: 1fr 1.15fr;
-  }
-  .feature.is-flipped .feature-copy {
-    order: 2;
-  }
-}
-
-/* 01 · The list prunes itself down to three, then grows back, on a loop. */
-.prune-heading {
-  display: grid;
-  margin: 0 0 14px;
-  font-size: 0.6667rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-.prune-heading span {
-  grid-area: 1 / 1;
-}
-.prune-count-before {
-  color: var(--muted);
-}
-.prune-count-after {
-  color: var(--blood-red);
-  opacity: 0;
-}
-.prune-list {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  font-size: 0.7778rem;
-  list-style: none;
-}
-.prune-list li {
-  overflow: hidden;
-  max-height: 3rem;
-  margin-bottom: 6px;
-  padding: 9px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.prune-list li span {
-  position: relative;
-}
-.prune-list .is-cut span::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 55%;
-  height: 1px;
-  background: var(--blood-red);
-  transform: scaleX(0);
-  transform-origin: left;
-}
-.feature.is-revealed .prune-count-before {
-  animation: prune-before 9s ease infinite;
-}
-.feature.is-revealed .prune-count-after {
-  animation: prune-after 9s ease infinite;
-}
-.feature.is-revealed .prune-list .is-cut {
-  animation: prune-row 9s var(--ease-out) infinite;
-  animation-delay: calc(var(--i) * 90ms);
-}
-.feature.is-revealed .prune-list .is-cut span::after {
-  animation: prune-strike 9s var(--ease-out) infinite;
-  animation-delay: calc(var(--i) * 90ms);
-}
-.feature.is-revealed .prune-list .is-kept {
-  animation: prune-keep 9s ease infinite;
-}
-@keyframes prune-strike {
-  0%,
-  10% {
-    transform: scaleX(0);
-  }
-  20%,
-  88% {
-    transform: scaleX(1);
-  }
-  96%,
-  100% {
-    transform: scaleX(0);
-  }
-}
-@keyframes prune-row {
-  0%,
-  24% {
-    opacity: 1;
-    max-height: 3rem;
-    margin-bottom: 6px;
-    padding-block: 9px;
-    border-width: 1px;
-  }
-  20% {
-    opacity: 0.45;
-  }
-  34%,
-  84% {
-    opacity: 0;
-    max-height: 0;
-    margin-bottom: 0;
-    padding-block: 0;
-    border-width: 0;
-  }
-  96%,
-  100% {
-    opacity: 1;
-    max-height: 3rem;
-    margin-bottom: 6px;
-    padding-block: 9px;
-    border-width: 1px;
-  }
-}
-@keyframes prune-keep {
-  0%,
-  30% {
-    border-color: var(--border);
-  }
-  40%,
-  84% {
-    border-color: color-mix(in srgb, var(--text) 55%, var(--border));
-    padding-block: 14px;
-  }
-  96%,
-  100% {
-    border-color: var(--border);
-  }
-}
-@keyframes prune-before {
-  0%,
-  30% {
-    opacity: 1;
-  }
-  36%,
-  86% {
-    opacity: 0;
-  }
-  94%,
-  100% {
-    opacity: 1;
-  }
-}
-@keyframes prune-after {
-  0%,
-  30% {
-    opacity: 0;
-  }
-  36%,
-  86% {
-    opacity: 1;
-  }
-  94%,
-  100% {
-    opacity: 0;
-  }
-}
-
-/* 02 · Focus ring plus the stop reasons it collects. */
-.focus-visual {
-  display: grid;
-  justify-items: center;
-  gap: 28px;
-}
-.focus-visual .mock-timer {
-  width: min(15rem, 80%);
-}
-.focus-visual .timer-digits {
-  font-size: clamp(1.5rem, 5vw, 2rem);
-}
-.pause-reasons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.6667rem;
-}
-.pause-reasons span {
-  width: 100%;
-  color: var(--muted);
-  text-align: center;
-}
-.pause-reasons b {
-  padding: 6px 10px;
-  font-weight: 400;
-  border: 1px solid var(--border);
-}
-.feature.is-revealed .pause-reasons b {
-  animation: reason-pick 7.5s ease infinite;
-}
-.feature.is-revealed .pause-reasons b:nth-of-type(2) {
-  animation-delay: 2.5s;
-}
-.feature.is-revealed .pause-reasons b:nth-of-type(3) {
-  animation-delay: 5s;
-}
-@keyframes reason-pick {
-  0%,
-  6% {
-    color: inherit;
-    background: transparent;
-    border-color: var(--border);
-  }
-  10%,
-  30% {
-    color: #000;
-    background: var(--text);
-    border-color: var(--text);
-  }
-  36%,
-  100% {
-    color: inherit;
-    background: transparent;
-    border-color: var(--border);
-  }
-}
-
-/* 03 · Calendar fills in, then the review writes itself line by line. */
-.review-visual {
-  display: grid;
-  gap: 20px;
-}
-.review-card {
-  display: grid;
-  gap: 10px;
-  padding: 16px 18px;
-  font-size: 0.7778rem;
-  line-height: 1.5;
-  background: var(--surface);
-  border-left: 2px solid var(--blood-red);
-}
-.review-line {
-  margin: 0;
-  color: var(--muted);
-}
-.review-line b {
-  color: var(--text);
-  font-weight: 500;
-}
-.feature .review-line {
-  opacity: 0;
-}
-.feature.is-revealed .review-line {
-  animation: review-line 700ms var(--ease-out) both;
-  animation-delay: 1.3s;
-}
-.feature.is-revealed .review-line:nth-of-type(3) {
-  animation-delay: 1.9s;
-}
-.feature.is-revealed .review-line:nth-of-type(4) {
-  animation-delay: 2.5s;
-}
-@keyframes review-line {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* ---------- Closing call to action ---------- */
-
-.preview-cta {
-  display: grid;
-  justify-items: center;
-  gap: 18px;
-  padding-block: 24px;
-  text-align: center;
-}
-.preview-signup {
-  margin: 0;
-}
 .landing-footer {
   display: flex;
   justify-content: center;
@@ -1002,8 +726,5 @@
 @media (max-width: 599px) {
   .device-screen {
     padding: 16px 12px;
-  }
-  .feature-visual {
-    min-height: 0;
   }
 }

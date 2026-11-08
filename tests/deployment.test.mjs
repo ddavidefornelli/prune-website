@@ -8,7 +8,7 @@ import { buildVercel } from "../scripts/build-vercel.ts";
 import { checkDeployment } from "../scripts/check-deployment.mjs";
 import { hardenHtml } from "../scripts/security-policy.ts";
 
-const paths = ["/", "/download", "/download/", "/index.html"];
+const paths = ["/", "/download", "/download/", "/login", "/login/", "/index.html"];
 const origin = "https://deployment-fixture.supabase.co";
 const script = "console.log('trusted application');";
 const css = "body { color: white; }";

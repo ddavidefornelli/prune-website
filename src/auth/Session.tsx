@@ -1,4 +1,4 @@
-import { Match, Switch } from "solid-js";
+import { createEffect, Match, Switch } from "solid-js";
 import { LoadingIndicator } from "../components/LoadingIndicator";
 import { PlanningClient } from "../planner/api";
 import { Planner } from "../planner/Planner";
@@ -8,6 +8,12 @@ import { SignIn } from "./SignIn";
 export function Session() {
   const client = new PlanningClient();
   const session = createSession(client);
+
+  // The planner lives at the root; don't leave a signed-in visitor on /login.
+  createEffect(() => {
+    if (session.account() && location.pathname !== "/")
+      history.replaceState(null, "", "/");
+  });
 
   return (
     <Switch>
@@ -25,6 +31,7 @@ export function Session() {
             client={client}
             initialError={session.initialError()}
             configurationError={session.configurationError}
+            onAuthenticated={session.authenticate}
           />
         </div>
       </Match>

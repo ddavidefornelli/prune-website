@@ -78,7 +78,13 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (request.method() === "OPTIONS") { await route.fulfill({ status: 204, headers }); return; }
       const body = request.postDataJSON() ?? {};
       state.requests.push({ path: url.pathname + url.search, body, authorization: request.headers().authorization });
-      if (url.pathname === "/auth/v1/settings") { await send({ external: { google: !state.googleDisabled } }); return; }
+      if (url.pathname === "/auth/v1/otp") { await send({}); return; }
+      if (url.pathname === "/auth/v1/verify") {
+        const valid = body.email === user.email && body.token === "12345678" && body.type === "email";
+        await send(valid ? session() : { msg: "private upstream error", error_code: "invalid_credentials" }, valid ? 200 : 400);
+        return;
+      }
+      if (url.pathname === "/auth/v1/settings") { await send({ external: { email: true, google: !state.googleDisabled } }); return; }
       if (url.pathname === "/auth/v1/authorize") {
         // Stand in for Google and Supabase: return straight to the PKCE callback.
         const callback = new URL(url.searchParams.get("redirect_to")!);
@@ -168,7 +174,7 @@ export async function openPlanner(page: Page) {
 }
 /** Signed-out visitors land on sign-in: Google is the only way in. */
 export async function openSignIn(page: Page) {
-  await page.goto("/");
+  await page.goto("/login");
   await expect(page.getByRole("button", { name: "Continue with Google", exact: true }).first()).toBeVisible();
 }
 export async function visitProfile(page: Page) {

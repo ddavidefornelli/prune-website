@@ -1,5 +1,7 @@
 /** Exact backend paths shared by the transport and generated CSP allowlist. */
 export const SUPABASE_ROUTES = {
+  sendCode: "/auth/v1/otp",
+  verifyCode: "/auth/v1/verify",
   user: "/auth/v1/user",
   token: "/auth/v1/token",
   signOut: "/auth/v1/logout",

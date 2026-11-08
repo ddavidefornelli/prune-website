@@ -7,7 +7,8 @@ import { isAccount, type Account } from "../planner/types.ts";
 
 type SessionPhase = "restoring" | "ready";
 
-/** Restores a saved session or completes a Google redirect, once, at startup. */
+/** Restores a saved session or completes a Google redirect, once, at startup.
+ * `authenticate` opens the account after an emailed code is verified. */
 export function createSession(
   client: PlanningClient,
   configure: () => unknown = webConfig,
@@ -51,5 +52,11 @@ export function createSession(
     void restore();
   });
 
-  return { account, phase, initialError, configurationError };
+  return {
+    account,
+    phase,
+    initialError,
+    configurationError,
+    authenticate: (signedIn: Account) => setAccount(signedIn),
+  };
 }

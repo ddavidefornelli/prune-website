@@ -144,7 +144,7 @@ test("Vercel packages the exact built headers with static files and both downloa
     assert.equal(readFileSync(join(output, "static/index.html"), "utf8"), built.html);
     assert.equal(existsSync(join(output, "static/security-headers.json")), false);
     const cacheRule = config.routes.find((route) => route.headers?.["Cache-Control"]);
-    for (const path of ["/", "/index.html", "/download", "/download/"]) assert.ok(new RegExp(cacheRule.src).test(path));
+    for (const path of ["/", "/index.html", "/download", "/download/", "/login", "/login/"]) assert.ok(new RegExp(cacheRule.src).test(path));
 
     writeFileSync(join(source, "assets/app.js"), `${script}\n// changed after hashing`);
     assert.throws(() => buildVercel(source, output), /integrity/);

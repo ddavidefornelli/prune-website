@@ -19,7 +19,7 @@ function fixture({ signupDisabled = true, override } = {}) {
     const replacement = await override?.(url, init);
     if (replacement) return replacement;
     if (url.origin === site) {
-      if (["/", "/download", "/download/", "/index.html"].includes(url.pathname)) return new Response(built.html, { headers: documentHeaders });
+      if (["/", "/download", "/download/", "/login", "/login/", "/index.html"].includes(url.pathname)) return new Response(built.html, { headers: documentHeaders });
       if (url.pathname === "/assets/app.js") return new Response(script, { headers: { "Content-Type": "text/javascript; charset=utf-8" } });
     }
     if (url.origin === api) {

@@ -246,7 +246,6 @@ textarea:focus {
   min-height: 50dvh;
 }
 
-/* Signup is the home page, not a marketing screen or a second login route. */
 .auth-panel {
   flex: none;
   width: 100%;
@@ -292,6 +291,64 @@ textarea:focus {
 }
 .auth-panel .signup-terms .privacy-policy-button {
   color: var(--text);
+}
+
+.auth-panel input[type="email"] {
+  width: 100%;
+  min-width: 0;
+  height: 2.8889rem;
+  padding: 12px 16px;
+  font-size: 0.9444rem;
+  line-height: 1.5;
+}
+.auth-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  font-size: 0.9444rem;
+  font-weight: 550;
+  line-height: 1.5;
+}
+.email-code-boxes {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: clamp(4px, 1vw, 8px);
+}
+/* One native input preserves paste, autofill, selection and keyboard editing. */
+.auth-panel .email-code-boxes .otp-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: text;
+}
+.email-code-digit {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: clamp(1rem, 4vw, 1.4444rem);
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.email-code-boxes:focus-within .email-code-digit.is-active {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+.email-code-boxes:has(input:disabled) {
+  opacity: 0.5;
 }
 
 #app .google-signin {

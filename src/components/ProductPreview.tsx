@@ -6,13 +6,12 @@ import {
   onCleanup,
   onMount,
   Switch,
-  type JSX,
 } from "solid-js";
 
 /**
- * The signed-out product tour below the sign-in hero: a framed, auto-playing
- * look at each planner screen, then one row per idea. Every "screenshot" is
- * drawn with HTML so it stays crisp, animates, and needs no network.
+ * The landing page's demonstration: a framed, auto-playing look at each
+ * planner screen. Every "screenshot" is drawn with HTML so it stays crisp,
+ * animates, and needs no network.
  */
 
 const SCREENS = [
@@ -51,17 +50,6 @@ const CALENDAR = [
   3, 3, 2, 3, 3, 3, 1, 0, 0,
 ] as const;
 
-const PRUNE_LIST = [
-  { title: "Write the first draft", keep: true },
-  { title: "Reorganise every bookmark", keep: false },
-  { title: "Answer all 43 emails", keep: false },
-  { title: "Call the accountant", keep: true },
-  { title: "Research yet another notes app", keep: false },
-  { title: "Tweak the colour theme", keep: false },
-  { title: "Ship the small update", keep: true },
-  { title: "Clean the downloads folder", keep: false },
-] as const;
-
 const reducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -90,20 +78,12 @@ function markInView(element: HTMLElement): void {
   );
 }
 
-/** Below the fold: also fades the block in the first time it scrolls into view. */
-function reveal(element: HTMLElement): void {
-  watchViewport(element, (visible) => {
-    if (visible) element.classList.add("is-revealed");
-    element.toggleAttribute("data-in-view", visible);
-  });
-}
-
 function clock(seconds: number): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
 }
 
-export function ProductPreview(props: { action: JSX.Element }) {
+export function ProductPreview() {
   let section!: HTMLElement;
   const [active, setActive] = createSignal<ScreenId>("today");
   const [autoplay, setAutoplay] = createSignal(!reducedMotion());
@@ -160,7 +140,7 @@ export function ProductPreview(props: { action: JSX.Element }) {
       ref={(element) => (section = element)}
       id="product-preview"
       class="product-preview"
-      aria-labelledby="preview-title"
+      aria-label="prune in action"
     >
       <div
         class="showcase"
@@ -247,159 +227,9 @@ export function ProductPreview(props: { action: JSX.Element }) {
               </div>
             </div>
           </div>
-
-          <div class="device-phone" aria-hidden="true">
-            <span class="phone-notch" />
-            <p class="phone-title">Write the first draft</p>
-            <TimerRing remaining={remaining()} total={FOCUS_TOTAL} />
-            <span class="mock-button is-primary">Complete task</span>
-          </div>
         </div>
       </div>
-
-      <header class="preview-intro reveal" ref={reveal}>
-        <p class="preview-eyebrow">Inside prune</p>
-        <h2 id="preview-title">
-          ONE DAY.
-          <br />
-          THREE TASKS.
-          <br />
-          NOTHING ELSE.
-        </h2>
-        <p>
-          A planner that refuses to let your list grow. Pick three, work them
-          one at a time, and let the weekly review tell you what got in the way.
-        </p>
-      </header>
-
-      <div class="feature-rows">
-        <Feature
-          index="01"
-          eyebrow="Prune"
-          title={
-            <>
-              TWENTY IN,
-              <br />
-              THREE OUT.
-            </>
-          }
-          body="Every day holds three tasks, never more. Choosing what not to do is the feature: the rest waits for tomorrow, or quietly disappears."
-          caption="A long to-do list is cut down to three tasks."
-        >
-          <div class="prune-visual">
-            <p class="prune-heading">
-              <span class="prune-count-before">8 things</span>
-              <span class="prune-count-after">3 tasks</span>
-            </p>
-            <ul class="prune-list">
-              <Index each={PRUNE_LIST}>
-                {(item, index) => (
-                  <li
-                    classList={{
-                      "is-kept": item().keep,
-                      "is-cut": !item().keep,
-                    }}
-                    style={{ "--i": index }}
-                  >
-                    <span>{item().title}</span>
-                  </li>
-                )}
-              </Index>
-            </ul>
-          </div>
-        </Feature>
-
-        <Feature
-          index="02"
-          eyebrow="Focus"
-          flip
-          title={
-            <>
-              ONE TASK.
-              <br />
-              ONE TIMER.
-            </>
-          }
-          body="Start any of your three and everything else fades. Pause when life interrupts and say why, so the interruptions add up to something you can fix."
-          caption="A focus timer counting down, with a pause reason being recorded."
-        >
-          <div class="focus-visual">
-            <TimerRing remaining={remaining()} total={FOCUS_TOTAL} />
-            <div class="pause-reasons">
-              <span>Paused because</span>
-              <b>Meeting ran over</b>
-              <b>Slack</b>
-              <b>Lost the thread</b>
-            </div>
-          </div>
-        </Feature>
-
-        <Feature
-          index="03"
-          eyebrow="Weekly review"
-          title={
-            <>
-              SEE WHAT HOLDS
-              <br />
-              YOU BACK.
-            </>
-          }
-          body="Every Sunday prune reads your week, finished tasks, estimates and stop reasons, and writes a short, honest review. Free, automatic, yours."
-          caption="A completion calendar filling in, next to a weekly review."
-        >
-          <div class="review-visual">
-            <CalendarGrid />
-            <div class="review-card">
-              <p class="mock-up-next">Week 44 review</p>
-              <p class="review-line">
-                You finished <b>11 of 15</b> tasks.
-              </p>
-              <p class="review-line">
-                4 of 6 pauses came after 3 PM, all marked{" "}
-                <b>“meeting ran over”</b>.
-              </p>
-              <p class="review-line">
-                Try this week: put your hardest task before lunch.
-              </p>
-            </div>
-          </div>
-        </Feature>
-      </div>
-
-      <div class="preview-cta reveal" ref={reveal}>
-        {props.action}
-      </div>
     </section>
-  );
-}
-
-function Feature(props: {
-  index: string;
-  eyebrow: string;
-  title: JSX.Element;
-  body: string;
-  caption: string;
-  flip?: boolean;
-  children: JSX.Element;
-}) {
-  return (
-    <article
-      class="feature reveal"
-      classList={{ "is-flipped": props.flip }}
-      ref={reveal}
-    >
-      <div class="feature-copy">
-        <p class="preview-eyebrow">
-          <span class="feature-index">{props.index}</span> {props.eyebrow}
-        </p>
-        <h3>{props.title}</h3>
-        <p>{props.body}</p>
-      </div>
-      <figure class="feature-visual">
-        <div aria-hidden="true">{props.children}</div>
-        <figcaption class="visually-hidden">{props.caption}</figcaption>
-      </figure>
-    </article>
   );
 }
 
