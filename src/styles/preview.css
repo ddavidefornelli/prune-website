@@ -142,6 +142,13 @@
     position: relative;
     grid-area: 1 / 1;
   }
+  /* A glimpse, not the whole screen: the bottom of each mock fades away. */
+  .landing .product-preview {
+    max-height: 15.5rem;
+  }
+  .landing .device-screen {
+    mask-image: linear-gradient(#000 calc(100% - 1.5rem), transparent);
+  }
   .landing-cta {
     min-height: 48px;
     margin-top: clamp(8px, 1.8svh, 20px);
