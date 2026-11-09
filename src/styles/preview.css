@@ -144,7 +144,7 @@
   }
   /* A glimpse, not the whole screen: the bottom of each mock fades away. */
   .landing .product-preview {
-    max-height: 15.5rem;
+    max-height: 18.5rem;
   }
   .landing .device-screen {
     mask-image: linear-gradient(#000 calc(100% - 1.5rem), transparent);
