@@ -102,7 +102,8 @@
 }
 
 /* Phones: everything on one screen, no scrolling. The page and the cookie
-   banner share the screen's height, and the demo takes whatever is left. */
+   banner share the screen's height. The demo is as tall as its tallest mock
+   screen, gives way when the height runs out, and the group is centred. */
 @media (max-width: 699px) and (orientation: portrait) {
   #root:has(.landing) {
     height: 100svh;
@@ -113,8 +114,8 @@
     padding-block: 10px;
   }
   .landing {
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    align-content: stretch;
+    grid-template-rows: auto auto minmax(0, max-content) auto;
+    align-content: center;
     min-height: 0;
     padding-block: 0;
   }
@@ -133,9 +134,28 @@
     height: 100%;
     min-height: 0;
   }
+  /* Stacked instead of overlaid, so the tallest screen sets the height. */
+  .landing .screen-panels {
+    display: grid;
+  }
+  .landing .screen-panel {
+    position: relative;
+    grid-area: 1 / 1;
+  }
   .landing-cta {
     min-height: 48px;
     margin-top: clamp(8px, 1.8svh, 20px);
+  }
+}
+/* Short phones: shrink the demo so its screens are not cut off. */
+@media (max-width: 699px) and (orientation: portrait) and (max-height: 600px) {
+  .landing .product-preview {
+    --demo-zoom: 0.62;
+  }
+}
+@media (max-width: 699px) and (orientation: portrait) and (max-height: 700px) {
+  #root:has(.cookie-banner) .product-preview {
+    --demo-zoom: 0.6;
   }
 }
 @media (min-width: 700px) {
