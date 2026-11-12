@@ -1,5 +1,6 @@
 import {
   createEffect,
+  For,
   createSignal,
   createUniqueId,
   onCleanup,
@@ -10,6 +11,9 @@ import {
 import { Dialog } from "../../components/Dialog";
 import type { PlannerView } from "../constants";
 import { errorMessage } from "../errors";
+import { ESTIMATE } from "../constants";
+import { parseQuickEntry } from "../quick-entry";
+import { STARTERS } from "../starters";
 
 export type TourView = Exclude<PlannerView, "profile" | "focus">;
 
@@ -67,7 +71,7 @@ const WITH_TASK: readonly Stop[] = [
   },
 ];
 
-/** A new, empty planner: explain the rule, then end at the task form. */
+/** A new, empty planner: explain the rule, then require the first task. */
 const EMPTY: readonly Stop[] = [
   {
     view: "today",
@@ -79,9 +83,10 @@ const EMPTY: readonly Stop[] = [
   ...AROUND,
   {
     view: "today",
-    target: ".task-form",
+    // The form is inside the popup; highlight the plan it fills, not a second form.
+    target: ".plan-heading",
     title: "Add your first task",
-    text: "Write one, or pick an idea below. Add a time like 45m to set the estimate.",
+    text: "Your plan starts here. Write one, or pick an idea. Add a time like 45m to set the estimate.",
   },
 ];
 
@@ -91,8 +96,11 @@ interface PlannerTourProps {
   onVisit: (view: TourView) => void;
   onDone: (started: boolean) => void;
   onStart: () => Promise<void>;
-  /** The empty tour's last action: close and put the cursor in the task form. */
-  onAdd: () => void;
+  /**
+   * The empty tour's last step: creating the first task is required, and is
+   * the only way to finish. Resolves false (with the reason) when it failed.
+   */
+  onCreate: (outcome: string, minutes: number) => Promise<string | null>;
 }
 
 /** Only measurement/positioning is imperative; coach-mark content stays reactive. */
@@ -100,6 +108,7 @@ export function PlannerTour(props: PlannerTourProps) {
   const [index, setIndex] = createSignal(0);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
+  const [outcome, setOutcome] = createSignal("");
   const headingId = createUniqueId();
   const hasTask = untrack(() => props.hasTask);
   const stops = hasTask ? WITH_TASK : EMPTY;
@@ -184,6 +193,22 @@ export function PlannerTour(props: PlannerTourProps) {
     });
   });
 
+  async function create(text: string, fallbackMinutes: number): Promise<void> {
+    if (busy() || !text.trim()) return;
+    const parsed = parseQuickEntry(text.trim());
+    setBusy(true);
+    setError("");
+    try {
+      const failure = await props.onCreate(
+        parsed.outcome,
+        parsed.minutes ?? fallbackMinutes,
+      );
+      if (failure && !disposed) setError(failure);
+    } finally {
+      if (!disposed) setBusy(false);
+    }
+  }
+
   async function start(): Promise<void> {
     if (busy()) return;
     setBusy(true);
@@ -232,10 +257,60 @@ export function PlannerTour(props: PlannerTourProps) {
           {stop().title}
         </h2>
         <p class="muted">{stop().text}</p>
+        <Show when={last() && !hasTask}>
+          <form
+            class="tour-task-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void create(outcome(), ESTIMATE.defaultMinutes);
+            }}
+          >
+            <input
+              aria-label="Your first task"
+              placeholder="e.g. Write the intro 45m"
+              maxLength={500}
+              value={outcome()}
+              disabled={busy()}
+              onInput={(event) => setOutcome(event.currentTarget.value)}
+            />
+            <div class="tour-starters" role="group" aria-label="Ideas">
+              <For each={STARTERS}>
+                {(starter) => (
+                  <button
+                    type="button"
+                    disabled={busy()}
+                    onClick={() =>
+                      void create(starter.outcome, starter.minutes)
+                    }
+                  >
+                    {starter.outcome}
+                    <span>{starter.minutes} min</span>
+                  </button>
+                )}
+              </For>
+            </div>
+            <div class="tour-actions">
+              <button
+                type="button"
+                disabled={busy()}
+                onClick={() => setIndex(index() - 1)}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                class="tour-primary"
+                disabled={busy() || !outcome().trim()}
+              >
+                Add task
+              </button>
+            </div>
+          </form>
+        </Show>
         <p class="error" role="alert" hidden={!error()}>
           {error()}
         </p>
-        <div class="tour-actions">
+        <div class="tour-actions" hidden={last() && !hasTask}>
           <Show when={index() > 0}>
             <button
               type="button"
@@ -257,18 +332,7 @@ export function PlannerTour(props: PlannerTourProps) {
               </button>
             }
           >
-            <Show
-              when={hasTask}
-              fallback={
-                <button
-                  type="button"
-                  class="tour-primary"
-                  onClick={() => props.onAdd()}
-                >
-                  Add my first task
-                </button>
-              }
-            >
+            <Show when={hasTask} fallback={null}>
               <button type="button" disabled={busy()} onClick={finish}>
                 Not now
               </button>

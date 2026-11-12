@@ -4,32 +4,13 @@ test.describe("first run", () => {
   test.use({ signedIn: true, firstVisit: true });
 
   for (const width of [1100, 390]) {
-    test(`plans inline and teaches focus just in time at ${width}px`, async ({ page, backend }) => {
+    test(`the first task comes from the tour, then focus is taught just in time at ${width}px`, async ({ page, backend }) => {
       await page.setViewportSize({ width, height: 844 });
       await openPlanner(page);
-      // The page tour opens first (tests/tour.spec.ts); the first-run prompt waits behind it.
+      // The tour opens first and ends by creating the first task (tests/tour.spec.ts).
       await finishTour(page);
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
-      const input = page.getByRole("textbox", { name: "Outcome", exact: true });
-      const add = page.locator(".task-form").getByRole("button", { name: "Add task", exact: true });
-      await expect(input).toBeInViewport({ ratio: 1 });
-      const inputBox = (await input.boundingBox())!;
-      const startersBox = (await page.locator(".starters").boundingBox())!;
-      expect(inputBox.y + inputBox.height).toBeLessThan(startersBox.y);
-      await expect(add).toHaveClass(/is-empty/);
-      await input.blur();
-      await add.click();
-      await expect(input).toBeFocused();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      expect(backend.requests.filter((request) => request.body.p_action === "create_task")).toHaveLength(0);
-      await input.fill("Draft");
-      await expect(add).not.toHaveClass(/is-empty/);
-      await input.fill("");
-      await page.getByRole("region", { name: "Starting ideas" })
-        .getByRole("button", { name: /Plan the week ahead/ }).click();
       await synced(page);
-      await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
       expect(backend.data.todayTasks).toHaveLength(1);
       expect(backend.data.todayTasks[0]!.estimatedMinutes).toBe(30);
       expect(backend.data.activeTask).toBeNull();

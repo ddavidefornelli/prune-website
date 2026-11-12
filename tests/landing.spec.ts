@@ -90,12 +90,10 @@ test.describe("a first sign-in", () => {
     expect(authorize.searchParams.get("code_challenge_method")).toBe("s256");
     expect(backend.requests.some((request) => request.path === "/auth/v1/token?grant_type=pkce" && request.body.auth_code === "fixture-oauth-code")).toBe(true);
 
-    // A new account lands in the tour, then on the first-task prompt behind it.
+    // A new account lands in the tour, which ends by creating the first task.
     const tour = page.locator(".tour-popup");
     await expect(tour.getByRole("heading")).toHaveText("Three tasks a day");
     await finishTour(page);
-    await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
-    await page.getByRole("region", { name: "Starting ideas" }).getByRole("button", { name: /Plan the week ahead/ }).click();
     await expect(page.getByRole("button", { name: "Edit task title: Plan the week ahead" })).toBeVisible();
     await expect(tour).toHaveCount(0);
 

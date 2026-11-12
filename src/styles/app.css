@@ -1292,6 +1292,40 @@ textarea:focus {
   padding: 8px 10px;
   font-size: 0.6667rem;
 }
+.tour-task-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.tour-task-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 0.8889rem;
+}
+.tour-starters {
+  display: grid;
+  gap: 6px;
+}
+.tour-starters button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  font-size: 0.7222rem;
+  text-align: left;
+}
+.tour-starters button span {
+  flex: none;
+  color: var(--muted);
+}
+.tour-task-form .tour-actions {
+  margin-top: 2px;
+}
+.tour-actions .tour-primary:disabled {
+  opacity: 0.45;
+}
 .tour-actions .tour-primary,
 .tour-actions .tour-primary:hover:not(:disabled) {
   color: #000;
@@ -1311,4 +1345,7 @@ textarea:focus {
     border-color: var(--action-hover);
     color: #000;
   }
+}
+.tour-actions[hidden] {
+  display: none;
 }

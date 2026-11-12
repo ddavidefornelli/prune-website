@@ -207,10 +207,17 @@ export async function synced(page: Page) {
   await expect(page.locator('main .add-task:disabled, main .estimate-dial[aria-disabled="true"], #focus-timer:disabled')).toHaveCount(0);
 }
 
-/** The tour can't be skipped: step through it and close it from the last step. */
-export async function finishTour(page: Page) {
+/**
+ * The tour can't be skipped: step through it and finish from the last step.
+ * An empty account must create its first task there (a starting idea here).
+ */
+export async function finishTour(page: Page, starter: RegExp = /Plan the week ahead/) {
   const tour = page.locator(".tour-popup");
-  const end = tour.getByRole("button", { name: /Add my first task|Not now/ });
-  while (!(await end.isVisible())) await tour.getByRole("button", { name: "Next", exact: true }).click();
-  await end.click();
+  const notNow = tour.getByRole("button", { name: "Not now", exact: true });
+  const firstTask = tour.getByRole("textbox", { name: "Your first task" });
+  while (!(await notNow.isVisible()) && !(await firstTask.isVisible()))
+    await tour.getByRole("button", { name: "Next", exact: true }).click();
+  if (await notNow.isVisible()) await notNow.click();
+  else await tour.getByRole("group", { name: "Ideas" }).getByRole("button", { name: starter }).click();
+  await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
 }

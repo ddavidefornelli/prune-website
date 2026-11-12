@@ -10,7 +10,7 @@ async function openWithTour(page: import("@playwright/test").Page) {
 }
 
 for (const width of [1100, 390]) {
-  test(`an empty account gets the tour on load, ending at the task form, at ${width}px`, async ({ page, backend }) => {
+  test(`an empty account gets the tour on load and must add its first task, at ${width}px`, async ({ page, backend }) => {
     await page.setViewportSize({ width, height: 844 });
     await openWithTour(page);
     const tour = page.locator(".planner-tour-dialog");
@@ -32,19 +32,29 @@ for (const width of [1100, 390]) {
         await popup.getByRole("button", { name: "Next", exact: true }).click();
       }
       if (index < 4) {
-        await expect(popup.getByRole("button", { name: /Add my first task|Start focusing/ })).toHaveCount(0);
+        await expect(popup.getByRole("button", { name: /Add task|Start focusing/ })).toHaveCount(0);
         await popup.getByRole("button", { name: "Next", exact: true }).click();
       }
     }
-    await popup.getByRole("button", { name: "Add my first task" }).click();
-    await expect(tour).toHaveCount(0);
-    await expect(page.getByRole("textbox", { name: "Outcome", exact: true })).toBeFocused();
-    await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
+    // The first task is required: nothing closes the tour until it exists.
+    const first = popup.getByRole("textbox", { name: "Your first task" });
+    const add = popup.getByRole("button", { name: "Add task", exact: true });
+    await expect(add).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(popup).toBeVisible();
+    await page.reload();
+    await expect(popup.getByRole("heading")).toHaveText(titles[0]!);
+    for (let step = 0; step < 4; step++) await popup.getByRole("button", { name: "Next", exact: true }).click();
     expect(backend.requests.filter((request) => request.body.p_action === "create_task")).toHaveLength(0);
-    // Adding the first task afterwards does not bring the tour back, nor does a reload.
-    await page.getByRole("region", { name: "Starting ideas" }).getByRole("button", { name: /Plan the week ahead/ }).click();
-    await synced(page);
+    await first.fill("Write the intro 45m");
+    await add.click();
     await expect(tour).toHaveCount(0);
+    await synced(page);
+    expect(backend.data.todayTasks).toHaveLength(1);
+    expect(backend.data.todayTasks[0]!.outcome).toBe("Write the intro");
+    expect(backend.data.todayTasks[0]!.estimatedMinutes).toBe(45);
+    await expect(page.locator("#app")).toHaveAttribute("data-view", "today");
+    // Finishing is remembered: a reload does not bring the tour back.
     await page.reload();
     await expect(page.locator(".task")).toHaveCount(1);
     await expect(tour).toHaveCount(0);
