@@ -731,16 +731,16 @@ textarea {
 }
 /* Solid reds: translucent ones turned muddy over the grey card. */
 .activity-level-1 {
-  background: #4a4843;
-  border-color: #57544e;
+  background: #6e1a24;
+  border-color: #7d1f2a;
 }
 .activity-level-2 {
-  background: #9a978e;
-  border-color: #a8a59c;
+  background: #bb2a39;
+  border-color: #c9303f;
 }
 .activity-level-3 {
-  background: #efeee7;
-  border-color: #ffffff;
+  background: #ff3b4e;
+  border-color: #ff5566;
 }
 .activity-day.is-future {
   background: transparent;
@@ -804,7 +804,7 @@ textarea {
   border: 1px solid var(--border);
 }
 .activity-stat:first-child {
-  border-left: 2px solid var(--text);
+  border-left: 2px solid var(--blood-red);
 }
 .activity-stat dt {
   color: var(--muted);
