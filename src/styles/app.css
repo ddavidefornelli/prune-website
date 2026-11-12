@@ -926,8 +926,8 @@ textarea:focus {
   padding: 0 18px;
   font-size: 0.7222rem;
   justify-self: end;
-  background: var(--action);
-  border-color: var(--action);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #000;
   transition:
     background-color 200ms ease,
@@ -1334,12 +1334,11 @@ textarea:focus {
 }
 
 /* Color roles: red marks the one thing to do next on a screen (Start focus,
-   Complete task, Add, Plan tomorrow, the tour's Next, a dialog's submit).
+   Complete task, Plan tomorrow, the tour's Next, a dialog's submit).
    Everything else is ivory or grey. Hover only lightens the red. */
 @media (hover: hover) {
   #app .task > button:not(:disabled):hover,
   #app .focus-actions > button:not(:disabled):hover,
-  #app .task-form .add-task:not(.is-empty):hover,
   .tour-actions .tour-primary:hover:not(:disabled) {
     background: var(--action-hover);
     border-color: var(--action-hover);
