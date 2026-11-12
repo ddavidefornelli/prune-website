@@ -12,6 +12,7 @@ import type { LocalQueue } from "./local-queue.ts";
 import type {
   AuthStatus,
   Dashboard,
+  EmailPreferences,
   MonthStats,
   Task,
   TaskSuggestion,
@@ -250,6 +251,19 @@ export class PlanningClient {
   async monthStats(month: string): Promise<MonthStats> {
     this.assertOpen();
     return this.query("month_stats", { month });
+  }
+
+  /** Never queued: a preference must not be replayed later over a newer choice. */
+  async emailPreferences(): Promise<EmailPreferences> {
+    this.assertOpen();
+    return this.query("email_preferences");
+  }
+
+  async setEmailPreferences(
+    preferences: EmailPreferences,
+  ): Promise<EmailPreferences> {
+    this.assertOpen();
+    return this.query("set_email_preferences", { ...preferences });
   }
 
   async weeklyOverview(): Promise<WeeklyOverview> {

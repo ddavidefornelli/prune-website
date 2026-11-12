@@ -21,7 +21,8 @@
     "test:unit": "node --experimental-strip-types --test tests/*.test.mjs && npm run test:reactivity",
     "test:reactivity": "node --conditions=browser --experimental-strip-types --test tests/reactivity/*.test.mjs",
     "test:e2e": "playwright test",
-    "check:production": "node --experimental-strip-types scripts/check-production.mjs"
+    "check:production": "node --experimental-strip-types scripts/check-production.mjs",
+    "email:test": "node --experimental-strip-types scripts/send-test-reminder.ts"
   },
   "dependencies": {
     "@contentsquare/tag-sdk": "^1.1.0",

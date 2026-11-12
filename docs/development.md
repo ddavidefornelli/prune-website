@@ -59,6 +59,7 @@ Do **not** reset the Mac app's database or create a parallel account store. Poin
 /rest/v1/rpc/planner_call
 /functions/v1/weekly-review
 /functions/v1/task-suggestions
+/functions/v1/email-unsubscribe
 ```
 
 Backend source, RLS, transactional planner rules, idempotent receipts, AI quotas and migrations remain in `../pro/supabase`. Apply any outstanding migrations there, including the local-queue protocol and `20261019000100_tomorrow_available.sql`. This website does not apply migrations or make administrative changes automatically. Provider secrets remain in the Edge Function, never in this repo's frontend configuration.
@@ -72,6 +73,28 @@ When Today or Tomorrow has open slots, signed-in users see up to three proposals
 3. Rebuild this client so the CSP `connect-src` includes the new function path.
 
 If the function is missing or fails, the plan simply shows no suggestions.
+
+### Reminder emails
+
+Two emails, both on by default and both switchable in Profile → Emails or from the link in each email:
+
+- **Daily reminder** — one per local day, only when tasks planned for today are still `planned` or `active`. Lists the task titles above a red **START NOW** button.
+- **Come-back** — at most once a week after 7 days without a signed-in planner request; stops after four in a row and resets when the owner returns.
+
+`pg_cron` calls the `daily-reminders` Edge Function at minute 5 of every hour. `planner_claim_reminders` picks accounts where it is 09:00–11:59 in the last timezone a client reported (so a missed run is caught up the next hour) and marks them as sent in the same statement, so overlapping or retried runs cannot email anyone twice. A claim is released for retry only when Brevo may accept it later (network error, 429, 5xx). If Brevo refuses the account itself (401, 402 or 403: a wrong key, an IP blocked by Brevo's **Authorised IPs** setting, or no credits), the run stops, releases every unsent claim and answers 502, so a misconfiguration never uses up a reminder. Supabase functions have no fixed outbound IP, so leave Authorised IPs off for this key.
+
+Setup, once:
+
+1. Apply `supabase/migrations/20261112000200_email_reminders.sql`, then `20261112000300_email_reminders_cron.sql`. Keep the first in the shared backend's deployment history: it redefines `planner_call`.
+2. In Brevo, create an **API key** (SMTP & API → API Keys; this is not the SMTP key used for sign-in codes) and switch off open/click tracking for transactional email.
+3. Set the function secrets (never commit them):
+   `npx supabase secrets set BREVO_API_KEY=… REMINDER_FROM_EMAIL=… REMINDER_CRON_SECRET=…`
+   `REMINDER_FROM_EMAIL` must be a sender verified in Brevo; `REMINDER_CRON_SECRET` is any long random string. Optional: `SITE_URL`, `REMINDER_BATCH_LIMIT` (emails per hourly run, default 100 — Brevo's free plan allows 300 a day, shared with sign-in codes).
+4. `npx supabase functions deploy daily-reminders email-unsubscribe` (`supabase/config.toml` turns JWT verification off for both; each checks its own secret or token).
+5. Create two Vault secrets so the cron job can call the function: `reminders_function_url` = `https://<project-ref>.supabase.co/functions/v1/daily-reminders` and `reminders_cron_secret` = the same value as `REMINDER_CRON_SECRET`.
+6. Rebuild this client so the CSP `connect-src` includes `/functions/v1/email-unsubscribe`.
+
+Until steps 3 and 5 are done the job runs but claims and sends nothing. To test by hand: `curl -X POST -H "Authorization: Bearer $REMINDER_CRON_SECRET" https://<project-ref>.supabase.co/functions/v1/daily-reminders` returns `{"sent":…,"retry":…,"rejected":…,"released":…}`.
 
 ### Removed guest and survey backend
 
@@ -180,7 +203,7 @@ After deployment, run `npm run check:production` with the matching public config
 
 ### Privacy before public release
 
-`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. Choosing **Continue with Google** or **Email me a code**, next to "By signing up, you agree to our Terms of Service and Privacy Policy.", records terms acceptance and privacy acknowledgement before any account request (`privacy-web-v13` added emailed-code sign-in and its email delivery back, so returning browsers acknowledge it again; v12 removed the guest planner, survey and usage counters; v11 made weekly reviews impossible to turn off in the app, v10 added the survey, its funnel totals and Google sign-in) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for always-on AI with no in-app opt-out, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
+`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. Choosing **Continue with Google** or **Email me a code**, next to "By signing up, you agree to our Terms of Service and Privacy Policy.", records terms acceptance and privacy acknowledgement before any account request (`privacy-web-v15` added reminder emails and their delivery through Brevo; `privacy-web-v13` added emailed-code sign-in and its email delivery back, so returning browsers acknowledge it again; v12 removed the guest planner, survey and usage counters; v11 made weekly reviews impossible to turn off in the app, v10 added the survey, its funnel totals and Google sign-in) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for always-on AI with no in-app opt-out, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
 
 Apply `supabase/migrations/20261024000100_automatic_weekly_reviews.sql` after the shared backend migrations before deploying this client. It enables reviews for newly provisioned planner accounts and preserves all existing account preferences (including disabled reviews). It affects all clients using this shared backend. Legacy backend `consent_*` fields remain protocol compatibility gates, not evidence of affirmative consent. Do not automatically enable existing disabled accounts from the browser.
 
@@ -264,6 +287,7 @@ server/
   http.ts                       Shared bounded reads and explicitly safe API errors
   weekly-review/                Review validation, provider requests and quota orchestration
   task-suggestions/             Previous-day task proposals: handler, OpenAI request, output validation
+  reminders/                    Reminder emails: HTML, Brevo request, cron and unsubscribe handlers
 ```
 
 See [refactoring notes](refactoring.md) for the cleanup boundaries and compatibility guarantees.

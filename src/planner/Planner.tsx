@@ -137,7 +137,11 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
           >
             <Switch>
               <Match when={planner.view() === "profile"}>
-                <Profile email={props.account.email} planner={planner} />
+                <Profile
+                  email={props.account.email}
+                  planner={planner}
+                  client={props.client}
+                />
               </Match>
               <Match when={planner.view() === "focus"}>
                 <FocusView

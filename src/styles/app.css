@@ -1083,6 +1083,64 @@ textarea:focus {
   margin: 0;
   font-size: clamp(1.3333rem, 5vw, 2.6667rem);
 }
+#root .unsubscribe-page {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  text-align: center;
+}
+.unsubscribe-page h1,
+.unsubscribe-page p {
+  margin: 0;
+}
+.unsubscribe-page h1 {
+  font-size: clamp(1.3333rem, 5vw, 2.6667rem);
+}
+.unsubscribe-page .unsubscribe-confirm {
+  min-height: 48px;
+  padding: 12px 24px;
+  font-weight: 600;
+}
+.unsubscribe-page a {
+  color: var(--muted);
+}
+.email-reminders {
+  margin-top: 28px;
+}
+.email-reminder {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.email-reminder input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--text);
+}
+.email-reminder-label,
+.email-reminder-hint {
+  display: block;
+}
+.email-reminder-label {
+  font-weight: 600;
+}
+.email-reminder-hint {
+  color: var(--muted);
+  font-size: 0.7222rem;
+  line-height: 1.5;
+}
 #app .task-form > label > input {
   padding-right: 96px;
 }

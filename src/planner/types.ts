@@ -77,6 +77,14 @@ export interface WeeklyReview {
 }
 
 /** A month of the owner's own tasks, counted on the server. */
+/** Which reminder emails the account receives. */
+export interface EmailPreferences {
+  /** One email on days when planned tasks are still unfinished. */
+  daily: boolean;
+  /** At most one email a week after 7 days away. */
+  comeback: boolean;
+}
+
 export interface MonthStats {
   month: string;
   /** Tasks planned for days so far, plus any of today's already finished. */

@@ -45,6 +45,7 @@ export interface Backend {
   protocolVersion: number;
   /** Answers month_stats; null makes the call fail like an unmigrated backend. */
   monthStats: Omit<MonthStats, "month"> | null;
+  emailPreferences: { daily: boolean; comeback: boolean };
   receipts: Map<string, unknown>;
 }
 
@@ -53,7 +54,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
   expired: [false, { option: true }],
   firstVisit: [false, { option: true }],
   backend: async ({ context, signedIn, expired, firstVisit }, use) => {
-    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, receipts: new Map() };
+    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, emailPreferences: { daily: true, comeback: true }, receipts: new Map() };
     // Seed once per browser context, not on reload/sign-out or each new tab.
     await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey, tourKey }) => {
       if (localStorage.getItem("prune:test:seeded")) return;
@@ -119,6 +120,11 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (action === "queue_protocol") { await send({ version: state.protocolVersion }); return; }
       if (action === "dashboard") { await send({ ...state.data, serverNow: Math.floor(Date.now() / 1000) }); return; }
       if (action === "weekly_overview") { await send(state.weekly); return; }
+      if (action === "email_preferences") { await send(state.emailPreferences); return; }
+      if (action === "set_email_preferences") {
+        state.emailPreferences = { daily: args.daily === true, comeback: args.comeback === true };
+        await send(state.emailPreferences); return;
+      }
       if (action === "month_stats") {
         if (!state.monthStats) { await send({ code: "PT400", message: "Unknown action." }, 400); return; }
         await send({ month: args.month, ...state.monthStats }); return;

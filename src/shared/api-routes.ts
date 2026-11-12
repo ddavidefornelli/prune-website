@@ -9,6 +9,7 @@ export const SUPABASE_ROUTES = {
   planner: "/rest/v1/rpc/planner_call",
   weeklyReview: "/functions/v1/weekly-review",
   taskSuggestions: "/functions/v1/task-suggestions",
+  emailUnsubscribe: "/functions/v1/email-unsubscribe",
 } as const;
 
 /** Same-domain relay for client error reports (see server/error-log.ts). */

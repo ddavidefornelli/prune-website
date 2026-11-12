@@ -1,8 +1,12 @@
 import { ErrorBoundary, Show } from "solid-js";
 import { Session } from "./auth/Session";
 import { DownloadPage } from "./components/DownloadPage";
+import { Unsubscribe, unsubscribeRequest } from "./components/Unsubscribe";
 
 export default function App() {
+  const unsubscribe = unsubscribeRequest(location.search);
+  // Keep the token out of the address bar, history and any consented analytics.
+  if (unsubscribe) history.replaceState(null, "", location.pathname);
   return (
     <ErrorBoundary
       fallback={
@@ -13,10 +17,17 @@ export default function App() {
       }
     >
       <Show
-        when={/^\/download\/?$/.test(location.pathname)}
-        fallback={<Session />}
+        when={unsubscribe}
+        fallback={
+          <Show
+            when={/^\/download\/?$/.test(location.pathname)}
+            fallback={<Session />}
+          >
+            <DownloadPage />
+          </Show>
+        }
       >
-        <DownloadPage />
+        {(request) => <Unsubscribe request={request()} />}
       </Show>
     </ErrorBoundary>
   );

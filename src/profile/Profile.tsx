@@ -1,7 +1,9 @@
 import { createMemo, For, Show, untrack } from "solid-js";
 import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
+import type { PlanningClient } from "../planner/api";
 import { ActivityCalendar } from "../planner/components/ActivityCalendar";
 import type { PlannerState } from "../planner/create-planner";
+import { EmailReminders } from "./EmailReminders";
 import { profileStats, todayFocusSeconds } from "./profile-stats";
 
 function focusMinutes(seconds: number): string {
@@ -26,7 +28,11 @@ function StatGrid(props: { metrics: readonly (readonly [string, string])[] }) {
   );
 }
 
-export function Profile(props: { email: string; planner: PlannerState }) {
+export function Profile(props: {
+  email: string;
+  planner: PlannerState;
+  client: PlanningClient;
+}) {
   const planner = untrack(() => props.planner);
   const stats = createMemo(() => {
     const data = planner.data();
@@ -91,6 +97,7 @@ export function Profile(props: { email: string; planner: PlannerState }) {
           </>
         )}
       </Show>
+      <EmailReminders client={props.client} />
       <div class="profile-links">
         <PrivacyPolicyButton />
         <button

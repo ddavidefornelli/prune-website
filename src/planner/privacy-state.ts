@@ -1,5 +1,5 @@
 /** Bump alongside PRIVACY.md whenever a newly presented notice is required. */
-export const PRIVACY_POLICY_VERSION = "privacy-web-v14";
+export const PRIVACY_POLICY_VERSION = "privacy-web-v15";
 export const PRIVACY_ACKNOWLEDGEMENT_KEY = "prune:privacy:acknowledgement";
 
 export interface PrivacyAcknowledgement {

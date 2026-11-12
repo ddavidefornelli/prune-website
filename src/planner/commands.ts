@@ -1,4 +1,9 @@
-import type { Dashboard, MonthStats, WeeklyOverview } from "./types.ts";
+import type {
+  Dashboard,
+  EmailPreferences,
+  MonthStats,
+  WeeklyOverview,
+} from "./types.ts";
 
 /** Non-queued RPC results; destructive account operations must stay online. */
 export interface PlannerQueries {
@@ -8,6 +13,8 @@ export interface PlannerQueries {
   weekly_overview: WeeklyOverview;
   set_weekly_ai_enabled: WeeklyOverview;
   month_stats: MonthStats;
+  email_preferences: EmailPreferences;
+  set_email_preferences: EmailPreferences;
 }
 
 /** Commands sent by the web UI, plus legacy commands kept for saved outboxes. */
