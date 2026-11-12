@@ -20,6 +20,14 @@ interface Stop {
   text: string;
 }
 
+/** Why finishing tasks matters, shown from the first visit. */
+const REVIEW: Stop = {
+  view: "today",
+  target: ".review-meter",
+  title: "Finish 10, get an AI review",
+  text: "Every 10 tasks you complete, AI reviews what slowed you down and what to try next. This bar counts them.",
+};
+
 const AROUND: readonly Stop[] = [
   {
     view: "tomorrow",
@@ -49,6 +57,7 @@ const WITH_TASK: readonly Stop[] = [
     title: "Adjust your estimate",
     text: "Turn this dial to change the minutes.",
   },
+  REVIEW,
   ...AROUND,
   {
     view: "today",
@@ -66,6 +75,7 @@ const EMPTY: readonly Stop[] = [
     title: "Three tasks a day",
     text: "That’s the whole rule. Fewer tasks, more focus.",
   },
+  REVIEW,
   ...AROUND,
   {
     view: "today",

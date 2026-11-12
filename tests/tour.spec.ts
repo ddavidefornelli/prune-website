@@ -15,20 +15,23 @@ for (const width of [1100, 390]) {
     await openWithTour(page);
     const tour = page.locator(".planner-tour-dialog");
     const popup = page.locator(".tour-popup");
-    const titles = ["Three tasks a day", "Plan ahead", "See your progress", "Add your first task"];
-    for (const [index, view] of ["today", "tomorrow", "habits", "today"].entries()) {
+    const titles = ["Three tasks a day", "Finish 10, get an AI review", "Plan ahead", "See your progress", "Add your first task"];
+    for (const [index, view] of ["today", "today", "tomorrow", "habits", "today"].entries()) {
       await expect(popup.getByRole("heading")).toHaveText(titles[index]!);
-      await expect(popup).toContainText(`${index + 1} / 4`);
+      await expect(popup).toContainText(`${index + 1} / 5`);
       await expect(page.locator("#app")).toHaveAttribute("data-view", view);
       await expect(popup).toBeInViewport({ ratio: 1 });
       await expect(page.locator(".tour-highlight")).toBeInViewport({ ratio: 1 });
       await expect(tour).not.toContainText("Profile");
       if (index === 1) {
+        // The meter is on Today from the first visit.
+        await expect(page.locator(".review-meter")).toContainText("3 / 10");
+        await expect(page.locator(".tour-highlight")).toBeInViewport();
         await popup.getByRole("button", { name: "Back", exact: true }).click();
         await expect(popup.getByRole("heading")).toHaveText(titles[0]!);
         await popup.getByRole("button", { name: "Next", exact: true }).click();
       }
-      if (index < 3) {
+      if (index < 4) {
         await expect(popup.getByRole("button", { name: /Add my first task|Start focusing/ })).toHaveCount(0);
         await popup.getByRole("button", { name: "Next", exact: true }).click();
       }
@@ -56,8 +59,8 @@ test("an account with a planned task tours it and can start its timer", async ({
   await openWithTour(page);
   const popup = page.locator(".tour-popup");
   await expect(popup.getByRole("heading")).toHaveText("Your task is here");
-  await expect(popup).toContainText("1 / 5");
-  for (let step = 0; step < 4; step++) await popup.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(popup).toContainText("1 / 6");
+  for (let step = 0; step < 5; step++) await popup.getByRole("button", { name: "Next", exact: true }).click();
   await expect(popup.getByRole("heading")).toHaveText("Ready to focus?");
   expect(backend.data.activeTask).toBeNull();
   await popup.getByRole("button", { name: "Start focusing" }).click();

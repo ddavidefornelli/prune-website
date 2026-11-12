@@ -2,6 +2,8 @@ import {
   createEffect,
   createSignal,
   Match,
+  on,
+  onCleanup,
   Show,
   Switch,
   untrack,
@@ -40,6 +42,20 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   let firstRunChecked = false;
   let previousView = planner.view();
   createShortcuts(planner, () => setShortcuts(true));
+  // A finished task moves Today's review meter: re-read once the outbox has
+  // had a moment to sync it, and request the review when it reaches 10.
+  const completedTasks = () =>
+    planner.data()?.completions.reduce((sum, day) => sum + day.count, 0) ?? 0;
+  createEffect(
+    on(
+      completedTasks,
+      () => {
+        const timer = window.setTimeout(() => void review.checkDue(), 2500);
+        onCleanup(() => window.clearTimeout(timer));
+      },
+      { defer: true },
+    ),
+  );
 
   function finishFirstRun(): void {
     if (!firstRun()) return;
@@ -168,6 +184,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                   hints={hints}
                   firstRun={firstRun()}
                   onShortcuts={() => setShortcuts(true)}
+                  review={review}
                 />
               </Match>
             </Switch>

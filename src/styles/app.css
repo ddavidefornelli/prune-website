@@ -435,6 +435,80 @@ textarea:focus {
 .plan-slots li.is-done {
   background: var(--text);
 }
+.review-meter {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 200ms var(--ease-out);
+}
+.review-meter:hover,
+.review-meter:focus-visible {
+  border-color: color-mix(in srgb, var(--text) 55%, var(--border));
+}
+.review-meter-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-meter-label {
+  font-size: 0.6111rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.review-meter-count {
+  font-family: "Pixelta", "Space Grotesk", sans-serif;
+  font-size: 1.2222rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.review-meter-count > span {
+  color: var(--muted);
+  font-size: 0.7778rem;
+}
+.review-meter-steps {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+.review-meter-steps > span {
+  height: 6px;
+  background: var(--border);
+  transition: background-color 600ms var(--ease-out);
+}
+.review-meter-steps > span.is-done {
+  background: var(--text);
+  animation: review-step-in 520ms var(--ease-out) both;
+  animation-delay: calc(var(--step) * 45ms);
+}
+.review-meter.is-preparing .review-meter-steps > span {
+  background: var(--blood-red);
+}
+.review-meter-caption {
+  color: var(--muted);
+  font-size: 0.6667rem;
+}
+@keyframes review-step-in {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0.2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-meter-steps > span.is-done {
+    animation: none;
+  }
+}
 #app .task-form > label {
   position: relative;
 }

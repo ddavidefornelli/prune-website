@@ -41,12 +41,19 @@ export function createWeeklyReview(
     }
   }
 
+  /** Also keeps progress current for Today's meter, so it shows from the start. */
   async function checkDue(): Promise<void> {
     if (disposed) return;
-    await client.generateIfDue().catch(() => {
+    const startedVersion = version;
+    const next = await client.generateIfDue().catch(() => {
       /* Server quotas enforce backoff. */
+      return null;
     });
-    if (!disposed && visible()) await refresh();
+    if (disposed) return;
+    if (next && startedVersion === version && !saving()) {
+      apply(next);
+      setError("");
+    } else if (visible() || !data()) await refresh();
   }
 
   async function enable(): Promise<void> {
@@ -92,7 +99,7 @@ export function createWeeklyReview(
     });
   });
 
-  return { data, saving, error, refresh, enable };
+  return { data, saving, error, refresh, enable, checkDue };
 }
 
 export type WeeklyReviewState = ReturnType<typeof createWeeklyReview>;

@@ -8,6 +8,8 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
+import { ReviewMeter } from "../../reviews/ReviewMeter";
 import type { PlanningClient } from "../api";
 import { PLANNER_LIMITS } from "../constants";
 import type { PlannerState } from "../create-planner";
@@ -28,6 +30,8 @@ export function PlanView(props: {
   hints: Hints;
   firstRun: boolean;
   onShortcuts: () => void;
+  /** Today only: progress toward the next AI review. */
+  review?: WeeklyReviewState;
 }) {
   const planner = untrack(() => props.planner);
   const tomorrow = () => planner.view() === "tomorrow";
@@ -178,6 +182,14 @@ export function PlanView(props: {
           </Index>
         </ol>
       </header>
+      <Show when={!tomorrow() && props.review}>
+        {(review) => (
+          <ReviewMeter
+            review={review()}
+            onOpen={() => planner.visit("habits")}
+          />
+        )}
+      </Show>
       <ul class="task-list">
         <For each={tasks()}>
           {(task) => (

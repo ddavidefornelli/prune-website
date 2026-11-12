@@ -219,8 +219,9 @@ export class PlanningClient {
     await this.request("sign_out");
   }
 
-  async generateIfDue(): Promise<void> {
-    if (this.generatingReview) return;
+  /** Returns the overview it read, unless it requested a review (then it is stale). */
+  async generateIfDue(): Promise<WeeklyOverview | null> {
+    if (this.generatingReview) return null;
     this.generatingReview = true;
     try {
       const overview = await this.weeklyOverview();
@@ -228,8 +229,11 @@ export class PlanningClient {
         overview.settings.enabled &&
         overview.available &&
         ["pending", "failed"].includes(overview.status)
-      )
+      ) {
         await this.retryWeeklyReview();
+        return null;
+      }
+      return overview;
     } finally {
       this.generatingReview = false;
     }
