@@ -17,13 +17,18 @@ export function ReviewMeter(props: { review: WeeklyReviewState }) {
   const preparing = () =>
     data()?.status === "pending" || data()?.status === "running";
   const first = () => !data()?.reviews.length;
-  const caption = () => {
-    if (preparing()) return "Your AI review is being written…";
+  /** One short trailing hint, like "7 to go", kept on the same line as the count. */
+  const hint = () => {
+    if (preparing()) return "Writing your review…";
     const done = completed();
-    if (done === undefined) return "Finish tasks to earn your AI review.";
+    if (done === undefined) return "";
     const left = Math.max(0, target() - done);
-    return `${left} more ${left === 1 ? "task" : "tasks"} to your ${first() ? "first" : "next"} AI review.`;
+    return `${left} to go`;
   };
+  const label = () =>
+    preparing()
+      ? "Your AI review is being written."
+      : `${completed() ?? 0} of ${target()} tasks done toward your ${first() ? "first" : "next"} AI review.`;
 
   return (
     <Show when={shown()}>
@@ -32,17 +37,19 @@ export function ReviewMeter(props: { review: WeeklyReviewState }) {
         classList={{ "is-preparing": preparing() }}
         aria-label="AI review progress"
       >
-        <div class="review-meter-top">
-          <p class="review-meter-label">AI review</p>
-          <p class="review-meter-count">
-            {completed() ?? "–"}
-            <span>/{target()}</span>
-          </p>
-        </div>
+        <p class="review-meter-row">
+          <span class="review-meter-label">AI review</span>
+          <span class="review-meter-count">
+            {completed() ?? "–"}/{target()}
+            <Show when={hint()}>
+              <span class="review-meter-hint"> · {hint()}</span>
+            </Show>
+          </span>
+        </p>
         <div
           class="review-meter-steps"
           role="progressbar"
-          aria-label="Completed tasks toward your next AI review"
+          aria-label={label()}
           aria-valuemin={0}
           aria-valuemax={target()}
           aria-valuenow={completed() ?? 0}
@@ -56,7 +63,6 @@ export function ReviewMeter(props: { review: WeeklyReviewState }) {
             )}
           </Index>
         </div>
-        <p class="review-meter-caption">{caption()}</p>
       </section>
     </Show>
   );

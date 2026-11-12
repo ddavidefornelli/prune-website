@@ -435,12 +435,13 @@ textarea:focus {
 .plan-slots li.is-done {
   background: var(--text);
 }
-/* A static status card, solid like the task cards so the artwork never shows through. */
+/* A slim status strip: one line of text over a thin segmented bar. Solid so
+   the artwork never shows through the small text; static, no hover. */
 .review-meter {
   display: grid;
-  gap: 14px;
-  margin: 32px 0 0;
-  padding: 18px 20px 16px;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 10px 14px 12px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -448,40 +449,35 @@ textarea:focus {
 .review-meter + .task-list {
   margin-top: 24px;
 }
-.review-meter-top {
+.review-meter-row {
   display: flex;
-  align-items: flex-end;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
-}
-.review-meter p {
+  gap: 12px;
   margin: 0;
+  font-size: 0.6667rem;
+  line-height: 1.2;
 }
 .review-meter-label {
   color: var(--blood-red);
-  font-size: 0.6667rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 .review-meter-count {
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
-  font-size: clamp(2rem, 7vw, 2.6667rem);
-  line-height: 0.8;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
-.review-meter-count > span {
-  margin-left: 4px;
+.review-meter-hint {
   color: var(--muted);
-  font-size: 0.45em;
 }
 .review-meter-steps {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 5px;
+  gap: 3px;
 }
 .review-meter-steps > span {
-  height: 10px;
+  height: 4px;
   background: color-mix(in srgb, var(--text) 12%, transparent);
 }
 .review-meter-steps > span.is-done {
@@ -491,10 +487,6 @@ textarea:focus {
 }
 .review-meter.is-preparing .review-meter-steps > span {
   background: var(--blood-red);
-}
-.review-meter-caption {
-  color: var(--muted);
-  font-size: 0.7778rem;
 }
 @keyframes review-step-in {
   from {
