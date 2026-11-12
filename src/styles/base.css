@@ -645,9 +645,9 @@ textarea::placeholder {
 .pause-form {
   margin: 0;
 }
-.pause-form button {
-  margin-right: 8px;
-  margin-bottom: 8px;
+.pause-form label {
+  display: grid;
+  gap: 10px;
 }
 textarea {
   resize: vertical;

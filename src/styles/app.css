@@ -1005,11 +1005,25 @@ textarea:focus {
   max-height: calc(100dvh - 32px);
   border-radius: 0;
 }
+/* Question, box and buttons share one left edge and one width, with even gaps. */
 .pause-form {
+  display: grid;
+  gap: 16px;
   padding: 20px;
 }
 .pause-form textarea {
-  margin-top: 8px;
+  display: block;
+  min-height: 6.5rem;
+  outline-offset: 0;
+}
+.pause-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.pause-actions button {
+  min-height: 48px;
+  margin: 0;
 }
 .profile-heading {
   flex-direction: column;

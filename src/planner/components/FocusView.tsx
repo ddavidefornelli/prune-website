@@ -185,6 +185,8 @@ export function FocusView(props: {
                   Why are you stopping?
                   <textarea
                     required
+                    // No native "Please fill out this field." hover tooltip.
+                    title=""
                     maxLength={PLANNER_LIMITS.stopReasonLength}
                     rows={3}
                     placeholder="e.g. Taking a break or handling an interruption"
@@ -196,22 +198,24 @@ export function FocusView(props: {
                     }}
                   />
                 </label>
-                <button type="submit" disabled={planner.busy()}>
-                  Save reason
-                </button>
-                <button
-                  type="button"
-                  disabled={planner.busy()}
-                  onClick={() => {
-                    void planner.mutate(async () => {
-                      await props.client.resume(active().id);
-                      setReason("");
-                      planner.setPauseReasonOpen(false);
-                    });
-                  }}
-                >
-                  Resume focusing
-                </button>
+                <div class="pause-actions">
+                  <button type="submit" disabled={planner.busy()}>
+                    Save reason
+                  </button>
+                  <button
+                    type="button"
+                    disabled={planner.busy()}
+                    onClick={() => {
+                      void planner.mutate(async () => {
+                        await props.client.resume(active().id);
+                        setReason("");
+                        planner.setPauseReasonOpen(false);
+                      });
+                    }}
+                  >
+                    Resume focusing
+                  </button>
+                </div>
               </form>
             </Dialog>
           </Show>
