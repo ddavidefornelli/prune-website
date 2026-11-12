@@ -206,3 +206,11 @@ export async function synced(page: Page) {
   await expect.poll(() => pendingCount(page)).toBe(0);
   await expect(page.locator('main .add-task:disabled, main .estimate-dial[aria-disabled="true"], #focus-timer:disabled')).toHaveCount(0);
 }
+
+/** The tour can't be skipped: step through it and close it from the last step. */
+export async function finishTour(page: Page) {
+  const tour = page.locator(".tour-popup");
+  const end = tour.getByRole("button", { name: /Add my first task|Not now/ });
+  while (!(await end.isVisible())) await tour.getByRole("button", { name: "Next", exact: true }).click();
+  await end.click();
+}

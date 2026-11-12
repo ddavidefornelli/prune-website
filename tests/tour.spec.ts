@@ -1,4 +1,4 @@
-import { test, expect, openPlanner, synced } from "./helpers/browser";
+import { test, expect, openPlanner, synced, finishTour } from "./helpers/browser";
 import type { Task } from "../src/planner/types";
 
 test.use({ signedIn: true, firstVisit: true });
@@ -69,9 +69,15 @@ test("an account with a planned task tours it and can start its timer", async ({
   await expect.poll(() => backend.data.activeTask).not.toBeNull();
 });
 
-test("skipping the tour is remembered for that account", async ({ page }) => {
+test("the tour can't be skipped, and finishing it is remembered for that account", async ({ page }) => {
   await openWithTour(page);
-  await page.locator(".tour-popup").getByRole("button", { name: "Skip tour" }).click();
+  const popup = page.locator(".tour-popup");
+  await expect(popup.getByRole("button", { name: /skip/i })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.mouse.click(5, 5);
+  await expect(popup).toBeVisible();
+  await expect(popup).toContainText("1 / 5");
+  await finishTour(page);
   await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
   await expect(page.locator("#app")).toHaveAttribute("data-view", "today");
   await openPlanner(page);

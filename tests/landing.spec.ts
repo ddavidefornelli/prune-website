@@ -1,4 +1,4 @@
-import { test, expect, AUTH_KEY, openSignIn, session } from "./helpers/browser";
+import { test, expect, AUTH_KEY, openSignIn, session, finishTour } from "./helpers/browser";
 import { PRIVACY_POLICY_VERSION, PRIVACY_ACKNOWLEDGEMENT_KEY } from "../src/planner/privacy-state";
 
 const GOOGLE = { name: "Continue with Google", exact: true } as const;
@@ -93,7 +93,7 @@ test.describe("a first sign-in", () => {
     // A new account lands in the tour, then on the first-task prompt behind it.
     const tour = page.locator(".tour-popup");
     await expect(tour.getByRole("heading")).toHaveText("Three tasks a day");
-    await tour.getByRole("button", { name: "Skip tour" }).click();
+    await finishTour(page);
     await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
     await page.getByRole("region", { name: "Starting ideas" }).getByRole("button", { name: /Plan the week ahead/ }).click();
     await expect(page.getByRole("button", { name: "Edit task title: Plan the week ahead" })).toBeVisible();

@@ -1,4 +1,4 @@
-import { test, expect, openPlanner, synced } from "./helpers/browser";
+import { test, expect, openPlanner, synced, finishTour } from "./helpers/browser";
 
 test.describe("first run", () => {
   test.use({ signedIn: true, firstVisit: true });
@@ -8,7 +8,7 @@ test.describe("first run", () => {
       await page.setViewportSize({ width, height: 844 });
       await openPlanner(page);
       // The page tour opens first (tests/tour.spec.ts); the first-run prompt waits behind it.
-      await page.locator(".tour-popup").getByRole("button", { name: "Skip tour" }).click();
+      await finishTour(page);
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page.locator(".plan-summary")).toHaveText("What would make today count?");
       const input = page.getByRole("textbox", { name: "Outcome", exact: true });

@@ -151,6 +151,8 @@ export function PlannerTour(props: PlannerTourProps) {
   const finish = () => {
     if (!busy()) props.onDone(false);
   };
+  // The tour can't be skipped: no Skip button, and Escape does nothing.
+  // It ends only from its last step.
 
   createEffect(() => {
     const current = stop();
@@ -199,8 +201,8 @@ export function PlannerTour(props: PlannerTourProps) {
     <Dialog
       class="planner-tour-dialog"
       aria-labelledby={headingId}
-      onDismiss={finish}
-      preventCancel={busy()}
+      onDismiss={() => {}}
+      preventCancel
     >
       <div
         ref={(element) => {
@@ -219,9 +221,6 @@ export function PlannerTour(props: PlannerTourProps) {
           <span class="tour-step">
             {index() + 1} / {stops.length}
           </span>
-          <button type="button" disabled={busy()} onClick={finish}>
-            Skip tour
-          </button>
         </div>
         <h2
           ref={(element) => {
