@@ -33,8 +33,8 @@ export default function PixelBackground(props: { completionLevel: number }) {
       const pixels = createPixelCells();
       alphas = new Uint8Array(pixels.length);
       // Grid lines are drawn once. Updating cell interiors never erases them.
-      context.fillStyle = "#efeee7";
-      context.globalAlpha = 0.03;
+      context.fillStyle = "#ff123b";
+      context.globalAlpha = 0.04;
       for (let x = 0; x < PIXEL_WIDTH; x += PIXEL_SIZE) {
         context.fillRect(x, 0, 1, PIXEL_HEIGHT);
       }
@@ -62,8 +62,7 @@ export default function PixelBackground(props: { completionLevel: number }) {
         alphas[index] = alpha;
         context.clearRect(cell.x, cell.y, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
         if (alpha === 0) continue;
-        // Ivory greys, not red: red is kept for the screen's main action.
-        context.fillStyle = cell.tier === 1 ? "#6f6c65" : "#4a4843";
+        context.fillStyle = cell.tier === 1 ? "#ff5872" : "#ff123b";
         context.globalAlpha = alpha / 255;
         context.fillRect(cell.x, cell.y, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
       }
