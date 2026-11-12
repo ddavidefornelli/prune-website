@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 import { PRODUCTION_ORIGINS } from "../src/shared/site.ts";
-import { SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
+import { ERROR_LOG_PATH, SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
 
 // Deliberately no origin-wide allowlist: do not permit Storage, arbitrary RPCs,
 // other Edge Functions, Realtime or another Supabase tenant.
@@ -11,6 +11,8 @@ export const API_PATHS = Object.values(SUPABASE_ROUTES);
 export const ANALYTICS_ORIGINS = PRODUCTION_ORIGINS;
 export const ANALYTICS_SCRIPTS = ANALYTICS_ORIGINS.map((origin) => `${origin}/_vercel/insights/script.js`);
 export const ANALYTICS_CONNECTIONS = ANALYTICS_ORIGINS.map((origin) => `${origin}/_vercel/insights/`);
+// Exact same-domain error relay path, so reports work when Supabase is blocked.
+export const ERROR_LOG_CONNECTIONS = PRODUCTION_ORIGINS.map((origin) => `${origin}${ERROR_LOG_PATH}`);
 export const CONTENTSQUARE_SCRIPTS = ["https://*.contentsquare.net", "https://app.contentsquare.com"];
 export const CONTENTSQUARE_CONNECTIONS = ["https://*.contentsquare.net", "https://*.contentsquare.com"];
 export const CONTENTSQUARE_IMAGES = ["https://*.contentsquare.net"];
@@ -39,7 +41,7 @@ export function securityHeaders(apiOrigin: string, scriptHashes: string[]): Reco
     "script-src-attr 'none'",
     "style-src 'self'",
     "style-src-attr 'none'",
-    `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" ")}`,
+    `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), ...ERROR_LOG_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" ")}`,
     `img-src 'self' ${CONTENTSQUARE_IMAGES.join(" ")}`,
     "font-src 'self'",
     "manifest-src 'none'",

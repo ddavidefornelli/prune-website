@@ -3,6 +3,7 @@ import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildVercel } from "./build-vercel.ts";
+import { buildFunctions } from "./build-functions.ts";
 import { checkDeployment, printDeploymentResult } from "./check-deployment.mjs";
 
 function compile() {
@@ -15,11 +16,12 @@ function compile() {
 }
 
 /** A failed build/check must not leave an older --prebuilt deployable behind. */
-export async function buildRelease({ source = "dist", destination = ".vercel/output", runBuild = compile, onResult = printDeploymentResult } = {}) {
+export async function buildRelease({ source = "dist", destination = ".vercel/output", runBuild = compile, onResult = printDeploymentResult, packageFunctions = buildFunctions } = {}) {
   rmSync(destination, { recursive: true, force: true });
   try {
     if (runBuild() !== 0) throw new Error("Production compilation failed; no deployable output was retained.");
     buildVercel(source, destination);
+    packageFunctions(destination);
     const report = await checkDeployment(destination, onResult);
     if (report.exitCode !== 0) throw new Error("Packaged deployment failed security checks; no deployable output was retained.");
     return report;

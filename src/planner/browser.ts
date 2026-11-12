@@ -11,18 +11,24 @@ import type { AuthStatus } from "./types.ts";
 import { webConfig, type PublicConfig } from "./config.ts";
 import { CloudError, httpError } from "./http-error.ts";
 import { hasPrivacyAcknowledgement } from "./privacy-state.ts";
+import { logError, networkDetail } from "./error-log.ts";
 
-function authError(error: AuthError): CloudError {
+const SIGN_IN_UNREACHABLE =
+  "Couldn't reach sign-in. If you use an ad blocker, VPN, or a work or school network, try turning it off or switching networks, then try again.";
+
+function unreachable(context: string, cause: unknown): CloudError {
+  logError("signin_network", context, networkDetail(cause));
+  return new CloudError("network", SIGN_IN_UNREACHABLE);
+}
+
+function authError(error: AuthError, context: string): CloudError {
   if (error.status === 429)
     return new CloudError(
       "rate_limited",
       "Too many sign-in attempts. Wait at least a minute before trying again.",
     );
   if (error.name === "AuthRetryableFetchError" || !error.status)
-    return new CloudError(
-      "network",
-      "Could not reach sign-in services. Check your connection and try again.",
-    );
+    return unreachable(context, error);
   if (error.status >= 500)
     return new CloudError(
       "server",
@@ -112,7 +118,7 @@ export class BrowserCloud implements CloudTransport {
 
   private async session(expected = this.accountKey): Promise<Session> {
     const { data, error } = await this.sdk().auth.getSession();
-    if (error) throw authError(error);
+    if (error) throw authError(error, "session");
     if (!data.session)
       throw new CloudError(
         "unauthorized",
@@ -137,10 +143,7 @@ export class BrowserCloud implements CloudTransport {
       );
     } catch (error) {
       if (error instanceof CloudError) throw error;
-      throw new CloudError(
-        "network",
-        "Could not reach sign-in services. Check your connection and try again.",
-      );
+      throw unreachable("google", error);
     }
     try {
       settings = await response.json();
@@ -189,7 +192,7 @@ export class BrowserCloud implements CloudTransport {
         );
     }
     const { data, error } = await sdk.auth.getSession();
-    if (error) throw authError(error);
+    if (error) throw authError(error, "startup");
     if (!data.session)
       return { configured: true, email: null, accountKey: null };
     // Verify identity with Auth before exposing a persistent account cache.
@@ -199,7 +202,7 @@ export class BrowserCloud implements CloudTransport {
         await sdk.auth.signOut({ scope: "local" });
         return { configured: true, email: null, accountKey: null };
       }
-      throw authError(result.error);
+      throw authError(result.error, "startup");
     }
     const user = result.data.user;
     if (!user.email || user.is_anonymous || user.id !== data.session.user.id)
@@ -276,7 +279,7 @@ export class BrowserCloud implements CloudTransport {
         const { error } = await this.sdk().auth.signInWithOtp({
           email: String(args.email),
         });
-        if (error) throw authError(error);
+        if (error) throw authError(error, "send_code");
         result = null;
         break;
       }
@@ -286,7 +289,7 @@ export class BrowserCloud implements CloudTransport {
           token: String(args.code),
           type: "email",
         });
-        if (error) throw authError(error);
+        if (error) throw authError(error, "verify_code");
         if (!data.session || !data.user?.email || data.user.is_anonymous)
           throw new CloudError(
             "auth",

@@ -70,6 +70,14 @@ select
   to_regprocedure('public.planner_week_goal(uuid,date)') is null as week_goal_removed,
   to_regclass('public.planner_onboarding') is null as survey_answers_removed;
 
+-- 4c. The error log's only anon entry point. Expected: anon may execute only
+-- log_client_error; nobody but service_role can read or write error_log directly.
+select
+  has_function_privilege('anon', 'public.log_client_error(text,text,text,text,text,text)', 'EXECUTE') as anon_can_log,
+  not has_function_privilege('authenticated', 'public.log_client_error(text,text,text,text,text,text)', 'EXECUTE') as authenticated_cannot_log,
+  not has_table_privilege('anon', 'public.error_log', 'SELECT,INSERT,UPDATE,DELETE') as anon_no_table_access,
+  not has_table_privilege('authenticated', 'public.error_log', 'SELECT,INSERT,UPDATE,DELETE') as authenticated_no_table_access;
+
 -- 5. Queue protocol and latest UI rules must actually be deployed.
 -- Expected: true for every column. Missing functions return false rather than applying anything.
 select

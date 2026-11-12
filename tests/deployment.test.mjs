@@ -118,8 +118,22 @@ test("release build removes an older prebuilt deployment before compilation and 
 
 test("a successful release keeps only the verified deployable", async (t) => {
   const { source, destination } = fixture(t);
+  const saved = { url: process.env.VITE_SUPABASE_URL, key: process.env.VITE_SUPABASE_ANON_KEY };
+  process.env.VITE_SUPABASE_URL = "https://fixture.supabase.co";
+  process.env.VITE_SUPABASE_ANON_KEY = "sb_publishable_fixture";
+  t.after(() => {
+    for (const [name, value] of [["VITE_SUPABASE_URL", saved.url], ["VITE_SUPABASE_ANON_KEY", saved.key]]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
   const report = await buildRelease({ source, destination, runBuild: () => 0, onResult: () => {} });
   assert.equal(report.exitCode, 0);
   assert.equal(existsSync(join(destination, "config.json")), true);
   assert.equal(existsSync(join(destination, "static/security-headers.json")), false);
+  // The error relay is packaged as an Edge Function with only public config inlined.
+  const fn = join(destination, "functions/api/error-log.func");
+  assert.deepEqual(JSON.parse(readFileSync(join(fn, ".vc-config.json"), "utf8")), { runtime: "edge", entrypoint: "index.js" });
+  const bundle = readFileSync(join(fn, "index.js"), "utf8");
+  assert.ok(bundle.includes("https://fixture.supabase.co") && bundle.includes("sb_publishable_fixture"));
 });

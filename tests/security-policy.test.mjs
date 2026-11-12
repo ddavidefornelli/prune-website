@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ANALYTICS_SCRIPTS, ANALYTICS_CONNECTIONS, CONTENTSQUARE_SCRIPTS, CONTENTSQUARE_CONNECTIONS, CONTENTSQUARE_IMAGES, CONTENTSQUARE_RESOURCES, API_PATHS, hardenHtml, integrity, securityHeaders } from "../scripts/security-policy.ts";
+import { ANALYTICS_SCRIPTS, ANALYTICS_CONNECTIONS, ERROR_LOG_CONNECTIONS, CONTENTSQUARE_SCRIPTS, CONTENTSQUARE_CONNECTIONS, CONTENTSQUARE_IMAGES, CONTENTSQUARE_RESOURCES, API_PATHS, hardenHtml, integrity, securityHeaders } from "../scripts/security-policy.ts";
 import { productionCsp } from "../scripts/csp-plugin.ts";
 import { buildVercel } from "../scripts/build-vercel.ts";
 
@@ -26,7 +26,7 @@ test("CSP and SRI use hashes of exact emitted bytes, with explicit managed analy
   assert.ok(built.html.includes(`<script integrity="${expected}"`));
   assert.ok(built.html.includes(`<link integrity="${integrity(css)}"`));
   assert.ok(built.html.indexOf("http-equiv=") < built.html.indexOf("<script"));
-  assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" "));
+  assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ERROR_LOG_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" "));
   // Replay may read static files from the site, never its same-origin API.
   assert.ok(CONTENTSQUARE_RESOURCES.every((source) => /^https:\/\/(?:www\.)?prune\.win\/(?:assets\/|fonts\/|[\w-]+\.(?:png|webp))$/.test(source)));
   assert.ok(!csp["connect-src"].split(" ").includes("'self'"));
