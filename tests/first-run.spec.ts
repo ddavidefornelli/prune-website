@@ -16,7 +16,7 @@ test.describe("first run", () => {
       expect(backend.data.activeTask).toBeNull();
       await expect(page.locator(".starters")).toHaveCount(0);
       const next = page.locator(".task.is-next");
-      await expect(next).toContainText("Up next");
+      await expect(next).not.toContainText("Up next");
       const tip = page.getByRole("complementary", { name: "Tip" });
       await expect(tip).toContainText("Start when you’re ready.");
       await page.reload();

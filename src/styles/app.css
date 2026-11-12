@@ -696,23 +696,6 @@ textarea:focus {
   border-color: var(--action-hover);
 }
 #app .task.is-next {
-  position: relative;
-  padding-top: 36px;
-}
-#app .task-details > .up-next {
-  grid-area: auto;
-  position: absolute;
-  top: 14px;
-  left: 16px;
-}
-.up-next {
-  margin: 0;
-  font-size: 0.6111rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-#app .task.is-next {
   border-color: color-mix(in srgb, var(--text) 35%, var(--border));
 }
 #app .task:not(.is-next) > button:not(:disabled) {

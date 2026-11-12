@@ -290,7 +290,6 @@ function TodayMock() {
         <Dial minutes={20} done />
       </div>
       <div class="mock-task is-next">
-        <p class="mock-up-next">Up next</p>
         <div class="mock-task-row">
           <span class="mock-task-title">Write the first draft</span>
           <Dial minutes={45} />

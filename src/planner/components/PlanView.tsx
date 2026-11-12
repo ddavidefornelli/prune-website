@@ -196,9 +196,6 @@ export function PlanView(props: {
               }}
             >
               <div class="task-details">
-                <Show when={task.id === nextTaskId()}>
-                  <p class="up-next">Up next</p>
-                </Show>
                 <TaskTitle
                   task={task}
                   heading="h2"
