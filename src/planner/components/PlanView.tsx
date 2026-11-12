@@ -183,12 +183,7 @@ export function PlanView(props: {
         </ol>
       </header>
       <Show when={!tomorrow() && props.review}>
-        {(review) => (
-          <ReviewMeter
-            review={review()}
-            onOpen={() => planner.visit("habits")}
-          />
-        )}
+        {(review) => <ReviewMeter review={review()} />}
       </Show>
       <ul class="task-list">
         <For each={tasks()}>

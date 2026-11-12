@@ -6,10 +6,7 @@ import type { WeeklyReviewState } from "./create-weekly-review";
  * AI review. Shown from the very first visit; hidden only for accounts with
  * reviews off or a backend that still reviews weekly.
  */
-export function ReviewMeter(props: {
-  review: WeeklyReviewState;
-  onOpen: () => void;
-}) {
+export function ReviewMeter(props: { review: WeeklyReviewState }) {
   const data = () => props.review.data();
   const shown = () => {
     const current = data();
@@ -30,21 +27,26 @@ export function ReviewMeter(props: {
 
   return (
     <Show when={shown()}>
-      <button
-        type="button"
+      <section
         class="review-meter"
         classList={{ "is-preparing": preparing() }}
-        aria-label={`${caption()} ${completed() ?? 0} of ${target()} tasks done. Open Overview.`}
-        onClick={() => props.onOpen()}
+        aria-label="AI review progress"
       >
-        <span class="review-meter-top">
-          <span class="review-meter-label">AI review</span>
-          <span class="review-meter-count">
+        <div class="review-meter-top">
+          <p class="review-meter-label">AI review</p>
+          <p class="review-meter-count">
             {completed() ?? "–"}
-            <span> / {target()}</span>
-          </span>
-        </span>
-        <span class="review-meter-steps" aria-hidden="true">
+            <span>/{target()}</span>
+          </p>
+        </div>
+        <div
+          class="review-meter-steps"
+          role="progressbar"
+          aria-label="Completed tasks toward your next AI review"
+          aria-valuemin={0}
+          aria-valuemax={target()}
+          aria-valuenow={completed() ?? 0}
+        >
           <Index each={Array.from({ length: target() })}>
             {(_, index) => (
               <span
@@ -53,9 +55,9 @@ export function ReviewMeter(props: {
               />
             )}
           </Index>
-        </span>
-        <span class="review-meter-caption">{caption()}</span>
-      </button>
+        </div>
+        <p class="review-meter-caption">{caption()}</p>
+      </section>
     </Show>
   );
 }

@@ -25,7 +25,7 @@ for (const width of [1100, 390]) {
       await expect(tour).not.toContainText("Profile");
       if (index === 1) {
         // The meter is on Today from the first visit.
-        await expect(page.locator(".review-meter")).toContainText("3 / 10");
+        await expect(page.locator(".review-meter")).toContainText("7 more tasks to your first AI review.");
         await expect(page.locator(".tour-highlight")).toBeInViewport();
         await popup.getByRole("button", { name: "Back", exact: true }).click();
         await expect(popup.getByRole("heading")).toHaveText(titles[0]!);
