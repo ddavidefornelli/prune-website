@@ -12,9 +12,10 @@ body {
   min-width: 280px;
   isolation: isolate;
 }
-/* A dense, fixed-resolution canvas stays registered to the artwork.
-   Completion unlocks clusters; slow independent charging stays in the background. */
+/* The artwork is a tiny canvas (one pixel per cell) scaled up and cut to the
+   thorn shape. Completion unlocks cells; light keeps moving through them. */
 body::before,
+body::after,
 .cyber-artwork {
   position: fixed;
   inset: 0;
@@ -40,18 +41,21 @@ body:has(#root:empty)::before {
   background-image: none;
 }
 body:has(#app[data-completion-level="1"]) {
-  --pixel-opacity: 0.32;
-  --pixel-presence: 0.48;
+  --pixel-opacity: 0.5;
+  --pixel-presence: 0.62;
+  --halo-opacity: 0.3;
   --logo-opacity: 0.025;
 }
 body:has(#app[data-completion-level="2"]) {
-  --pixel-opacity: 0.58;
-  --pixel-presence: 0.7;
+  --pixel-opacity: 0.72;
+  --pixel-presence: 0.8;
+  --halo-opacity: 0.6;
   --logo-opacity: 0.03;
 }
 body:has(#app[data-completion-level="3"]) {
   --pixel-opacity: 0.94;
   --pixel-presence: 0.9;
+  --halo-opacity: 1;
   --logo-opacity: 0.035;
 }
 body:has(#app[data-completion-level]:not([data-completion-level="0"]))::before {
@@ -70,7 +74,8 @@ body:has(#app[data-completion-level]:not([data-completion-level="0"]))::before {
     opacity 0.8s ease,
     visibility 0.8s;
 }
-.pixel-grid {
+.pixel-grid,
+.cyber-artwork::after {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -78,9 +83,37 @@ body:has(#app[data-completion-level]:not([data-completion-level="0"]))::before {
   width: auto;
   aspect-ratio: 2;
   transform: translate(-50%, -50%);
+}
+.pixel-grid {
   image-rendering: pixelated;
   opacity: var(--pixel-presence, 0);
   transition: opacity 1.8s ease;
+}
+/* Hairlines between cells, drawn once in CSS instead of in every frame. */
+.cyber-artwork::after {
+  content: "";
+  background:
+    linear-gradient(to right, var(--background) 1px, transparent 1px) 0 0 /
+      calc(100% / 160) 100%,
+    linear-gradient(to bottom, var(--background) 1px, transparent 1px) 0 0 /
+      100% calc(100% / 80);
+}
+/* A soft halo behind the thorns, so the light seems to leave the artwork.
+   It only fades in with progress; it never pulses. */
+body::after {
+  content: "";
+  background: radial-gradient(
+    ellipse calc(clamp(70svh, 50vw, 100svh) * 0.95)
+      calc(clamp(70svh, 50vw, 100svh) * 0.5) at center,
+    rgb(255 18 59 / 0.2),
+    rgb(255 18 59 / 0.07) 55%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+body:has(#app[data-completion-level]:not([data-completion-level="0"]))::after {
+  opacity: var(--halo-opacity);
 }
 body:has(#app[data-completion-level]:not([data-completion-level="0"]))
   .cyber-artwork {
@@ -106,6 +139,7 @@ body:has(#app[data-completion-level]:not([data-completion-level="0"]))
 }
 @media (prefers-reduced-motion: reduce) {
   body::before,
+  body::after,
   .cyber-artwork,
   .pixel-grid {
     transition: none !important;

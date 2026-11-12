@@ -1,12 +1,18 @@
 import type { Page } from "@playwright/test";
 import { test, expect, synced, type Backend } from "./helpers/browser";
 import {
-  createPixelCells, PIXEL_COLUMNS, PIXEL_ROWS, PIXEL_SIZE,
-  PIXEL_WIDTH, PIXEL_HEIGHT, PIXEL_FRAME_INTERVAL,
+  createPixelField, paintPixels, PIXEL_COLUMNS, PIXEL_ROWS, PIXEL_COUNT, PIXEL_PALETTE,
+  PIXEL_FRAME_INTERVAL, PIXEL_REVEAL_DURATION,
 } from "../src/shared/pixel-background";
 
-const cells = createPixelCells();
-const counts = [0, 1, 2, 3].map((level) => cells.filter((cell) => cell.tier <= level).length);
+const field = createPixelField();
+const counts = [0, 1, 2, 3].map((level) => field.tier.filter((tier) => tier <= level).length);
+// The still frame shown under reduced motion, as alpha values.
+const still = (() => {
+  const shades = new Uint8Array(PIXEL_COUNT);
+  paintPixels(field, shades, { level: 3, time: 0, elapsed: [0, 0, 0, 0], pulse: 0, reducedMotion: true });
+  return Array.from(shades, (shade) => PIXEL_PALETTE[shade * 4 + 3]);
+})();
 
 function seedTasks(backend: Backend): void {
   backend.data.todayTasks = ["First outcome", "Second outcome", "Third outcome"].map((outcome, i) => ({
@@ -23,30 +29,25 @@ async function expectArtwork(page: Page, level: number): Promise<void> {
   await expect(artwork).toHaveAttribute("aria-hidden", "true");
   await expect(artwork).toHaveCSS("pointer-events", "none");
   await expect(artwork).toHaveCSS("visibility", level ? "visible" : "hidden");
-  await expect(artwork).toHaveCSS("opacity", ["0", "0.32", "0.58", "0.94"][level]);
+  await expect(artwork).toHaveCSS("opacity", ["0", "0.5", "0.72", "0.94"][level]);
   const mask = await artwork.evaluate((node) => getComputedStyle(node).maskImage);
   expect(mask).toContain("/prune-background-mask.png");
   await expect(artwork).toHaveCSS("mask-mode", "alpha");
   const canvas = page.locator("canvas.pixel-grid");
-  await expect(canvas).toHaveAttribute("width", String(PIXEL_WIDTH));
-  await expect(canvas).toHaveAttribute("height", String(PIXEL_HEIGHT));
+  // One buffer pixel per cell: the browser scales it, so frames stay tiny.
+  await expect(canvas).toHaveAttribute("width", String(PIXEL_COLUMNS));
+  await expect(canvas).toHaveAttribute("height", String(PIXEL_ROWS));
   await expect(canvas).toHaveCSS("image-rendering", "pixelated");
   // Density must not turn into thousands of DOM nodes or CSS animations.
   await expect(artwork.locator("*")).toHaveCount(1);
   await expect(canvas).toHaveCSS("animation-name", "none");
 }
 
-const pixelAlphas = (page: Page): Promise<number[]> => page.locator(".pixel-grid").evaluate(
-  (node, { columns, rows, size }) => {
-    const canvas = node as HTMLCanvasElement;
-    const data = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
-    return Array.from({ length: columns * rows }, (_, index) => {
-      const x = index % columns * size + Math.floor(size / 2);
-      const y = Math.floor(index / columns) * size + Math.floor(size / 2);
-      return data[(y * canvas.width + x) * 4 + 3];
-    });
-  }, { columns: PIXEL_COLUMNS, rows: PIXEL_ROWS, size: PIXEL_SIZE },
-);
+const pixelAlphas = (page: Page): Promise<number[]> => page.locator(".pixel-grid").evaluate((node) => {
+  const canvas = node as HTMLCanvasElement;
+  const data = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+  return Array.from({ length: canvas.width * canvas.height }, (_, index) => data[index * 4 + 3]);
+});
 
 async function expectLitPixels(page: Page, level: number): Promise<void> {
   await expect.poll(async () => (await pixelAlphas(page)).filter((alpha) => alpha > 0).length).toBe(counts[level]);
@@ -54,8 +55,9 @@ async function expectLitPixels(page: Page, level: number): Promise<void> {
 
 async function expectStaticPixels(page: Page): Promise<void> {
   // Wait for the JS media-query change event as well as the CSS update.
+  // One step of tolerance covers engines rounding the sine table differently.
   await expect.poll(async () => (await pixelAlphas(page)).filter((alpha, index) =>
-    Math.abs(alpha - Math.round(cells[index].intensity * 255)) > 1).length).toBe(0);
+    Math.abs(alpha - still[index]) > 2).length).toBe(0);
 }
 
 test.use({ signedIn: true, timezoneId: "UTC" });
@@ -149,8 +151,10 @@ test("pixels change gently and independently; reduced motion makes them static",
   await page.clock.runFor(1000);
   const second = await pixelAlphas(page);
   expect(second).not.toEqual(first);
-  const largestChange = second.reduce((max, alpha, index) => Math.max(max, Math.abs(alpha - first[index])), 0);
-  expect(largestChange).toBeLessThanOrEqual(20);
+  // The light drifts: most cells move, but only twinkles change a lot in a second.
+  const changes = second.map((alpha, index) => Math.abs(alpha - first[index]));
+  expect(changes.filter((change) => change > 0).length).toBeGreaterThan(counts[3] / 4);
+  expect(changes.filter((change) => change > 80).length).toBeLessThan(counts[3] / 20);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator(".pixel-grid")).toHaveCSS("transition-duration", "0s");
   await expectStaticPixels(page);
@@ -162,7 +166,28 @@ test("pixels change gently and independently; reduced motion makes them static",
   await expect.poll(pixelAlphas.bind(null, page)).not.toEqual(still);
 });
 
-test("drawing is capped, skips unchanged pixels, and stops when hidden or inactive", async ({ page, backend }) => {
+test("a completion blooms outward from the centre, then settles", async ({ page, backend }) => {
+  await page.clock.install();
+  await page.goto("/");
+  await expectArtwork(page, 0);
+  // Freeze time so the wave only advances when the test says so.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  backend.data.completions = [{ day: backend.data.today, count: 3 }];
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expectArtwork(page, 3);
+  await page.clock.runFor(500);
+  const early = await pixelAlphas(page);
+  const lit = early.filter((alpha) => alpha > 0).length;
+  expect(lit).toBeGreaterThan(0);
+  expect(lit).toBeLessThan(counts[3] / 2);
+  const reach = (wanted: boolean) => early.reduce((sum, alpha, index) =>
+    alpha > 0 === wanted ? sum + field.radius[index] : sum, 0) / (wanted ? lit : counts[3] - lit);
+  expect(reach(true)).toBeLessThan(reach(false) / 2);
+  await page.clock.runFor(PIXEL_REVEAL_DURATION);
+  await expectLitPixels(page, 3);
+});
+
+test("drawing is capped, skips unchanged frames, and stops when hidden or inactive", async ({ page, backend }) => {
   await page.clock.install();
   await page.addInitScript(({ interval }) => {
     const stats = { scheduled: 0, paints: 0 };
@@ -173,10 +198,10 @@ test("drawing is capped, skips unchanged pixels, and stops when hidden or inacti
       if (timeout === interval) stats.scheduled++;
       return schedule(handler, timeout, ...args);
     };
-    const clear = CanvasRenderingContext2D.prototype.clearRect;
-    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+    const put = CanvasRenderingContext2D.prototype.putImageData;
+    CanvasRenderingContext2D.prototype.putImageData = function (...args: unknown[]) {
       if ((this.canvas as HTMLCanvasElement).classList.contains("pixel-grid")) stats.paints++;
-      return clear.apply(this, args);
+      return (put as (...args: unknown[]) => void).apply(this, args);
     };
   }, { interval: PIXEL_FRAME_INTERVAL });
   const stats = () => page.evaluate(() => (window as typeof window & {
@@ -195,10 +220,11 @@ test("drawing is capped, skips unchanged pixels, and stops when hidden or inacti
   await page.clock.runFor(1000);
   const active = await stats();
   const frames = active.scheduled - start.scheduled;
-  expect(frames).toBeGreaterThan(0);
+  // Ambient light: at most 10 updates/second, each a single small upload.
+  expect(frames).toBeGreaterThan(5);
   expect(frames).toBeLessThanOrEqual(11);
   expect(active.paints - start.paints).toBeGreaterThan(0);
-  expect(active.paints - start.paints).toBeLessThan(counts[3] * frames / 2);
+  expect(active.paints - start.paints).toBeLessThanOrEqual(frames + 1);
 
   await page.evaluate(() => {
     Object.defineProperty(document, "hidden", { configurable: true, value: true });

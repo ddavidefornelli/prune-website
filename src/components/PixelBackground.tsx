@@ -1,13 +1,15 @@
 import { createEffect, onCleanup, onMount } from "solid-js";
 import { PLANNER_LIMITS } from "../planner/constants";
 import {
-  createPixelCells,
-  pixelAlpha,
+  createPixelField,
+  paintPixels,
+  PIXEL_COLUMNS,
+  PIXEL_COUNT,
   PIXEL_FRAME_INTERVAL,
-  PIXEL_HEIGHT,
-  PIXEL_SIZE,
-  PIXEL_WIDTH,
-  type PixelCell,
+  PIXEL_PALETTE,
+  PIXEL_REVEAL_DURATION,
+  PIXEL_ROWS,
+  type PixelField,
 } from "../shared/pixel-background";
 
 export default function PixelBackground(props: { completionLevel: number }) {
@@ -18,58 +20,65 @@ export default function PixelBackground(props: { completionLevel: number }) {
     if (!context) return;
 
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let cells: PixelCell[] | undefined;
-    let alphas = new Uint8Array(0);
-    let level = 0;
-    let timer: number | undefined;
+    const image = context.createImageData(PIXEL_COLUMNS, PIXEL_ROWS);
+    const shades = new Uint8Array(PIXEL_COUNT);
+    const painted = new Uint8Array(PIXEL_COUNT);
+    const elapsed = [0, 0, 0, 0];
     const revealedAt = [0, Infinity, Infinity, Infinity];
+    let field: PixelField | undefined;
+    let level = 0;
+    let pulseAt = -Infinity;
+    let timer: number | undefined;
+    let animationFrame: number | undefined;
 
     const stop = () => {
       window.clearTimeout(timer);
-      timer = undefined;
-    };
-
-    const initialize = (): PixelCell[] => {
-      const pixels = createPixelCells();
-      alphas = new Uint8Array(pixels.length);
-      // Grid lines are drawn once. Updating cell interiors never erases them.
-      context.fillStyle = "#ff123b";
-      context.globalAlpha = 0.04;
-      for (let x = 0; x < PIXEL_WIDTH; x += PIXEL_SIZE) {
-        context.fillRect(x, 0, 1, PIXEL_HEIGHT);
-      }
-      for (let y = 0; y < PIXEL_HEIGHT; y += PIXEL_SIZE) {
-        context.fillRect(0, y, PIXEL_WIDTH, 1);
-      }
-      context.globalAlpha = 1;
-      return pixels;
+      if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+      timer = animationFrame = undefined;
     };
 
     const draw = () => {
-      timer = undefined;
-      if (level === 0 || document.hidden) return;
-      // No cell generation or painting until there is progress to display.
-      const pixels = (cells ??= initialize());
+      timer = animationFrame = undefined;
+      if (document.hidden) return;
+      // No field generation or painting until there is progress to display.
+      if (level === 0 && !field) return;
       const now = performance.now();
       const reducedMotion = motion.matches;
-      for (let index = 0; index < pixels.length; index++) {
-        const cell = pixels[index];
-        const alpha =
-          cell.tier <= level
-            ? pixelAlpha(cell, now - revealedAt[cell.tier], reducedMotion)
-            : 0;
-        if (alpha === alphas[index]) continue;
-        alphas[index] = alpha;
-        context.clearRect(cell.x, cell.y, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
-        if (alpha === 0) continue;
-        context.fillStyle = cell.tier === 1 ? "#ff5872" : "#ff123b";
-        context.globalAlpha = alpha / 255;
-        context.fillRect(cell.x, cell.y, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
+      for (let tier = 1; tier < revealedAt.length; tier++) {
+        elapsed[tier] = now - revealedAt[tier];
       }
-      context.globalAlpha = 1;
-      // Slow ambient changes need at most 10 updates/second, not a 60fps loop.
-      // Reduced motion gets one static frame with no recurring work.
-      if (!reducedMotion) timer = window.setTimeout(draw, PIXEL_FRAME_INTERVAL);
+      paintPixels((field ??= createPixelField()), shades, {
+        level,
+        time: now,
+        elapsed,
+        pulse: now - pulseAt,
+        reducedMotion,
+      });
+      // Only cells whose brightness changed are rewritten, and a frame with
+      // no change (a still, reduced-motion artwork) uploads nothing.
+      let changed = false;
+      for (let index = 0; index < PIXEL_COUNT; index++) {
+        const shade = shades[index];
+        if (shade === painted[index]) continue;
+        painted[index] = shade;
+        changed = true;
+        const source = shade * 4;
+        const target = index * 4;
+        image.data[target] = PIXEL_PALETTE[source];
+        image.data[target + 1] = PIXEL_PALETTE[source + 1];
+        image.data[target + 2] = PIXEL_PALETTE[source + 2];
+        image.data[target + 3] = PIXEL_PALETTE[source + 3];
+      }
+      if (changed) context.putImageData(image, 0, 0);
+      // Reduced motion and an empty day get one frame with no recurring work.
+      if (level === 0 || reducedMotion) return;
+      // The wave after a completion runs at display rate for its few seconds;
+      // the slow ambient light needs only 10 updates/second.
+      if (now - pulseAt < PIXEL_REVEAL_DURATION) {
+        animationFrame = requestAnimationFrame(draw);
+      } else {
+        timer = window.setTimeout(draw, PIXEL_FRAME_INTERVAL);
+      }
     };
 
     const redraw = () => {
@@ -88,6 +97,7 @@ export default function PixelBackground(props: { completionLevel: number }) {
         if (tier > next) revealedAt[tier] = Infinity;
         else if (tier > level) revealedAt[tier] = now;
       }
+      if (next > level) pulseAt = now;
       level = next;
       redraw();
     };
@@ -105,12 +115,12 @@ export default function PixelBackground(props: { completionLevel: number }) {
 
   return (
     <div class="cyber-artwork" aria-hidden="true">
-      {/* Fixed resolution avoids multiplying background work on Retina screens. */}
+      {/* One canvas pixel per cell: the compositor does the scaling. */}
       <canvas
         class="pixel-grid"
         ref={(element) => (canvas = element)}
-        width={PIXEL_WIDTH}
-        height={PIXEL_HEIGHT}
+        width={PIXEL_COLUMNS}
+        height={PIXEL_ROWS}
       />
     </div>
   );
