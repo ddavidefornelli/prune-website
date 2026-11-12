@@ -236,7 +236,7 @@
 }
 .mock-up-next {
   margin: 0;
-  color: var(--blood-red);
+  color: var(--muted);
   font-size: 0.6667rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -438,7 +438,7 @@
   text-wrap: balance;
 }
 .mock-summary em {
-  color: var(--blood-red);
+  color: var(--text);
   font-style: normal;
 }
 .mock-slots {
@@ -457,7 +457,7 @@
   background: color-mix(in srgb, var(--text) 45%, var(--border));
 }
 .mock-slots .is-active {
-  background: var(--blood-red);
+  background: var(--muted);
 }
 .mock-slots .is-done {
   background: var(--text);
@@ -561,7 +561,7 @@
   stroke-linecap: square;
 }
 .mock-dial.is-done .dial-value {
-  stroke: var(--blood-red);
+  stroke: var(--text);
 }
 .screen-panel.is-active .dial-value {
   animation: dial-in 1s var(--ease-out) 400ms both;
@@ -655,10 +655,10 @@
   gap: 3px;
   padding: 10px 12px;
   background: var(--surface);
-  border: 1px solid var(--blood-red);
+  border: 1px solid var(--border);
 }
 .mock-suggestion small {
-  color: var(--blood-red);
+  color: var(--muted);
   font-size: 0.5556rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -701,7 +701,7 @@
   gap: 6px;
   padding: 12px 14px;
   background: var(--surface);
-  border-left: 2px solid var(--blood-red);
+  border-left: 2px solid var(--text);
 }
 
 .mock-calendar {

@@ -402,7 +402,7 @@ textarea:focus {
 }
 .plan-summary em {
   font-style: normal;
-  color: var(--blood-red);
+  color: var(--text);
 }
 
 .plan-summary {
@@ -430,7 +430,7 @@ textarea:focus {
   background: color-mix(in srgb, var(--text) 45%, var(--border));
 }
 .plan-slots li.is-active {
-  background: var(--blood-red);
+  background: var(--muted);
 }
 .plan-slots li.is-done {
   background: var(--text);
@@ -459,7 +459,7 @@ textarea:focus {
   line-height: 1.2;
 }
 .review-meter-label {
-  color: var(--blood-red);
+  color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -486,7 +486,7 @@ textarea:focus {
   animation-delay: calc(var(--step) * 45ms);
 }
 .review-meter.is-preparing .review-meter-steps > span {
-  background: var(--blood-red);
+  background: var(--text);
 }
 @keyframes review-step-in {
   from {
@@ -623,7 +623,7 @@ textarea:focus {
 .hint-card {
   margin-top: 24px;
   padding: 16px 20px;
-  border-left: 2px solid var(--blood-red);
+  border-left: 2px solid var(--text);
   background: color-mix(in srgb, var(--surface) 75%, transparent);
   animation: rise 420ms var(--ease-out) both;
 }
@@ -657,7 +657,7 @@ textarea:focus {
   font-size: 0.6667rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--blood-red);
+  color: var(--muted);
 }
 .evening-card .evening-title {
   margin: 0;
@@ -668,7 +668,7 @@ textarea:focus {
 }
 .evening-title em {
   font-style: normal;
-  color: var(--blood-red);
+  color: var(--text);
 }
 .evening-card .evening-note {
   margin: 8px 0 0;
@@ -688,12 +688,12 @@ textarea:focus {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: var(--blood-red);
-  border-color: var(--blood-red);
+  background: var(--action);
+  border-color: var(--action);
 }
 #app .evening-primary:hover:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--action-hover);
+  border-color: var(--action-hover);
 }
 #app .task.is-next {
   position: relative;
@@ -710,7 +710,7 @@ textarea:focus {
   font-size: 0.6111rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--blood-red);
+  color: var(--muted);
 }
 #app .task.is-next {
   border-color: color-mix(in srgb, var(--text) 35%, var(--border));
@@ -797,7 +797,7 @@ textarea:focus {
   height: 32px;
 }
 #app .task-done .estimate-ring-progress {
-  stroke: var(--blood-red);
+  stroke: var(--text);
 }
 #app .task-done-check {
   font-size: 0.7778rem;
@@ -875,9 +875,10 @@ textarea:focus {
   padding: 10px 16px;
   font-size: 0.7222rem;
 }
+/* Start focus: the main action on Today, so it is the red one. */
 #app .task > button:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--action);
+  border-color: var(--action);
   color: #000;
 }
 #app .task-form {
@@ -925,8 +926,8 @@ textarea:focus {
   padding: 0 18px;
   font-size: 0.7222rem;
   justify-self: end;
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--action);
+  border-color: var(--action);
   color: #000;
   transition:
     background-color 200ms ease,
@@ -995,8 +996,8 @@ textarea:focus {
 #app .focus-actions > button {
   width: 100%;
   min-height: 48px;
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--action);
+  border-color: var(--action);
   color: #000;
 }
 .pause-dialog {
@@ -1229,7 +1230,7 @@ textarea:focus {
 }
 .tour-highlight {
   position: fixed;
-  border: 2px solid var(--blood-red);
+  border: 2px solid var(--text);
   border-radius: 4px;
   box-shadow: 0 0 0 9999px #0009;
   pointer-events: none;
@@ -1294,6 +1295,20 @@ textarea:focus {
 .tour-actions .tour-primary,
 .tour-actions .tour-primary:hover:not(:disabled) {
   color: #000;
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--action);
+  border-color: var(--action);
+}
+
+/* Color roles: red marks the one thing to do next on a screen (Start focus,
+   Complete task, Add, Plan tomorrow, the tour's Next, a dialog's submit).
+   Everything else is ivory or grey. Hover only lightens the red. */
+@media (hover: hover) {
+  #app .task > button:not(:disabled):hover,
+  #app .focus-actions > button:not(:disabled):hover,
+  #app .task-form .add-task:not(.is-empty):hover,
+  .tour-actions .tour-primary:hover:not(:disabled) {
+    background: var(--action-hover);
+    border-color: var(--action-hover);
+    color: #000;
+  }
 }

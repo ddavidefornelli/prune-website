@@ -46,12 +46,15 @@ h1 {
   --surface-hover: #292825;
   --text: #efeee7;
   --blood-red: #d4535b;
-  --taupe: var(--blood-red);
+  /* Red is reserved for the one main action on a screen (see --action). */
+  --action: var(--blood-red);
+  --action-hover: #e2666e;
+  --taupe: color-mix(in srgb, var(--text) 45%, var(--border));
   --muted: #b6afa2;
   --border: #393630;
   --accent: var(--text);
-  --success: var(--taupe);
-  --warning: var(--taupe);
+  --success: var(--text);
+  --warning: var(--muted);
   --error: var(--text);
 }
 * {
@@ -317,15 +320,19 @@ button:hover:not(:disabled) {
   border-color: var(--taupe);
 }
 button[aria-current],
-button[aria-current]:hover:not(:disabled),
-button[type="submit"] {
+button[aria-current]:hover:not(:disabled) {
   color: #000;
   background: var(--accent);
   border-color: var(--accent);
 }
+button[type="submit"] {
+  color: #000;
+  background: var(--action);
+  border-color: var(--action);
+}
 button[type="submit"]:hover:not(:disabled) {
-  background: var(--taupe);
-  border-color: var(--taupe);
+  background: var(--action-hover);
+  border-color: var(--action-hover);
 }
 nav button {
   min-width: 0;
@@ -617,7 +624,7 @@ textarea::placeholder {
 }
 .timer.is-overdue,
 .timer.is-overdue:hover:not(:disabled) {
-  color: var(--warning);
+  color: var(--text);
 }
 .timer.is-paused:hover:not(:disabled) {
   color: var(--muted);
@@ -724,16 +731,16 @@ textarea {
 }
 /* Solid reds: translucent ones turned muddy over the grey card. */
 .activity-level-1 {
-  background: #6e1a24;
-  border-color: #7d1f2a;
+  background: #4a4843;
+  border-color: #57544e;
 }
 .activity-level-2 {
-  background: #bb2a39;
-  border-color: #c9303f;
+  background: #9a978e;
+  border-color: #a8a59c;
 }
 .activity-level-3 {
-  background: #ff3b4e;
-  border-color: #ff5566;
+  background: #efeee7;
+  border-color: #ffffff;
 }
 .activity-day.is-future {
   background: transparent;
@@ -797,7 +804,7 @@ textarea {
   border: 1px solid var(--border);
 }
 .activity-stat:first-child {
-  border-left: 2px solid var(--blood-red);
+  border-left: 2px solid var(--text);
 }
 .activity-stat dt {
   color: var(--muted);

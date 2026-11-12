@@ -98,7 +98,7 @@
   background: var(--text);
 }
 .tour-progress .is-current {
-  background: var(--blood-red);
+  background: var(--text);
 }
 
 .tour-body {
@@ -321,7 +321,7 @@
     stroke 300ms ease;
 }
 .mini-dial.is-done .mini-dial-value {
-  stroke: var(--blood-red);
+  stroke: var(--text);
 }
 .mini-dial.is-done > span {
   color: var(--muted);
@@ -395,7 +395,7 @@
   left: 0.4em;
   right: 0.4em;
   height: 2px;
-  background: var(--blood-red);
+  background: var(--text);
   transform: rotate(-1.5deg) scaleX(0);
   transform-origin: left center;
   transition: transform 300ms var(--ease-out) calc(var(--k) * 130ms);
@@ -515,7 +515,7 @@
   line-height: 1.35;
   text-align: left;
   background: var(--surface);
-  border-left: 2px solid var(--blood-red);
+  border-left: 2px solid var(--text);
   opacity: 0;
   transform: translateY(0.6em);
   transition:
@@ -616,9 +616,9 @@
 }
 @keyframes light-done {
   25% {
-    border-color: var(--blood-red);
+    border-color: var(--text);
     box-shadow:
-      0 0 0 1px var(--blood-red),
-      0 0 28px rgb(212 83 91 / 0.45);
+      0 0 0 1px var(--text),
+      0 0 28px rgb(239 238 231 / 0.3);
   }
 }
