@@ -131,7 +131,7 @@ export function ReviewReport(props: { review: WeeklyReview }) {
 
   return (
     <article class="weekly-report">
-      <h4>What to improve on this week</h4>
+      <h4>What to improve next</h4>
       <ol class="weekly-improvements">
         <For each={props.review.analysis.improvements}>
           {(improvement) => <li>{reviewText(improvement)}</li>}

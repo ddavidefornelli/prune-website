@@ -31,7 +31,7 @@ const AROUND: readonly Stop[] = [
     view: "habits",
     target: "nav button[aria-current]",
     title: "See your progress",
-    text: "Your activity and weekly reviews live here.",
+    text: "Your activity and AI reviews live here.",
   },
 ];
 

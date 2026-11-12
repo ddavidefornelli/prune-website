@@ -36,7 +36,7 @@ const SCREENS = [
     id: "overview",
     label: "Overview",
     caption:
-      "Overview: a completion calendar and a free weekly review of what held you back.",
+      "Overview: a completion calendar and a free AI review of what held you back, every 10 tasks.",
   },
 ] as const;
 type ScreenId = (typeof SCREENS)[number]["id"];
@@ -376,8 +376,8 @@ function OverviewMock() {
       </dl>
       <CalendarGrid />
       <div class="mock-review-ready">
-        <p class="mock-up-next">Weekly review</p>
-        <span>Your review for week 44 is ready</span>
+        <p class="mock-up-next">AI review</p>
+        <span>Your review of your last 10 tasks is ready</span>
       </div>
     </>
   );

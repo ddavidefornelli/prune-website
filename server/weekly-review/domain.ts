@@ -67,16 +67,6 @@ function date(value: unknown): string {
     invalid();
   return value;
 }
-function previousMonday(day: Date): string {
-  const offset = (day.getUTCDay() + 6) % 7;
-  return new Date(
-    Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()) -
-      (offset + 7) * DAY_MS,
-  )
-    .toISOString()
-    .slice(0, 10);
-}
-
 /** Strict allowlist: resource paths/URLs, model choices and prompts are never accepted. */
 export function validateInput(
   value: unknown,
@@ -98,11 +88,6 @@ export function validateInput(
   }
   const weekStart = date(input.weekStart);
   const weekEnd = date(input.weekEnd);
-  // Accept the latest due week in any real timezone, including Sunday 16:00.
-  // The service-only SQL loader selects the exact local schedule boundary.
-  const validWeeks = [-1, 0, 1].map((offset) =>
-    previousMonday(new Date(now.getTime() + offset * DAY_MS)),
-  );
   if (preview) {
     const localDays = [-1, 0, 1].map((offset) =>
       new Date(now.getTime() + offset * DAY_MS).toISOString().slice(0, 10),
@@ -114,11 +99,12 @@ export function validateInput(
       .toISOString()
       .slice(0, 10);
     if (!localDays.includes(weekEnd) || weekStart !== monday) invalid();
-  } else if (
-    !validWeeks.includes(weekStart) ||
-    Date.parse(weekEnd) - Date.parse(weekStart) !== 6 * DAY_MS
-  )
-    invalid();
+  } else {
+    // A review covers a batch of 10 completed tasks, from its first to its last
+    // date. The service-only SQL loader picks the batch; it can't end in the future.
+    const latest = new Date(now.getTime() + DAY_MS).toISOString().slice(0, 10);
+    if (weekStart > weekEnd || weekEnd > latest) invalid();
+  }
   const activity = record(input.activity, [
     "tasks",
     "stops",

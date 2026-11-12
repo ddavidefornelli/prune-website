@@ -20,7 +20,7 @@ export function dashboard(): Dashboard {
   return { revision: 0, today: day(), tomorrow: new Date(Date.now() + 86400000).toISOString().slice(0, 10), todayTasks: [], tomorrowTasks: [], activeTask: null, canPlanTomorrow: true, completions: [], serverNow: Math.floor(Date.now() / 1000) };
 }
 function overview(): WeeklyOverview {
-  return { settings: { enabled: true }, model: "gpt-4.1-mini", available: true, week: { start: day(), end: day(), nextUpdate: day(), nextUpdateAt: new Date(Date.now() + 5 * 86400000).toISOString() }, status: "no_data", error: null, reviews: [] };
+  return { settings: { enabled: true }, model: "gpt-4.1-mini", available: true, week: { start: day(), end: day(), nextUpdate: day(), nextUpdateAt: new Date(Date.now() + 5 * 86400000).toISOString() }, progress: { completed: 3, target: 10 }, status: "no_data", error: null, reviews: [] };
 }
 export function review(): WeeklyReview {
   return { weekStart: day(), weekEnd: day(), generatedAt: Math.floor(Date.now() / 1000), model: "gpt-4.1-mini", activity: { tasks: [], stops: [], totalStops: 0, omittedStops: 0 }, analysis: { summary: "A steady start.", mainReasons: [], improvements: ["Keep your first focus session small."] } };

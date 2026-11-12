@@ -332,7 +332,7 @@ export function PlanView(props: {
         </Match>
         <Match when={hint() === "progress"}>
           <aside class="hint-card" aria-label="Tip">
-            <p>Nice work. Your streak and weekly review live in Overview.</p>
+            <p>Nice work. Your streak and AI reviews live in Overview.</p>
             <button
               type="button"
               class="primary-button"

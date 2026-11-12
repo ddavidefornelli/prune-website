@@ -203,13 +203,15 @@ test("rejected cross-device changes stay visible until explicitly discarded", as
   await expect(page.locator(".task")).toHaveCount(0);
 });
 
-test("weekly reviews are automatic, cannot be turned off, and have no manual preview", async ({ page, backend }) => {
+test("AI reviews are automatic, cannot be turned off, and have no manual preview", async ({ page, backend }) => {
   await openPlanner(page);
   expect(backend.requests.filter((request) => request.path.includes("/functions/v1/weekly-review"))).toHaveLength(0);
   await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
   expect(backend.weekly.settings.enabled).toBe(true);
-  await expect(page.locator(".review-countdown")).toBeVisible();
-  await expect(page.getByRole("button", { name: /weekly reviews/ })).toHaveCount(0);
+  await expect(page.locator(".review-progress")).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Completed tasks toward your next AI review" })).toHaveAttribute("aria-valuenow", "3");
+  await expect(page.getByText("Complete 7 more tasks to get your next review.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /AI reviews/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Profile", exact: true }).click();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await expect(page.locator(".profile-page").getByText(/weekly review/i)).toHaveCount(0);
@@ -229,13 +231,13 @@ test("an account that turned reviews off earlier can turn them back on, but not 
   backend.weekly.status = "disabled";
   await openPlanner(page);
   await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
-  await expect(page.getByText("Weekly reviews are off for this account.")).toBeVisible();
+  await expect(page.getByText("AI reviews are off for this account.")).toBeVisible();
   await expect(page.getByText("Once on, they can’t be turned off.")).toBeVisible();
-  await expect(page.locator(".review-countdown")).toHaveCount(0);
-  await page.getByRole("button", { name: "Turn on weekly reviews", exact: true }).click();
+  await expect(page.locator(".review-progress")).toHaveCount(0);
+  await page.getByRole("button", { name: "Turn on AI reviews", exact: true }).click();
   await expect.poll(() => backend.weekly.settings.enabled).toBe(true);
-  await expect(page.locator(".review-countdown")).toBeVisible();
-  await expect(page.getByRole("button", { name: /weekly reviews/ })).toHaveCount(0);
+  await expect(page.locator(".review-progress")).toBeVisible();
+  await expect(page.getByRole("button", { name: /AI reviews/ })).toHaveCount(0);
 });
 
 test("profile stats and local-only sign-out preserve pending work and sign out other web tabs", async ({ page, context, backend }) => {

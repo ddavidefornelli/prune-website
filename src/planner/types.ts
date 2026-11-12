@@ -104,6 +104,8 @@ export interface WeeklyOverview {
     nextUpdate: string;
     nextUpdateAt?: string;
   };
+  /** Completed tasks toward the next review; absent from servers that still review weekly. */
+  progress?: { completed: number; target: number };
   status:
     | "disabled"
     | "unavailable"

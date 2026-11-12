@@ -57,7 +57,7 @@ const RESERVATION_ERRORS = {
   invalid: [400, "The requested review week or consent version is invalid."],
   running: [
     409,
-    "This weekly review is already being generated. Please check again shortly.",
+    "This review is already being generated. Please check again shortly.",
   ],
   rate_limited: [
     429,
@@ -70,7 +70,7 @@ const RESERVATION_ERRORS = {
   ],
   conflict: [
     409,
-    "A review already exists for this week with different activity. It cannot be regenerated.",
+    "A review already exists for these tasks with different activity. It cannot be regenerated.",
   ],
   expired: [
     410,
@@ -116,7 +116,7 @@ export function createHandler(
         throw new ApiError(
           405,
           "method_not_allowed",
-          "Use POST to request a weekly review.",
+          "Use POST to request a review.",
         );
       }
       const bearer = /^Bearer ([^\s]+)$/i.exec(

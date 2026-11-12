@@ -936,6 +936,32 @@ textarea {
   color: var(--muted);
   font-size: 0.6667rem;
 }
+.review-progress-count {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+}
+.review-progress-of {
+  color: var(--muted);
+  font-size: 0.7778rem;
+}
+.review-progress-steps {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: clamp(3px, 1vw, 6px);
+  margin: 20px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.review-progress-steps > li {
+  height: 10px;
+  background: #ffffff12;
+  transition: background-color 240ms ease;
+}
+.review-progress-steps > li.is-done {
+  background: var(--accent);
+}
 .review-countdown.is-preparing {
   border-color: #ffffff55;
 }
