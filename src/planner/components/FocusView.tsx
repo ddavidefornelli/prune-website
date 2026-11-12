@@ -196,14 +196,6 @@ export function FocusView(props: {
                     }}
                   />
                 </label>
-                <p class="muted">
-                  The timer is paused while you write your reason.
-                  <Show when={!props.hints.seen("pause")}>
-                    {" "}
-                    One honest line is enough; your AI review uses these to spot
-                    what pulls you away.
-                  </Show>
-                </p>
                 <button type="submit" disabled={planner.busy()}>
                   Save reason
                 </button>

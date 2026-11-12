@@ -25,7 +25,8 @@ test.describe("first run", () => {
       await expect(page.locator("#focus-timer")).toBeVisible();
       await expect(page).toHaveTitle(/· Plan the week ahead$/);
       await page.locator("#focus-timer").click();
-      await expect(page.getByRole("dialog")).toContainText("One honest line is enough");
+      await expect(page.getByRole("dialog")).toContainText("Why are you stopping?");
+      await expect(page.getByRole("dialog")).not.toContainText("The timer is paused");
     });
   }
 
