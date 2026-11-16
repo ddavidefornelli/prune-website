@@ -1633,6 +1633,140 @@ textarea,
     animation: focus-paused 1.6s steps(1) infinite;
   }
 }
+/* Off, rain or white noise: three quiet pills under the timer on phones,
+   under the title on laptops. The one chosen takes the timer's lavender;
+   Off stays plain black and white. */
+#app .focus-sounds {
+  order: 3;
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.focus-sounds-label {
+  float: left;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.6111rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.focus-sounds-options {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+#app .focus-sound {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8889rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+.focus-sound input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.focus-sound:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.focus-sound svg,
+.focus-sounds-volume svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  #app .focus-sound:hover:not(:has(input:checked)) {
+    background: var(--surface-hover);
+    border-color: var(--taupe);
+  }
+}
+#app .focus-sound:has(input:checked) {
+  background: var(--pearl-pale);
+  border-color: var(--pearl);
+  color: var(--pearl-deep);
+}
+#app .focus-sound:has(input[value="off"]:checked) {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-accent);
+}
+.focus-sound.is-loading {
+  cursor: progress;
+}
+@media (max-width: 399px) {
+  #app .focus-sound {
+    padding-inline: 12px;
+  }
+  .focus-sound svg {
+    display: none;
+  }
+}
+.focus-sounds-error {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7778rem;
+}
+.focus-sounds-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 4px;
+  color: var(--muted);
+}
+.focus-sounds-volume input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--pearl-deep);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .focus-sound:has(input:checked):not(:has(input[value="off"])) svg {
+    animation: focus-sound-breathe 2.4s ease-in-out infinite;
+  }
+  .focus-sound.is-loading svg {
+    animation-duration: 0.8s;
+  }
+}
+@keyframes focus-sound-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
 #app .focus-notes {
   order: 3;
   width: 100%;
@@ -1789,6 +1923,9 @@ textarea,
   #app .focus-layout .timer {
     width: 100%;
     margin: 0;
+  }
+  #app .focus-sounds {
+    margin-top: 24px;
   }
   #app .focus-notes {
     margin-top: 24px;

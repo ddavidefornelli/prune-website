@@ -1,0 +1,11 @@
+Focus sounds used by prune
+
+rain.m4a
+  "20180616 - Tropical rain Thailand 02" by LG
+  https://freesound.org/people/LG/sounds/462774/
+  Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+  Changes: a 60-second excerpt, made to loop, stereo widened, level adjusted,
+  re-encoded as AAC.
+
+white-noise.m4a
+  Pink noise generated for prune. No third-party material.

@@ -15,6 +15,7 @@ import type { Hints } from "../hints";
 import type { Task } from "../types";
 import { trackedSeconds } from "../task-model";
 import { formatDuration } from "../time";
+import { FocusSounds } from "./FocusSounds";
 import { TaskTitle } from "./TaskTitle";
 
 const RING_RADIUS = 54;
@@ -89,6 +90,7 @@ export function FocusView(props: {
                   )
                 }
               />
+              <FocusSounds />
               <div class="focus-notes">
                 <label for={notesId}>Notes</label>
                 <textarea
