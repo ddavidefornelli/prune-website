@@ -120,7 +120,6 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (action === "queue_protocol") { await send({ version: state.protocolVersion }); return; }
       if (action === "dashboard") { await send({ ...state.data, serverNow: Math.floor(Date.now() / 1000) }); return; }
       if (action === "weekly_overview") { await send(state.weekly); return; }
-      if (action === "set_check_in_day") { state.weekly.checkIn = { day: args.day, plan: state.weekly.checkIn?.plan ?? null }; await send(state.weekly); return; }
       if (action === "set_check_in_plan") { state.weekly.checkIn = { day: state.weekly.checkIn?.day ?? 0, plan: { estimateFactor: args.estimateFactor, dailyTarget: args.dailyTarget, decidedFor: args.decidedFor } }; await send(state.weekly); return; }
       if (action === "email_preferences") { await send(state.emailPreferences); return; }
       if (action === "set_email_preferences") {

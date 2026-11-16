@@ -210,9 +210,8 @@ test("AI reviews are automatic, cannot be turned off, and have no manual preview
   expect(backend.weekly.settings.enabled).toBe(true);
   await expect(page.locator(".review-countdown")).toContainText("Next check-in · Sunday");
   await expect(page.locator(".review-countdown")).toContainText("Each check-in looks at the seven days before it");
-  await page.getByLabel("Check-in day").selectOption("Friday");
-  await expect.poll(() => backend.weekly.checkIn?.day).toBe(5);
-  await expect(page.locator(".review-countdown")).toContainText("Next check-in · Friday");
+  await expect(page.locator(".review-countdown")).toContainText("Every Sunday, the weekday after you started.");
+  await expect(page.getByLabel("Check-in day")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /AI check-ins/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Profile", exact: true }).click();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();

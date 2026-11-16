@@ -8,12 +8,7 @@ import { reviewCountdown } from "./review-countdown";
 
 const COUNTDOWN_LABELS = ["Days", "Hours", "Minutes", "Seconds"] as const;
 
-function NextCheckIn(props: {
-  data: WeeklyOverview;
-  now: number;
-  state: WeeklyReviewState;
-}) {
-  const selectId = createUniqueId();
+function NextCheckIn(props: { data: WeeklyOverview; now: number }) {
   const countdown = createMemo(() =>
     reviewCountdown(props.data.week, props.now),
   );
@@ -52,24 +47,10 @@ function NextCheckIn(props: {
           <span style={{ width: `${(countdown()?.progress ?? 0) * 100}%` }} />
         </div>
       </Show>
-      <Show when={props.data.checkIn}>
-        <div class="check-in-day">
-          <label for={selectId}>Check-in day</label>
-          <select
-            id={selectId}
-            value={day()}
-            disabled={props.state.saving() || preparing()}
-            onChange={(event) =>
-              void props.state.setDay(Number(event.currentTarget.value))
-            }
-          >
-            <For each={WEEKDAYS}>
-              {(name, index) => <option value={index()}>{name}</option>}
-            </For>
-          </select>
-        </div>
-      </Show>
       <p class="review-countdown-date">
+        <Show when={props.data.checkIn}>
+          Every {WEEKDAYS[day()]}, the weekday after you started.{" "}
+        </Show>
         Each check-in looks at the seven days before it: your trends, a plan for
         next week, and a short note.
       </p>
@@ -134,7 +115,7 @@ export function WeeklyReview(props: {
               </p>
             </Show>
             <Show when={data().settings.enabled}>
-              <NextCheckIn data={data()} now={props.now} state={review} />
+              <NextCheckIn data={data()} now={props.now} />
             </Show>
             {/* Reviews can't be turned off; only accounts that opted out earlier are disabled. */}
             <Show when={data().status === "disabled"}>

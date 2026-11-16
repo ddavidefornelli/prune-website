@@ -85,17 +85,6 @@ export function createWeeklyReview(
     if (saved && !disposed && data()?.settings.enabled) await checkDue();
   }
 
-  /** Moving the day may make a check-in due now. */
-  async function setDay(day: number): Promise<void> {
-    if (
-      await save(
-        () => client.setCheckInDay(day),
-        "Could not change your check-in day. Please try again.",
-      )
-    )
-      await checkDue();
-  }
-
   async function decide(plan: CheckInPlan): Promise<void> {
     await save(
       () => client.setCheckInPlan(plan),
@@ -130,7 +119,7 @@ export function createWeeklyReview(
     });
   });
 
-  return { data, saving, error, refresh, enable, checkDue, setDay, decide };
+  return { data, saving, error, refresh, enable, checkDue, decide };
 }
 
 export type WeeklyReviewState = ReturnType<typeof createWeeklyReview>;

@@ -892,27 +892,6 @@ textarea,
   font-size: 0.8333rem;
   line-height: 1.55;
 }
-.check-in-day {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin: 0 0 12px;
-}
-.check-in-day label {
-  font-size: 0.7778rem;
-  font-weight: 600;
-}
-.check-in-day select {
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.8333rem;
-}
 @media (min-width: 640px) {
   .check-in-trends {
     grid-template-columns: repeat(3, minmax(0, 1fr));

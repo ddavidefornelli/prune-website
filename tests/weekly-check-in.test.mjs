@@ -6,6 +6,7 @@ const fixture = () =>
   reviewFixture([
     "20261112000500_reviews_every_ten_tasks.sql",
     "20261116000100_weekly_check_in.sql",
+    "20261117000100_check_in_day_after_start.sql",
   ]);
 const call = (db, action, args = {}) =>
   db.rows("select public.planner_call($1, $2::jsonb, 'Europe/Rome') r", [action, JSON.stringify(args)]).then((r) => r[0].r);
@@ -25,12 +26,14 @@ test("a check-in covers the seven days before the check-in day", async () => {
   const db = await fixture();
   let overview = await db.overview();
   assert.equal(overview.status, "no_data", "an empty week makes no AI request");
-  assert.equal(overview.checkIn.day, 0);
+  const today = (await db.rows("select (now() at time zone 'Europe/Rome')::date::text d"))[0].d;
+  const tomorrow = new Date(`${shift(today, 1)}T12:00:00Z`).getUTCDay();
+  assert.equal(overview.checkIn.day, tomorrow, "the weekday after the account started");
   assert.equal(overview.checkIn.plan, null);
   assert.equal(overview.progress, undefined, "no task-count unlocks any more");
   const { start, end } = overview.week;
   assert.equal(shift(start, 6), end);
-  assert.equal(new Date(`${shift(end, 1)}T12:00:00Z`).getUTCDay(), 0, "Sunday by default");
+  assert.equal(new Date(`${shift(end, 1)}T12:00:00Z`).getUTCDay(), tomorrow);
   assert.equal(overview.week.nextUpdate, shift(end, 8), "nothing to check in on: next week");
 
   await addTask(db, start, start);
@@ -61,21 +64,34 @@ test("a check-in covers the seven days before the check-in day", async () => {
   assert.equal((await db.input()).activity.tasks.length, 0, "a saved check-in is never paid for again");
 });
 
-test("moving the check-in day never reviews the same days twice", async () => {
+test("the day can't be changed, and no account change ever re-reviews covered days", async () => {
   const db = await fixture();
-  const { start, end } = (await db.overview()).week;
+  await assert.rejects(call(db, "set_check_in_day", { day: 3 }), /weekday after you started/);
+  const { end } = (await db.overview()).week;
   await addTask(db, end, end);
-  const input = await db.input();
-  assert.equal(await db.finish(await db.reserve(input)), true);
-  for (let day = 0; day < 7; day++) {
-    const overview = await call(db, "set_check_in_day", { day });
-    assert.equal(overview.checkIn.day, day);
-    assert.notEqual(overview.status, "pending", `day ${day} overlaps the saved check-in`);
-    assert.equal((await db.input()).activity.tasks.length, 0);
+  assert.equal(await db.finish(await db.reserve(await db.input())), true);
+  // Whatever weekday the account started on, a window that begins on or before
+  // the saved check-in's last day is already covered: no second paid call.
+  for (let back = 0; back < 7; back++) {
+    await db.rows("update auth.users set created_at = now() - make_interval(days => $1)", [back]);
+    const overview = await db.overview();
+    assert.notEqual(overview.status, "pending", `started ${back} days ago`);
+    assert.equal((await db.input()).activity.tasks.length, 0, `started ${back} days ago`);
+    assert.equal((await db.reserve(await db.input(), { tasks: [], stops: [], totalStops: 0, omittedStops: 0 })).outcome === "reserved", false);
   }
-  await assert.rejects(call(db, "set_check_in_day", { day: 7 }));
-  await assert.rejects(call(db, "set_check_in_day", { day: "1" }));
-  assert.ok(start);
+  assert.equal((await db.rows("select count(*)::int n from public.ai_review_requests"))[0].n, 1);
+});
+
+test("the next week after a check-in is due again", async () => {
+  const db = await fixture();
+  // An account that started 13 days ago has a check-in due this week.
+  await db.rows("update auth.users set created_at = now() - interval '13 days'");
+  const first = (await db.overview()).week;
+  await addTask(db, first.start, first.start);
+  assert.equal(await db.finish(await db.reserve(await db.input())), true);
+  // A review that ended the day before this window starts doesn't cover it.
+  await db.rows("update public.planner_reviews set week_start = $1::date", [shift(first.start, -1)]);
+  assert.equal((await db.overview()).status, "pending");
 });
 
 test("the accepted plan is validated and returned with the overview", async () => {

@@ -277,11 +277,6 @@ export class PlanningClient {
   }
 
   /** Never queued, like every preference. */
-  async setCheckInDay(day: number): Promise<WeeklyOverview> {
-    this.assertOpen();
-    return this.query("set_check_in_day", { day });
-  }
-
   async setCheckInPlan(plan: CheckInPlan): Promise<WeeklyOverview> {
     this.assertOpen();
     return this.query("set_check_in_plan", { ...plan });
