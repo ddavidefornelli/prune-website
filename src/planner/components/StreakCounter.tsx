@@ -1,4 +1,4 @@
-import { createUniqueId, For, Show, untrack } from "solid-js";
+import { For, Show, untrack } from "solid-js";
 import { type Streak, streakNote } from "../streak";
 
 const STATES = {
@@ -20,7 +20,6 @@ let shown: number | undefined;
 
 /** Always on Today: days in a row as a lit flame, and this week as embers. */
 export function StreakCounter(props: { streak: Streak }) {
-  const id = createUniqueId();
   const days = () => props.streak.days;
   const grew = untrack(() => {
     const now = days();
@@ -49,32 +48,11 @@ export function StreakCounter(props: { streak: Streak }) {
       <p class="streak-count">
         <span class="streak-flame" aria-hidden="true">
           <svg viewBox="0 0 24 30">
-            <defs>
-              <linearGradient id={`${id}-o`} x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" style={{ "stop-color": "var(--flame-low)" }} />
-                <stop
-                  offset="0.55"
-                  style={{ "stop-color": "var(--flame-mid)" }}
-                />
-                <stop
-                  offset="1"
-                  style={{ "stop-color": "var(--flame-high)" }}
-                />
-              </linearGradient>
-              <linearGradient id={`${id}-i`} x1="0" y1="1" x2="0" y2="0">
-                <stop
-                  offset="0"
-                  style={{ "stop-color": "var(--flame-core)" }}
-                />
-                <stop
-                  offset="1"
-                  style={{ "stop-color": "var(--flame-high)" }}
-                />
-              </linearGradient>
-            </defs>
             <g class="streak-fire">
-              <path d={FLAME} fill={`url(#${id}-o)`} />
-              <path class="streak-core" d={CORE} fill={`url(#${id}-i)`} />
+              {/* Plain fills: no gradient references or filters, which some
+                  browsers drew as a black flame. */}
+              <path d={FLAME} fill="#ff7a1a" />
+              <path class="streak-core" d={CORE} fill="#ffd23f" />
             </g>
           </svg>
           <Show when={atRisk()}>
