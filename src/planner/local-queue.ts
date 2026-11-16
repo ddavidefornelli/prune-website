@@ -154,6 +154,10 @@ export class LocalQueue {
   get blocked(): boolean {
     return !!this.state.blocked;
   }
+  /** The server's reason for rejecting the first pending change, if any. */
+  get blockedReason(): string | null {
+    return this.state.blocked;
+  }
   snapshot(): Dashboard | null {
     if (!this.state.base) return null;
     const data = structuredClone(this.state.base);

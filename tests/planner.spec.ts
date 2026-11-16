@@ -194,10 +194,19 @@ test("rejected cross-device changes stay visible until explicitly discarded", as
   backend.rejectWrites = true;
   await addTask(page, "A conflicting edit");
   await expect(page.locator(".sync-bar")).toBeVisible();
+  await expect(page.locator(".sync-bar")).toContainText("A change couldn’t be saved");
+  await expect(page.locator(".sync-bar")).toContainText("Another device changed your plan.");
   await expect.poll(() => pendingCount(page)).toBe(1);
   expect(backend.data.todayTasks).toHaveLength(0);
+  // A further edit points to the bar instead of stacking a second error.
+  await page.getByRole("textbox", { name: "Outcome", exact: true }).fill("One more");
+  await page.locator(".task-form").getByRole("button", { name: "Add task", exact: true }).click();
+  const estimate = page.getByRole("dialog", { name: "How much time will this task take to complete?" });
+  if (await estimate.isVisible()) await estimate.getByRole("button", { name: "Add task", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Discard change", exact: true })).toBeFocused();
+  await expect(page.locator("#app > .error")).toBeHidden();
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Discard rejected changes", exact: true }).click();
+  await page.getByRole("button", { name: "Discard change", exact: true }).click();
   await expect(page.locator(".sync-bar")).toBeHidden();
   await expect.poll(() => pendingCount(page)).toBe(0);
   await expect(page.locator(".task")).toHaveCount(0);

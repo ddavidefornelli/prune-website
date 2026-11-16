@@ -66,6 +66,10 @@ export class PlanningClient {
     return this.queue?.blocked ?? false;
   }
 
+  get syncBlockedReason(): string | null {
+    return this.queue?.blockedReason ?? null;
+  }
+
   cachedDashboard(): Dashboard | null {
     return this.queue?.snapshot() ?? null;
   }

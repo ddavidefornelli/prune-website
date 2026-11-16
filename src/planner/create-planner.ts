@@ -24,6 +24,9 @@ export function createPlanner(client: PlanningClient) {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
   const [syncBlocked, setSyncBlocked] = createSignal(client.syncBlocked);
+  const [syncBlockedReason, setSyncBlockedReason] = createSignal(
+    client.syncBlockedReason,
+  );
   const [pauseReasonOpen, setPauseReasonOpen] = createSignal(false);
   const [clock, setClock] = createSignal(Date.now());
   const [clockOffset, setClockOffset] = createSignal(0);
@@ -108,11 +111,18 @@ export function createPlanner(client: PlanningClient) {
       setError("");
     });
     let success = false;
+    let pointToSyncBar = false;
     try {
       await action();
       success = true;
     } catch (cause) {
-      if (!disposed) setError(errorMessage(cause));
+      // While a rejected change waits to be discarded, the sync bar explains
+      // why nothing new saves; point to it instead of a second error.
+      if (!disposed && client.syncBlocked) {
+        setSyncBlocked(true);
+        setSyncBlockedReason(client.syncBlockedReason);
+        pointToSyncBar = true;
+      } else if (!disposed) setError(errorMessage(cause));
     } finally {
       if (!disposed) {
         try {
@@ -122,6 +132,12 @@ export function createPlanner(client: PlanningClient) {
           success = false;
         }
         if (!disposed) setBusy(false);
+        if (!disposed && pointToSyncBar) {
+          const discard =
+            document.querySelector<HTMLButtonElement>(".sync-bar button");
+          discard?.scrollIntoView({ block: "center", behavior: "smooth" });
+          discard?.focus({ preventScroll: true });
+        }
       }
     }
     return success && !disposed;
@@ -163,6 +179,7 @@ export function createPlanner(client: PlanningClient) {
   onMount(() => {
     const queueChanged = () => {
       setSyncBlocked(client.syncBlocked);
+      setSyncBlockedReason(client.syncBlockedReason);
       const next = client.cachedDashboard();
       if (next && !busy()) applyDashboard(next);
     };
@@ -198,6 +215,7 @@ export function createPlanner(client: PlanningClient) {
     focusLocked,
     completionLevel,
     syncBlocked,
+    syncBlockedReason,
     pauseReasonOpen,
     setPauseReasonOpen,
     notes,

@@ -1729,13 +1729,44 @@ textarea,
 .review-stats dd {
   font-size: 1.3333rem;
 }
+/* A change the server refused: what happened, and the one way forward. */
 .sync-bar {
-  padding: 12px;
-  border: 1px solid var(--warning);
-  line-height: 1.6;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.7778rem;
+  line-height: 1.45;
+}
+.sync-bar p {
+  flex: 1 1 16rem;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+.sync-bar strong {
+  font-weight: 700;
+}
+.sync-bar p span {
+  color: var(--muted);
 }
 .sync-bar button {
+  flex: none;
   min-height: 44px;
+  padding: 0 18px;
+  border-color: var(--action);
+  background: var(--action);
+  color: var(--on-accent);
+  font-size: 0.7222rem;
+}
+@media (max-width: 479px) {
+  .sync-bar button {
+    width: 100%;
+  }
 }
 
 @media (min-width: 760px) {

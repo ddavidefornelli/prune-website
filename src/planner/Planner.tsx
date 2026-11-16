@@ -146,11 +146,16 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
       >
         <PlannerNavigation planner={planner} />
         <div class="sync-bar" hidden={!planner.syncBlocked()}>
-          <span role="alert">
-            {planner.syncBlocked()
-              ? "Some recent changes could not be applied. They are kept on this device until you discard them."
-              : ""}
-          </span>
+          <p role="alert">
+            <Show when={planner.syncBlocked()}>
+              <strong>A change couldn&rsquo;t be saved</strong>
+              <span>
+                {planner.syncBlockedReason() ??
+                  "Your plan changed somewhere else."}{" "}
+                Discard it to keep working from your saved plan.
+              </span>
+            </Show>
+          </p>
           <button
             type="button"
             disabled={planner.busy()}
@@ -158,7 +163,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
               void planner.discardPending();
             }}
           >
-            Discard rejected changes
+            Discard change
           </button>
         </div>
         <p class="error" role="alert" hidden={!planner.error()}>
