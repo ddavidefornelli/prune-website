@@ -40,7 +40,8 @@ test.describe("mobile planner", () => {
     await expect(page.getByRole("dialog", { name: "Why are you stopping?" })).toBeInViewport({ ratio: 1 });
     await expect(page.getByText("The more precise the reason, the faster you’ll improve.", { exact: false })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Why are you stopping?" })).not.toBeFocused();
-    await page.getByRole("group", { name: "Common reasons" }).getByRole("button", { name: "Taking a break", exact: true }).tap();
+    await page.getByRole("group", { name: "Where it came from" }).getByRole("button", { name: "Planned", exact: true }).tap();
+    await page.getByRole("group", { name: "Planned" }).getByRole("button", { name: "A planned break", exact: true }).tap();
     await expect(page.locator("#focus-timer")).toHaveClass(/is-paused/);
     await visitProfile(page);
     await expect(page.locator(".profile-page")).toBeVisible();

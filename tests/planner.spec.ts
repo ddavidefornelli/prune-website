@@ -311,3 +311,21 @@ test.describe("expired browser sessions", () => {
     expect(rpc.authorization).toMatch(/^Bearer /);
   });
 });
+
+test("stop reasons narrow from an area to a reason in two taps", async ({ page, backend }) => {
+  await openPlanner(page);
+  await addTask(page, "Find why I stop");
+  await synced(page);
+  await page.getByRole("button", { name: "Start focus", exact: true }).click();
+  await page.locator("#focus-timer").click();
+  const areas = page.getByRole("group", { name: "Where it came from" });
+  await expect(areas.getByRole("button")).toHaveText(["Inside me", "The task", "People", "Screens", "Surroundings", "Planned"].map((area) => new RegExp(`^${area}`)));
+  await areas.getByRole("button", { name: "Screens", exact: true }).click();
+  const screens = page.getByRole("group", { name: "Screens" });
+  await expect(screens.getByRole("button", { name: "A notification", exact: true })).toBeFocused();
+  await screens.getByRole("button", { name: "Other areas" }).click();
+  await areas.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("group", { name: "People" }).getByRole("button", { name: "A meeting", exact: true }).click();
+  await expect(page.locator(".pause-dialog")).toHaveCount(0);
+  await expect.poll(() => backend.stops).toContain("People: A meeting");
+});
