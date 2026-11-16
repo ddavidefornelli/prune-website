@@ -6,6 +6,7 @@ import {
   createUniqueId,
   Show,
   untrack,
+  For,
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import type { PlanningClient } from "../api";
@@ -21,6 +22,16 @@ import { TaskTitle } from "./TaskTitle";
 const RING_RADIUS = 54;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
+/** One-tap reasons for the stop dialog; a written reason is still welcome. */
+export const PRESET_STOP_REASONS = [
+  "Taking a break",
+  "Got interrupted",
+  "Something more urgent came up",
+  "Stuck on it",
+  "Lost focus",
+  "Done for now",
+] as const;
+
 export function FocusView(props: {
   planner: PlannerState;
   client: PlanningClient;
@@ -32,6 +43,7 @@ export function FocusView(props: {
   const task = () => planner.data()?.activeTask;
   const [reason, setReason] = createSignal("");
   const reasonId = createUniqueId();
+  const reasonHintId = createUniqueId();
   const notesId = createUniqueId();
   const paused = () => task()?.startedAt === null;
   const remaining = createMemo(() => {
@@ -68,6 +80,17 @@ export function FocusView(props: {
       );
       if (success) planner.setPauseReasonOpen(true);
     }
+  }
+
+  function saveReason(text: string): void {
+    const active = task();
+    if (!active) return;
+    void planner.mutate(async () => {
+      await props.client.savePauseReason(active.id, text);
+      props.hints.dismiss("pause");
+      setReason("");
+      planner.setPauseReasonOpen(false);
+    });
   }
 
   return (
@@ -188,7 +211,12 @@ export function FocusView(props: {
               preventCancel
               onDismiss={() => {}}
               initialFocus={(dialog) =>
-                dialog.querySelector("textarea")?.focus()
+                // On touch screens a focused box would raise the keyboard over
+                // the one-tap reasons, so start on the first of those instead.
+                (window.matchMedia("(pointer: fine)").matches
+                  ? dialog.querySelector("textarea")
+                  : dialog.querySelector<HTMLElement>(".pause-preset")
+                )?.focus()
               }
             >
               <form
@@ -199,34 +227,53 @@ export function FocusView(props: {
                   input.setCustomValidity(
                     reason().trim()
                       ? ""
-                      : "Please write a reason for stopping.",
+                      : "Pick a reason or write one for stopping.",
                   );
                   if (!event.currentTarget.reportValidity()) return;
-                  void planner.mutate(async () => {
-                    await props.client.savePauseReason(active().id, reason());
-                    props.hints.dismiss("pause");
-                    setReason("");
-                    planner.setPauseReasonOpen(false);
-                  });
+                  saveReason(reason());
                 }}
               >
-                <label id={reasonId}>
-                  Why are you stopping?
-                  <textarea
-                    required
-                    // No native "Please fill out this field." hover tooltip.
-                    title=""
-                    maxLength={PLANNER_LIMITS.stopReasonLength}
-                    rows={3}
-                    placeholder="e.g. Taking a break or handling an interruption"
-                    value={reason()}
-                    disabled={planner.busy()}
-                    onInput={(event) => {
-                      event.currentTarget.setCustomValidity("");
-                      setReason(event.currentTarget.value);
-                    }}
-                  />
-                </label>
+                <div class="pause-heading">
+                  <h2 id={reasonId}>Why are you stopping?</h2>
+                  <p id={reasonHintId} class="muted">
+                    Tap one, or write exactly what happened. The more precise
+                    the reason, the faster you’ll improve.
+                  </p>
+                </div>
+                <div
+                  class="pause-presets"
+                  role="group"
+                  aria-label="Common reasons"
+                >
+                  <For each={PRESET_STOP_REASONS}>
+                    {(preset) => (
+                      <button
+                        type="button"
+                        class="pause-preset"
+                        disabled={planner.busy()}
+                        onClick={() => saveReason(preset)}
+                      >
+                        {preset}
+                      </button>
+                    )}
+                  </For>
+                </div>
+                <textarea
+                  aria-labelledby={reasonId}
+                  aria-describedby={reasonHintId}
+                  required
+                  // No native "Please fill out this field." hover tooltip.
+                  title=""
+                  maxLength={PLANNER_LIMITS.stopReasonLength}
+                  rows={3}
+                  placeholder="e.g. A colleague asked about the release, and I didn’t know where the spec was"
+                  value={reason()}
+                  disabled={planner.busy()}
+                  onInput={(event) => {
+                    event.currentTarget.setCustomValidity("");
+                    setReason(event.currentTarget.value);
+                  }}
+                />
                 <div class="pause-actions">
                   <button type="submit" disabled={planner.busy()}>
                     Save reason
