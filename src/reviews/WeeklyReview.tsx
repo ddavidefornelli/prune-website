@@ -49,7 +49,8 @@ function NextCheckIn(props: { data: WeeklyOverview; now: number }) {
       </Show>
       <p class="review-countdown-date">
         <Show when={props.data.checkIn}>
-          Every {WEEKDAYS[day()]}, the weekday after you started.{" "}
+          Your first check-in is three days after you started, then every{" "}
+          {WEEKDAYS[day()]}.{" "}
         </Show>
         Each check-in looks at the seven days before it: your trends, a plan for
         next week, and a short note.

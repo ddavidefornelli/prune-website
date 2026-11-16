@@ -29,7 +29,7 @@ const REVIEW: Stop = {
   view: "today",
   target: ".review-meter",
   title: "A weekly check-in",
-  text: "Once a week, on the weekday after you started, prune looks back at your last seven days: how your estimates held up, how many tasks you really finish, and a plan for next week.",
+  text: "Three days after you start, then once a week, prune looks back at your last seven days: how your estimates held up, how many tasks you really finish, and a plan for next week.",
 };
 
 const AROUND: readonly Stop[] = [

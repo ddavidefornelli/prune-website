@@ -114,7 +114,7 @@ export interface WeeklyOverview {
     nextUpdate: string;
     nextUpdateAt?: string;
   };
-  /** The check-in day (0 is Sunday; the weekday after the account started) and the plan accepted at the last one; absent from older servers. */
+  /** The check-in day (0 is Sunday; the weekday of the first check-in, three days after the account started) and the plan accepted at the last one; absent from older servers. */
   checkIn?: { day: number; plan: CheckInPlan | null };
   status:
     | "disabled"

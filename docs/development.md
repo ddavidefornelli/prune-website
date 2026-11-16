@@ -225,6 +225,8 @@ Reviews no longer run on Sundays. A review is due each time an owner completes 1
 
 **Since `20261117000100_check_in_day_after_start.sql` the day is fixed:** the check-in is on the weekday after the account started (`auth.users.created_at` in the owner's time zone, plus one day); `set_check_in_day` is refused and Overview has no picker (`check_in_day` stays in the table, unused). It also fixes repeated check-ins: a week used to be skipped only when a saved review ended inside it, so moving the day back pointed at an earlier unreviewed week and each change paid for another check-in. A week is now skipped when any saved review ends on or after its first day. Apply it after `20261116000100`.
 
+**Since `20261118000100_first_check_in_after_three_days.sql`:** the first check-in is due three days after the account started (S+3, with S the start day in the owner's time zone), then every seven days (S+10, S+17, …); the weekday in `checkIn.day` is the weekday of S+3. Before S+3 the window counts as covered, so nothing is sent and `week.nextUpdate` is S+3. Overlap skipping is unchanged, so accounts moving off the old weekday never re-send days. Apply it after `20261117000100`.
+
 **Deploy order:** apply the migration, redeploy `weekly-review`, then ship the client. An older client against the new backend falls back to the countdown it already had and simply ignores `checkIn`.
 
 ### Insight drops and the streak

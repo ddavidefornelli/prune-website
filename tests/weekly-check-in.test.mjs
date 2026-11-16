@@ -7,7 +7,13 @@ const fixture = () =>
     "20261112000500_reviews_every_ten_tasks.sql",
     "20261116000100_weekly_check_in.sql",
     "20261117000100_check_in_day_after_start.sql",
+    "20261118000100_first_check_in_after_three_days.sql",
   ]);
+const startedDaysAgo = (db, days) =>
+  db.rows("update auth.users set created_at = now() - make_interval(days => $1)", [days]);
+const localToday = async (db) =>
+  (await db.rows("select (now() at time zone 'Europe/Rome')::date::text d"))[0].d;
+const weekday = (day) => new Date(`${day}T12:00:00Z`).getUTCDay();
 const call = (db, action, args = {}) =>
   db.rows("select public.planner_call($1, $2::jsonb, 'Europe/Rome') r", [action, JSON.stringify(args)]).then((r) => r[0].r);
 const shift = (day, days) =>
@@ -22,18 +28,58 @@ async function addTask(db, plannedFor, completedOn = null) {
   return r;
 }
 
+test("the first check-in is three days after the account started", async () => {
+  const db = await fixture();
+  const today = await localToday(db);
+  for (const back of [0, 1, 2]) {
+    await startedDaysAgo(db, back);
+    const overview = await db.overview();
+    const first = shift(today, 3 - back);
+    assert.equal(overview.week.nextUpdate, first, `started ${back} days ago`);
+    assert.equal(overview.checkIn.day, weekday(first));
+    // Nothing is due yet, even with work in the days before.
+    await addTask(db, today, today);
+    assert.notEqual((await db.overview()).status, "pending", `started ${back} days ago`);
+    assert.equal((await db.input()).activity.tasks.length, 0);
+    await db.rows("delete from public.planner_tasks");
+  }
+  // On the third day the first check-in covers the seven days before it.
+  await startedDaysAgo(db, 3);
+  await addTask(db, shift(today, -1), shift(today, -1));
+  const overview = await db.overview();
+  assert.equal(overview.status, "pending");
+  assert.equal(overview.week.end, shift(today, -1));
+  assert.equal(overview.week.start, shift(today, -7));
+  assert.equal(overview.week.nextUpdate, today);
+  assert.equal(overview.checkIn.day, weekday(today));
+});
+
+test("after the first, a check-in is due every seven days", async () => {
+  const db = await fixture();
+  const today = await localToday(db);
+  for (let back = 3; back < 24; back++) {
+    await startedDaysAgo(db, back);
+    const overview = await db.overview();
+    const sinceFirst = (back - 3) % 7;
+    const due = shift(today, -sinceFirst);
+    assert.equal(overview.week.end, shift(due, -1), `started ${back} days ago`);
+    assert.equal(overview.week.nextUpdate, shift(due, 7), "nothing to check in on: next week");
+    assert.equal(overview.checkIn.day, weekday(due));
+  }
+});
+
 test("a check-in covers the seven days before the check-in day", async () => {
   const db = await fixture();
+  await startedDaysAgo(db, 9);
   let overview = await db.overview();
   assert.equal(overview.status, "no_data", "an empty week makes no AI request");
-  const today = (await db.rows("select (now() at time zone 'Europe/Rome')::date::text d"))[0].d;
-  const tomorrow = new Date(`${shift(today, 1)}T12:00:00Z`).getUTCDay();
-  assert.equal(overview.checkIn.day, tomorrow, "the weekday after the account started");
+  const today = await localToday(db);
+  assert.equal(overview.checkIn.day, weekday(shift(today, 1)), "the weekday of start + 3");
   assert.equal(overview.checkIn.plan, null);
   assert.equal(overview.progress, undefined, "no task-count unlocks any more");
   const { start, end } = overview.week;
   assert.equal(shift(start, 6), end);
-  assert.equal(new Date(`${shift(end, 1)}T12:00:00Z`).getUTCDay(), tomorrow);
+  assert.equal(end, shift(today, -7), "the first check-in was six days ago");
   assert.equal(overview.week.nextUpdate, shift(end, 8), "nothing to check in on: next week");
 
   await addTask(db, start, start);
@@ -66,14 +112,15 @@ test("a check-in covers the seven days before the check-in day", async () => {
 
 test("the day can't be changed, and no account change ever re-reviews covered days", async () => {
   const db = await fixture();
-  await assert.rejects(call(db, "set_check_in_day", { day: 3 }), /weekday after you started/);
+  await startedDaysAgo(db, 3);
+  await assert.rejects(call(db, "set_check_in_day", { day: 3 }));
   const { end } = (await db.overview()).week;
   await addTask(db, end, end);
   assert.equal(await db.finish(await db.reserve(await db.input())), true);
   // Whatever weekday the account started on, a window that begins on or before
   // the saved check-in's last day is already covered: no second paid call.
-  for (let back = 0; back < 7; back++) {
-    await db.rows("update auth.users set created_at = now() - make_interval(days => $1)", [back]);
+  for (let back = 3; back < 10; back++) {
+    await startedDaysAgo(db, back);
     const overview = await db.overview();
     assert.notEqual(overview.status, "pending", `started ${back} days ago`);
     assert.equal((await db.input()).activity.tasks.length, 0, `started ${back} days ago`);
@@ -85,7 +132,7 @@ test("the day can't be changed, and no account change ever re-reviews covered da
 test("the next week after a check-in is due again", async () => {
   const db = await fixture();
   // An account that started 13 days ago has a check-in due this week.
-  await db.rows("update auth.users set created_at = now() - interval '13 days'");
+  await startedDaysAgo(db, 13);
   const first = (await db.overview()).week;
   await addTask(db, first.start, first.start);
   assert.equal(await db.finish(await db.reserve(await db.input())), true);
