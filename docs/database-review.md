@@ -25,7 +25,7 @@ The web app and Mac app share a Supabase schema. The base schema lives in `../pr
 ## Fields that may look redundant
 
 - **`planner_tasks.is_priority` / API `isPriority`:** not used to rank tasks on the website, but used by Mac clients, legacy commands, task serialization and acknowledgement validation. Retain until a coordinated shared-protocol migration retires them.
-- **`planner_tasks.slot`:** implements the unique per-day task positions and three-task limit. It is not just a presentation preference.
+- **`planner_tasks.slot`:** implements the unique per-day task positions and the five-task limit (three until `20261119000100_five_tasks_per_day.sql`). It is not just a presentation preference.
 - **Resource labels, targets and kinds:** intentionally inert on the web, not unused on the Mac. Removing resource controls/helpers/styles does not authorize deleting the underlying metadata.
 - **`consent_version`, `consent_recorded_at`, AI/consent revision fields:** legacy naming does not make these removable. Existing review reservation and completion functions use the version/revision gates; other clients still write the preference metadata. These fields are not evidence of affirmative legal consent.
 - **`revision`, `last_event_at`, receipt inputs/results:** required by ordered outbox replay, clock validation, conflict detection and exactly-once mutation identities.

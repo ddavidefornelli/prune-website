@@ -227,6 +227,8 @@ Reviews no longer run on Sundays. A review is due each time an owner completes 1
 
 **Since `20261118000100_first_check_in_after_three_days.sql`:** the first check-in is due three days after the account started (S+3, with S the start day in the owner's time zone), then every seven days (S+10, S+17, …); the weekday in `checkIn.day` is the weekday of S+3. Before S+3 the window counts as covered, so nothing is sent and `week.nextUpdate` is S+3. Overlap skipping is unchanged, so accounts moving off the old weekday never re-send days. Apply it after `20261117000100`.
 
+**Five tasks a day (`20261119000100_five_tasks_per_day.sql`):** the shared backend kept three slots per day (`planner_tasks_slot_check` and the slot search in `planner_execute`) after the website moved to five, so a fourth task was rejected on sync. This migration widens the check to 1–5 and patches only the slot range and its message in `planner_execute`, refusing to run if that function's text has changed. Mac clients that assume three slots should be checked before relying on days with more than three tasks.
+
 **Deploy order:** apply the migration, redeploy `weekly-review`, then ship the client. An older client against the new backend falls back to the countdown it already had and simply ignores `checkIn`.
 
 ### Insight drops and the streak
