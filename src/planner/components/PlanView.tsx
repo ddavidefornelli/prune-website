@@ -211,16 +211,18 @@ export function PlanView(props: {
           </Index>
         </ol>
       </header>
-      <Show when={!tomorrow() && !firstPlan() && planner.data()} keyed>
-        {(data) => <StreakCounter streak={streakFor(data)} />}
-      </Show>
-      <Show when={!tomorrow() && props.review && planner.data()}>
-        <CheckInMeter
-          review={props.review!}
-          today={planner.data()!.today}
-          onOpen={() => planner.visit("habits")}
-        />
-      </Show>
+      <div class="today-panels">
+        <Show when={!tomorrow() && !firstPlan() && planner.data()} keyed>
+          {(data) => <StreakCounter streak={streakFor(data)} />}
+        </Show>
+        <Show when={!tomorrow() && props.review && planner.data()}>
+          <CheckInMeter
+            review={props.review!}
+            today={planner.data()!.today}
+            onOpen={() => planner.visit("habits")}
+          />
+        </Show>
+      </div>
       <Show when={!tomorrow() && props.checkInReady}>
         <aside class="review-unlocked" role="status">
           <p>

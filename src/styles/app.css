@@ -385,8 +385,41 @@ textarea,
   background: var(--surface);
   color: var(--text);
 }
-.streak + .review-meter {
-  margin-top: 8px;
+/* Today's panels: the streak and the check-in, stacked on phones and side
+   by side on laptops. */
+.today-panels {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 0;
+}
+.today-panels:empty {
+  display: none;
+}
+.today-panels > .streak,
+.today-panels > .review-meter {
+  min-width: 0;
+  margin: 0;
+}
+@media (min-width: 760px) {
+  .today-panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .today-panels > :only-child {
+    grid-column: 1 / -1;
+  }
+  /* Half a row is too narrow for the count and the week side by side. */
+  .today-panels:not(:has(> :only-child)) .streak-week {
+    flex-basis: 100%;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    justify-items: center;
+    margin: 0;
+  }
+  .today-panels > .review-meter {
+    display: grid;
+  }
+  .today-panels .check-in-meter {
+    align-content: space-between;
+  }
 }
 /* The streak: a flame that is lit while the run is alive, with the count
    beside it, and this week as seven embers. An hourglass sits on the flame
