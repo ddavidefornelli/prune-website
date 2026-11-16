@@ -2,13 +2,10 @@ import {
   createEffect,
   createSignal,
   Match,
-  on,
-  onCleanup,
   Show,
   Switch,
   untrack,
 } from "solid-js";
-import PixelBackground from "../components/PixelBackground";
 import { LoadingIndicator } from "../components/LoadingIndicator";
 import { Profile } from "../profile/Profile";
 import { createWeeklyReview } from "../reviews/create-weekly-review";
@@ -22,6 +19,7 @@ import { ShortcutSheet } from "./components/ShortcutSheet";
 import { VIEW_LABELS } from "./constants";
 import { createPlanner } from "./create-planner";
 import { createHints } from "./hints";
+import { completionInsight, type Insight } from "./insights";
 import {
   onboardingKey,
   shouldOfferOnboarding,
@@ -29,7 +27,7 @@ import {
   tourKey,
 } from "./onboarding";
 import { createShortcuts } from "./shortcuts";
-import type { Account } from "./types";
+import type { Account, Task } from "./types";
 
 export function Planner(props: { client: PlanningClient; account: Account }) {
   const client = untrack(() => props.client);
@@ -39,23 +37,39 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   const [firstRun, setFirstRun] = createSignal(false);
   const [shortcuts, setShortcuts] = createSignal(false);
   const [tour, setTour] = createSignal(false);
+  const [insight, setInsight] = createSignal<Insight | null>(null);
+  const [checkInReady, setCheckInReady] = createSignal(false);
+  // A check-in that lands while the planner is open is announced on Today.
+  let newestReview: number | null = null;
+  createEffect(() => {
+    const data = review.data();
+    if (!data) return;
+    const newest = data.reviews[0]?.generatedAt ?? 0;
+    if (newestReview !== null && newest > newestReview) setCheckInReady(true);
+    newestReview = newest;
+  });
+  createEffect(() => {
+    if (planner.view() === "habits") setCheckInReady(false);
+  });
   let firstRunChecked = false;
   let previousView = planner.view();
   createShortcuts(planner, () => setShortcuts(true));
-  // A finished task moves Today's review meter: re-read once the outbox has
-  // had a moment to sync it, and request the review when it reaches 10.
-  const completedTasks = () =>
-    planner.data()?.completions.reduce((sum, day) => sum + day.count, 0) ?? 0;
-  createEffect(
-    on(
-      completedTasks,
-      () => {
-        const timer = window.setTimeout(() => void review.checkDue(), 2500);
-        onCleanup(() => window.clearTimeout(timer));
-      },
-      { defer: true },
-    ),
-  );
+  /** A finished task may drop a fact about the owner's own habits. */
+  function taskCompleted(task: Task): void {
+    const data = planner.data();
+    if (!data) return;
+    const dropped = completionInsight(
+      localStorage,
+      props.account.accountKey,
+      task,
+      data,
+    );
+    if (dropped) setInsight(dropped);
+  }
+  // An insight belongs to the moment after finishing, not to the next task.
+  createEffect(() => {
+    if (planner.view() === "focus") setInsight(null);
+  });
 
   function finishFirstRun(): void {
     if (!firstRun()) return;
@@ -124,7 +138,6 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
 
   return (
     <>
-      <PixelBackground completionLevel={planner.completionLevel()} />
       <div
         id="app"
         data-view={planner.view()}
@@ -180,6 +193,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                   planner={planner}
                   client={props.client}
                   hints={hints}
+                  onCompleted={taskCompleted}
                 />
               </Match>
               <Match when={planner.view() === "habits"}>
@@ -201,6 +215,10 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                   firstRun={firstRun()}
                   onShortcuts={() => setShortcuts(true)}
                   review={review}
+                  insight={insight()}
+                  onDismissInsight={() => setInsight(null)}
+                  checkInReady={checkInReady()}
+                  onDismissCheckIn={() => setCheckInReady(false)}
                 />
               </Match>
             </Switch>

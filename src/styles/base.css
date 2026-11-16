@@ -1,61 +1,59 @@
-/* Pixelta's bundled license permits personal use only.
-   Obtain a commercial/webfont license before commercial deployment. */
-@font-face {
-  font-family: "Pixelta";
-  src: url("/fonts/pixelta.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Space Grotesk";
-  src:
-    url("/fonts/space-grotesk-variable.woff2") format("woff2"),
-    url("/fonts/space-grotesk-variable.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 300 700;
-  font-display: swap;
-}
-
-h1 {
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
-}
-
+/* Type is the system's own grotesk, tight and heavy for headings, with the
+   system monospace for clocks and counts. No webfonts are downloaded. */
 :root {
-  color-scheme: dark;
-  font-family:
-    "Space Grotesk",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  color-scheme: light;
+  --font:
+    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-family: var(--font);
   color: var(--text);
   background: var(--background);
   /* Fluid type: 18px up to 1280px wide, scaling to 22px at 2560px.
      rem-based so browser zoom and the user's font-size setting still apply. */
   font-size: clamp(1.125rem, 0.875rem + 0.3125vw, 1.375rem);
-  letter-spacing: 0.035em;
+  letter-spacing: -0.011em;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  /* Reference palette: near-black, charcoal, warm ivory, and blood red. */
-  /* Matches the background artwork's own black, so its edges never show. */
-  --background: #000000;
-  --surface: #1e1e1e;
-  --surface-hover: #292825;
-  --text: #efeee7;
-  --blood-red: #d4535b;
-  /* Red is reserved for the one main action on a screen (see --action). */
-  --action: var(--blood-red);
-  --action-hover: #e2666e;
+  /* Palette: a light grey page, white cards, near-black ink. */
+  --background: #f2f2f2;
+  --surface: #ffffff;
+  --surface-hover: #f6f6f6;
+  --text: #0b0b0b;
+  --muted: #6e6e6e;
+  --border: #e3e3e3;
   --taupe: color-mix(in srgb, var(--text) 45%, var(--border));
-  --muted: #b6afa2;
-  --border: #393630;
+  /* Ink on a black control. */
+  --on-accent: #ffffff;
   --accent: var(--text);
+  /* The one main action on a screen is a black pill (see --action). */
+  --action: var(--text);
+  --action-hover: #2b2b2b;
+  /* Done, streaks and the activity calendar. */
+  --positive: #34c759;
+  /* The streak's flame, bottom to tip. */
+  --flame-low: #ff3b1f;
+  --flame-mid: #ff8a00;
+  --flame-high: #ffd23f;
+  --flame-core: #fff4c2;
+  /* The pearl: the timer's face and the light behind a finished day. */
+  --pearl: #b7b2f4;
+  --pearl-pale: #e4e2fb;
+  --pearl-deep: #7d74ec;
   --success: var(--text);
   --warning: var(--muted);
   --error: var(--text);
+  /* Shape: soft cards, softer controls, pill buttons. */
+  --radius-card: 20px;
+  --radius-control: 14px;
+  --radius-pill: 999px;
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px rgb(0 0 0 / 0.08);
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.035em;
 }
 * {
   box-sizing: border-box;
@@ -66,7 +64,6 @@ h1 {
 .privacy-policy-button {
   padding: 0;
   border: 0;
-  border-radius: 0;
   background: transparent;
   color: var(--accent);
   font: inherit;
@@ -85,14 +82,15 @@ h1 {
   color: inherit;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
 }
 .privacy-dialog[open] {
   display: flex;
   flex-direction: column;
 }
 .privacy-dialog::backdrop {
-  background: #000a;
+  background: rgb(0 0 0 / 0.32);
 }
 .privacy-dialog-header {
   display: flex;
@@ -197,7 +195,6 @@ h1 {
   min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0;
 }
 .profile-stat dt {
   color: var(--muted);
@@ -280,7 +277,7 @@ nav {
   padding: 5px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: var(--radius-pill);
 }
 nav::before {
   content: "";
@@ -292,7 +289,7 @@ nav::before {
   height: var(--selection-height, 0px);
   transform: translate3d(var(--selection-left, 5px), 0, 0);
   background: var(--accent);
-  border-radius: 0;
+  border-radius: var(--radius-pill);
   pointer-events: none;
 }
 nav.has-selection::before {
@@ -321,12 +318,12 @@ button:hover:not(:disabled) {
 }
 button[aria-current],
 button[aria-current]:hover:not(:disabled) {
-  color: #000;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
 button[type="submit"] {
-  color: #000;
+  color: var(--on-accent);
   background: var(--action);
   border-color: var(--action);
 }
@@ -341,7 +338,6 @@ nav button {
   word-spacing: 0.12em;
   background: transparent;
   border-color: transparent;
-  border-radius: 0;
   color: var(--muted);
   transition: color 180ms ease;
 }
@@ -352,7 +348,7 @@ nav button:hover:not(:disabled) {
 }
 nav button[aria-current],
 nav button[aria-current]:hover:not(:disabled) {
-  color: #000;
+  color: var(--on-accent);
   background: transparent;
   border-color: transparent;
 }
@@ -363,7 +359,7 @@ nav button.day-complete {
   color: var(--text);
 }
 nav.today-complete-selected button.day-complete[aria-current] {
-  color: #000;
+  color: var(--on-accent);
 }
 button:disabled {
   opacity: 0.5;
@@ -377,13 +373,14 @@ button:disabled {
   outline-offset: 3px;
 }
 ::selection {
-  color: #000;
+  color: var(--on-accent);
   background: var(--accent);
 }
 h1 {
   font-size: clamp(1.7778rem, 4vw, 2.4444rem);
-  font-weight: 600;
-  letter-spacing: 0.025em;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
   margin: 12px 0;
 }
 .plan-heading {
@@ -399,7 +396,7 @@ h1 {
 }
 h2 {
   font-size: 1.0556rem;
-  font-weight: 550;
+  font-weight: 600;
   margin: 0 0 8px;
   overflow-wrap: anywhere;
 }
@@ -408,7 +405,6 @@ h2 {
   max-width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 0;
   background: transparent;
   font: inherit;
   letter-spacing: inherit;
@@ -549,7 +545,6 @@ textarea::placeholder {
   color: var(--error);
   padding: 12px;
   border: 1px solid currentColor;
-  border-radius: 0;
 }
 .error:empty {
   display: none;
@@ -595,7 +590,7 @@ textarea::placeholder {
 }
 .timer circle {
   fill: none;
-  stroke-width: 6;
+  stroke-width: 1.75;
 }
 .timer-track {
   stroke: var(--border);
@@ -611,9 +606,11 @@ textarea::placeholder {
   text-align: center;
 }
 .timer-value {
+  font-family: var(--mono);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   font-size: clamp(1.6667rem, 8vw, 3.1111rem);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
 }
 .timer-caption {
   font-size: 0.8333rem;
@@ -640,7 +637,7 @@ textarea::placeholder {
   background: var(--surface);
 }
 .pause-dialog::backdrop {
-  background: rgb(0 0 0 / 70%);
+  background: rgb(0 0 0 / 0.32);
 }
 .pause-form {
   margin: 0;
@@ -704,7 +701,6 @@ textarea {
 .activity-card {
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 0;
   background: var(--surface);
 }
 /* Same month grid as the landing page preview: Monday first, wide cells. */
@@ -725,30 +721,32 @@ textarea {
   display: block;
   aspect-ratio: 1.7;
   min-width: 0;
-  border: 1px solid #1f1d1b;
-  border-radius: 0;
-  background: #141312;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
 }
-/* Solid reds: translucent ones turned muddy over the grey card. */
+/* One green, five strengths. */
 .activity-level-1 {
-  background: #6e1a24;
-  border-color: #7d1f2a;
+  background: color-mix(in srgb, var(--positive) 22%, var(--surface));
 }
 .activity-level-2 {
-  background: #bb2a39;
-  border-color: #c9303f;
+  background: color-mix(in srgb, var(--positive) 42%, var(--surface));
 }
 .activity-level-3 {
-  background: #ff3b4e;
-  border-color: #ff5566;
+  background: color-mix(in srgb, var(--positive) 62%, var(--surface));
+}
+.activity-level-4 {
+  background: color-mix(in srgb, var(--positive) 82%, var(--surface));
+}
+.activity-level-5 {
+  background: var(--positive);
 }
 .activity-day.is-future {
   background: transparent;
-  border-color: #1a1918;
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .activity-day.is-today {
-  outline: 1px solid #ffffff70;
-  outline-offset: -1px;
+  outline: 1.5px solid var(--text);
+  outline-offset: 1px;
 }
 .activity-grid .activity-day:not(.is-future):hover,
 .activity-day:focus-visible {
@@ -802,9 +800,6 @@ textarea {
   padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-}
-.activity-stat:first-child {
-  border-left: 2px solid var(--blood-red);
 }
 .activity-stat dt {
   color: var(--muted);
@@ -881,7 +876,6 @@ textarea {
   margin-top: 24px;
   padding: clamp(24px, 5vw, 44px);
   border: 1px solid var(--border);
-  border-radius: 0;
   background: var(--background);
 }
 .weekly-overview .review-countdown-title {
@@ -906,11 +900,11 @@ textarea {
   gap: 10px;
   padding: 18px 6px 14px;
   text-align: center;
-  border: 1px solid #ffffff12;
-  border-radius: 0;
+  border: 1px solid var(--border);
   background: transparent;
 }
 .review-countdown-value {
+  font-family: var(--mono);
   font-size: clamp(1.4444rem, 5vw, 2.4444rem);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -928,14 +922,12 @@ textarea {
 .review-countdown-track {
   height: 3px;
   margin: 24px 0 12px;
-  border-radius: 0;
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   overflow: hidden;
 }
 .review-countdown-track > span {
   display: block;
   height: 100%;
-  border-radius: 0;
   background: var(--accent);
 }
 .review-countdown-date {
@@ -943,34 +935,8 @@ textarea {
   color: var(--muted);
   font-size: 0.6667rem;
 }
-.review-progress-count {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0;
-}
-.review-progress-of {
-  color: var(--muted);
-  font-size: 0.7778rem;
-}
-.review-progress-steps {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: clamp(3px, 1vw, 6px);
-  margin: 20px 0 12px;
-  padding: 0;
-  list-style: none;
-}
-.review-progress-steps > li {
-  height: 10px;
-  background: #ffffff12;
-  transition: background-color 240ms ease;
-}
-.review-progress-steps > li.is-done {
-  background: var(--accent);
-}
 .review-countdown.is-preparing {
-  border-color: #ffffff55;
+  border-color: var(--text);
 }
 .weekly-overview h4 {
   margin: 28px 0 12px;
@@ -995,7 +961,6 @@ textarea {
   margin-top: 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0;
 }
 .weekly-report > h4:first-child {
   margin-top: 0;
@@ -1008,7 +973,6 @@ textarea {
 .review-stats > div {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 0;
 }
 .review-stats dt {
   color: var(--muted);
@@ -1023,8 +987,7 @@ textarea {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 0;
-  background: #ffffff03;
+  background: var(--surface);
 }
 .review-timing-comparison.is-yellow {
   --timing-color: var(--taupe);
@@ -1069,7 +1032,6 @@ textarea {
 }
 .review-timing-comparison .review-bar-track {
   height: 22px;
-  border-radius: 0;
 }
 .review-timing-comparison .review-bar-actual {
   background: var(--timing-color);
@@ -1081,13 +1043,11 @@ textarea {
   height: 8px;
   margin-block: 6px;
   overflow: hidden;
-  background: #ffffff0a;
-  border-radius: 0;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
 }
 .review-bar-track > span {
   display: block;
   height: 100%;
-  border-radius: 0;
 }
 .review-bar-estimate {
   background: var(--accent);
@@ -1105,7 +1065,6 @@ textarea {
   margin-block: 18px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 0;
 }
 .review-reason-caption {
   display: flex;
@@ -1155,8 +1114,7 @@ textarea {
   counter-increment: review-action;
   padding: 18px;
   border: 1px solid var(--border);
-  background: #ffffff05;
-  border-radius: 0;
+  background: var(--surface);
   white-space: pre-line;
 }
 .weekly-improvements li::before {

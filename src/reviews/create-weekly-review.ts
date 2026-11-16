@@ -2,7 +2,7 @@ import { createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
 import type { PlanningClient } from "../planner/api";
 import { onWake } from "../shared/on-wake.ts";
 import { POLLING } from "../planner/constants.ts";
-import type { WeeklyOverview } from "../planner/types";
+import type { CheckInPlan, WeeklyOverview } from "../planner/types";
 
 /** AI requests never lock tasks or timers; preference writes invalidate older reads. */
 export function createWeeklyReview(
@@ -56,20 +56,51 @@ export function createWeeklyReview(
     } else if (visible() || !data()) await refresh();
   }
 
-  async function enable(): Promise<void> {
-    if (saving() || disposed) return;
+  /** A preference write: it invalidates any read still in flight. */
+  async function save(
+    write: () => Promise<WeeklyOverview>,
+    failure: string,
+  ): Promise<boolean> {
+    if (saving() || disposed) return false;
     version++;
     setSaving(true);
     setError("");
     try {
-      const next = await client.enableWeeklyAi();
+      const next = await write();
       if (!disposed) apply(next);
+      return true;
     } catch {
-      if (!disposed) setError("Could not save AI settings. Please try again.");
+      if (!disposed) setError(failure);
+      return false;
     } finally {
       if (!disposed) setSaving(false);
     }
-    if (!error() && !disposed && data()?.settings.enabled) await checkDue();
+  }
+
+  async function enable(): Promise<void> {
+    const saved = await save(
+      () => client.enableWeeklyAi(),
+      "Could not save AI settings. Please try again.",
+    );
+    if (saved && !disposed && data()?.settings.enabled) await checkDue();
+  }
+
+  /** Moving the day may make a check-in due now. */
+  async function setDay(day: number): Promise<void> {
+    if (
+      await save(
+        () => client.setCheckInDay(day),
+        "Could not change your check-in day. Please try again.",
+      )
+    )
+      await checkDue();
+  }
+
+  async function decide(plan: CheckInPlan): Promise<void> {
+    await save(
+      () => client.setCheckInPlan(plan),
+      "Could not save your plan. Please try again.",
+    );
   }
 
   createEffect(
@@ -99,7 +130,7 @@ export function createWeeklyReview(
     });
   });
 
-  return { data, saving, error, refresh, enable, checkDue };
+  return { data, saving, error, refresh, enable, checkDue, setDay, decide };
 }
 
 export type WeeklyReviewState = ReturnType<typeof createWeeklyReview>;

@@ -1,5 +1,5 @@
 /* First-run tour: a full-screen welcome in three scenes, centered on the
-   planner's own artwork. The planner stays hidden behind it, then fades in.
+   page. The planner stays hidden behind it, then fades in.
    Mobile first: one column with the button in thumb reach; on larger screens
    everything gathers into a single centered block. */
 
@@ -90,7 +90,8 @@
   list-style: none;
 }
 .tour-progress li {
-  height: 2px;
+  height: 4px;
+  border-radius: var(--radius-pill);
   background: var(--border);
   transition: background-color 500ms var(--ease-out);
 }
@@ -137,28 +138,12 @@
 .tour-caption h2:focus-visible {
   outline: none;
 }
-/* Once the background lights up, a soft shadow keeps the words readable. */
-.tour-copy::before {
-  content: "";
-  position: absolute;
-  inset: -32px -48px;
-  z-index: -1;
-  background: radial-gradient(closest-side, #000 50%, transparent);
-  opacity: 0;
-  transition: opacity 900ms ease;
-  pointer-events: none;
-}
-#app:not([data-completion-level="0"]) .tour-copy::before {
-  opacity: 0.92;
-}
 .tour-copy h2 {
   margin: 0;
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
   font-size: clamp(2.1rem, 10.5vw, 2.8rem);
-  font-weight: 400;
-  line-height: 1.02;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.055em;
   text-wrap: balance;
 }
 .tour-copy p {
@@ -184,7 +169,7 @@
   width: 100%;
   min-height: 54px;
   padding: 14px 20px;
-  color: #000;
+  color: var(--on-accent);
   font-size: 0.9444rem;
   font-weight: 550;
   background: var(--text);
@@ -192,8 +177,8 @@
 }
 @media (hover: hover) {
   .tour-primary:hover:not(:disabled) {
-    background: #fff;
-    border-color: #fff;
+    background: var(--action-hover);
+    border-color: var(--action-hover);
   }
 }
 
@@ -273,7 +258,8 @@
   list-style: none;
 }
 .scene-slots li {
-  height: 2px;
+  height: 4px;
+  border-radius: var(--radius-pill);
   background: var(--border);
   transition: background-color 500ms var(--ease-out) calc(var(--i) * 140ms);
 }
@@ -281,7 +267,7 @@
   background: color-mix(in srgb, var(--text) 45%, var(--border));
 }
 .scene-slots .is-done {
-  background: var(--text);
+  background: var(--positive);
   transition-delay: 0ms;
 }
 .scene-task-title {
@@ -321,7 +307,7 @@
     stroke 300ms ease;
 }
 .mini-dial.is-done .mini-dial-value {
-  stroke: var(--text);
+  stroke: var(--positive);
 }
 .mini-dial.is-done > span {
   color: var(--muted);
@@ -359,6 +345,7 @@
   padding: 0.5em 0.85em;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 0.9em;
 }
 .prune-scene-list li + li {
   margin-top: 0.42em;
@@ -375,7 +362,7 @@
     transform: translateY(0.8em);
   }
 }
-/* The cut: a red slash through every row that doesn't make the day… */
+/* The cut: a black slash through every row that doesn't make the day… */
 .prune-scene-list .is-cut {
   max-height: 3em;
   overflow: hidden;
@@ -461,8 +448,9 @@
   max-width: 100%;
   margin: 0;
   overflow: hidden;
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
   font-size: clamp(0.9rem, 7.5cqh, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -482,7 +470,7 @@
 }
 .focus-scene-timer circle {
   fill: none;
-  stroke-width: 5;
+  stroke-width: 3;
 }
 .focus-scene-track {
   stroke: var(--border);
@@ -492,9 +480,11 @@
   transition: stroke 400ms ease;
 }
 .focus-scene-digits {
+  font-family: var(--mono);
   font-size: clamp(0.8rem, 7.5cqh, 1.5rem);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 .focus-scene-hint {
   margin-top: 0.3em;
@@ -515,7 +505,8 @@
   line-height: 1.35;
   text-align: left;
   background: var(--surface);
-  border-left: 2px solid var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.9em;
   opacity: 0;
   transform: translateY(0.6em);
   transition:
@@ -576,7 +567,8 @@
 .light-scene-summary {
   margin: 0;
   font-size: clamp(0.7rem, 6cqh, 1.1rem);
-  font-weight: 300;
+  font-weight: 650;
+  letter-spacing: -0.035em;
   line-height: 1.2;
 }
 .light-scene-list {
@@ -596,6 +588,7 @@
   padding: 0.75em 0.9em;
   background: var(--surface);
   border: 1px solid color-mix(in srgb, var(--text) 50%, var(--border));
+  border-radius: 0.9em;
   transition: border-color 500ms ease;
 }
 .light-scene-list li.is-done {
@@ -616,9 +609,9 @@
 }
 @keyframes light-done {
   25% {
-    border-color: var(--text);
+    border-color: var(--pearl);
     box-shadow:
-      0 0 0 1px var(--text),
-      0 0 28px rgb(239 238 231 / 0.3);
+      0 0 0 1px var(--pearl),
+      0 0 28px rgb(139 130 255 / 0.35);
   }
 }

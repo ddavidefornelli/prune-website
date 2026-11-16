@@ -27,7 +27,7 @@ export interface Suggestion {
   basis: "carry_over" | "follow_up";
 }
 
-const SYSTEM_PROMPT = `You propose a day's tasks for a personal focus planner that allows at most three outcomes per day.
+const SYSTEM_PROMPT = `You propose a day's tasks for a personal focus planner that allows at most five outcomes per day.
 Base every proposal ONLY on the previous day's tasks. The previous day may still be in progress. Unfinished tasks (planned or active) should usually carry over,
 keeping their wording; use basis "carry_over" and estimate the remaining time from estimatedMinutes minus
 actualSeconds, never below 5 minutes. For completed tasks, propose the next step that continues the same work, project or area (for example the

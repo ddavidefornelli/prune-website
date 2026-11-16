@@ -24,12 +24,12 @@ interface Stop {
   text: string;
 }
 
-/** Why finishing tasks matters, shown from the first visit. */
+/** The weekly check-in, shown from the first visit. */
 const REVIEW: Stop = {
   view: "today",
   target: ".review-meter",
-  title: "Finish 10, get an AI review",
-  text: "Every 10 tasks you complete, AI reviews what slowed you down and what to try next. This bar counts them.",
+  title: "A weekly check-in",
+  text: "Once a week, on a day you pick, prune looks back at your last seven days: how your estimates held up, how many tasks you really finish, and a plan for next week.",
 };
 
 const AROUND: readonly Stop[] = [
@@ -53,7 +53,7 @@ const WITH_TASK: readonly Stop[] = [
     view: "today",
     target: ".task .editable-title",
     title: "Your task is here",
-    text: "Tap the title to edit it. Keep today to three tasks.",
+    text: "Tap the title to edit it. Keep today to five tasks.",
   },
   {
     view: "today",
@@ -76,7 +76,7 @@ const EMPTY: readonly Stop[] = [
   {
     view: "today",
     target: ".plan-heading",
-    title: "Three tasks a day",
+    title: "Five tasks a day",
     text: "That’s the whole rule. Fewer tasks, more focus.",
   },
   REVIEW,

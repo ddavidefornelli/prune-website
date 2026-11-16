@@ -12,18 +12,20 @@
 .landing h1 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(2.4rem, 7.2vw, 6rem);
-  font-weight: 400;
-  line-height: 1.04;
-  letter-spacing: 0.025em;
+  font-size: clamp(2.4rem, 7.2vw, 5.4rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
 }
 .landing-subtitle {
   max-width: 100%;
   margin: clamp(10px, 2svh, 20px) 0 clamp(18px, 3.5svh, 36px);
-  color: var(--text);
-  font-size: clamp(1rem, 1.6vw, 1.3333rem);
-  font-weight: 550;
-  line-height: 1.3;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.6vw, 1.2222rem);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 /* The demo keeps its natural layout and is scaled as a whole: about 60% of a
    desktop screen, 16:9, with the call to action still on the first screen. */
@@ -36,8 +38,6 @@
 }
 .landing .device-browser {
   zoom: var(--demo-zoom);
-  /* Neutral and dimmed, so the call to action is the one bright thing here. */
-  filter: grayscale(1) brightness(0.62);
 }
 @media (max-height: 860px) {
   .landing .product-preview {
@@ -58,20 +58,21 @@
   width: min(100%, 22rem);
   min-height: 56px;
   margin-top: clamp(20px, 4svh, 40px);
-  color: #000;
+  color: var(--on-accent);
   font-size: 1.0556rem;
   font-weight: 600;
   text-decoration: none;
-  background: var(--blood-red);
-  border: 1px solid var(--blood-red);
+  background: var(--action);
+  border: 1px solid var(--action);
+  border-radius: var(--radius-pill);
   transition:
     background-color 150ms ease,
     border-color 150ms ease;
 }
 @media (hover: hover) {
   .landing-cta:hover {
-    background: #e2666e;
-    border-color: #e2666e;
+    background: var(--action-hover);
+    border-color: var(--action-hover);
   }
 }
 .landing-cta:focus-visible {
@@ -184,6 +185,9 @@
   font-size: 0.8333rem;
   text-decoration: none;
 }
+.login-back:hover {
+  color: var(--text);
+}
 .login .auth-panel h1 {
   margin-bottom: 28px;
 }
@@ -232,7 +236,6 @@
 
 .product-preview {
   scroll-margin-top: 24px;
-  letter-spacing: 0.01em;
 }
 .mock-up-next {
   margin: 0;
@@ -274,11 +277,12 @@
 }
 .device-browser {
   overflow: hidden;
-  background: #050505;
+  background: var(--background);
   border: 1px solid var(--border);
-  box-shadow: 0 0 0 6px rgb(255 255 255 / 0.015);
+  border-radius: 28px;
+  box-shadow: var(--shadow-float);
 }
-/* The planner's own navigation, same look as the app's: an ivory block slides
+/* The planner's own navigation, same look as the app's: a black pill slides
    under the selected page. It is the switcher, so it stays clickable. */
 .screen-column {
   display: flex;
@@ -300,6 +304,7 @@
   padding: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
 }
 .app-nav-selection {
   position: absolute;
@@ -309,6 +314,7 @@
   left: 4px;
   width: calc((100% - 8px - 3 * var(--gap)) / 4);
   background: var(--text);
+  border-radius: var(--radius-pill);
   transform: translateX(calc(var(--index, 0) * (100% + var(--gap))));
   transition: transform 360ms var(--ease-out);
 }
@@ -330,7 +336,7 @@
   background: transparent;
 }
 #app .app-nav button[aria-selected="true"] {
-  color: #000;
+  color: var(--on-accent);
 }
 
 /* Invisible: its 6s animation only times autoplay (pausing on hover and off
@@ -360,7 +366,7 @@
   position: relative;
   height: 31rem;
   padding: 24px 20px;
-  background: #000;
+  background: var(--background);
 }
 .screen-panel {
   position: absolute;
@@ -433,8 +439,9 @@
 .mock-summary {
   margin: 0;
   font-size: 1.05rem;
-  font-weight: 300;
-  line-height: 1.3;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 .mock-summary em {
@@ -450,7 +457,8 @@
   list-style: none;
 }
 .mock-slots li {
-  height: 2px;
+  height: 4px;
+  border-radius: var(--radius-pill);
   background: var(--border);
 }
 .mock-slots .is-planned {
@@ -460,7 +468,7 @@
   background: var(--muted);
 }
 .mock-slots .is-done {
-  background: var(--text);
+  background: var(--positive);
 }
 .screen-panel.is-active .mock-slots li {
   transform-origin: left;
@@ -481,6 +489,7 @@
   padding: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-control);
 }
 .mock-task.is-next {
   border-color: color-mix(in srgb, var(--text) 35%, var(--border));
@@ -520,7 +529,8 @@
   gap: 12px;
 }
 .mock-task-title {
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .mock-button {
   display: grid;
@@ -528,10 +538,12 @@
   min-height: 34px;
   padding: 6px 12px;
   font-size: 0.6667rem;
+  font-weight: 550;
   border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
 }
 .mock-button.is-primary {
-  color: #000;
+  color: var(--on-accent);
   background: var(--text);
   border-color: var(--text);
 }
@@ -558,10 +570,10 @@
 }
 .dial-value {
   stroke: var(--text);
-  stroke-linecap: square;
+  stroke-linecap: round;
 }
 .mock-dial.is-done .dial-value {
-  stroke: var(--text);
+  stroke: var(--positive);
 }
 .screen-panel.is-active .dial-value {
   animation: dial-in 1s var(--ease-out) 400ms both;
@@ -574,8 +586,9 @@
 
 .mock-focus-title {
   margin: 4px 0 0;
-  font-family: "Pixelta", "Space Grotesk", sans-serif;
   font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 .mock-timer {
   position: relative;
@@ -593,23 +606,25 @@
 }
 .mock-timer circle {
   fill: none;
-  stroke-width: 7;
+  stroke-width: 1.75;
 }
-.timer-track {
-  stroke: #1a1918;
+.mock-timer .timer-track {
+  stroke: var(--border);
 }
 /* Steps once a second: easing it would repaint the SVG every frame. */
 .timer-value {
   stroke: var(--text);
 }
 .timer-digits {
-  font-size: 1.6rem;
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 .timer-hint {
   margin-top: 4px;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--text) 62%, transparent);
   font-size: 0.5556rem;
 }
 .mock-label {
@@ -623,6 +638,7 @@
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-control);
 }
 .mock-caret {
   display: inline-block;
@@ -644,7 +660,8 @@
   display: grid;
   gap: 10px;
   padding: 14px;
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--taupe);
+  border-radius: var(--radius-control);
 }
 .mock-open-label {
   color: var(--muted);
@@ -656,6 +673,7 @@
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 10px;
 }
 .mock-suggestion small {
   color: var(--muted);
@@ -686,11 +704,13 @@
   padding: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-control);
 }
 .mock-stats dd {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 .mock-stats dt {
   color: var(--muted);
@@ -701,7 +721,8 @@
   gap: 6px;
   padding: 12px 14px;
   background: var(--surface);
-  border-left: 2px solid var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
 }
 
 .mock-calendar {
@@ -716,17 +737,17 @@
 }
 .calendar-cell {
   aspect-ratio: 1.7;
-  background: #141312;
-  border: 1px solid #1f1d1b;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
 }
 .calendar-cell.level-1 {
-  background: rgb(212 83 91 / 0.18);
+  background: color-mix(in srgb, var(--positive) 28%, var(--surface));
 }
 .calendar-cell.level-2 {
-  background: rgb(212 83 91 / 0.42);
+  background: color-mix(in srgb, var(--positive) 62%, var(--surface));
 }
 .calendar-cell.level-3 {
-  background: rgb(212 83 91 / 0.85);
+  background: var(--positive);
 }
 .screen-panel.is-active .calendar-cell {
   animation: cell-pop 500ms var(--ease-out) both;

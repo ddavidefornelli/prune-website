@@ -114,7 +114,7 @@ export function Login(props: LoginProps) {
         ← Back
       </a>
       <section class="auth-panel" aria-labelledby="login-title">
-        <h1 id="login-title">SIGN IN</h1>
+        <h1 id="login-title">Sign in</h1>
         <Show
           when={sentTo()}
           fallback={

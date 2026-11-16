@@ -8,7 +8,9 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 export const reviewDate = (day: string): string =>
   dateFormatter.format(new Date(`${day}T12:00:00Z`));
 export const reviewRange = (start: string, end: string): string =>
-  `${reviewDate(start)} – ${reviewDate(end)}`;
+  start === end
+    ? reviewDate(start)
+    : `${reviewDate(start)} – ${reviewDate(end)}`;
 
 /** Hide internal citations; structured evidence stays available separately. */
 export const reviewText = (text: string): string =>

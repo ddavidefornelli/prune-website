@@ -6,7 +6,7 @@ const GOOGLE = { name: "Continue with Google", exact: true } as const;
 test("the landing page is the title, subtitle, demonstration and one call to action", async ({ page, backend }) => {
   await page.goto("/");
   await expect(page).toHaveTitle("prune — Your day. Three priorities.");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("DO LESS. ACHIEVE MORE.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Do less. Achieve more.");
   await expect(page.getByRole("heading")).toHaveCount(1);
   await expect(page.locator(".landing-subtitle")).toContainText("Time is limited.");
   await expect(page.getByRole("tablist", { name: "App screens" })).toBeVisible();
@@ -20,7 +20,7 @@ test("the landing page is the title, subtitle, demonstration and one call to act
 
   await cta.click();
   await expect(page).toHaveURL("http://127.0.0.1:4173/login");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("SIGN IN");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
   await expect(page.getByRole("button", GOOGLE)).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Email address" })).toBeVisible();
   await expect(page.getByRole("checkbox")).toHaveCount(0);
@@ -34,7 +34,7 @@ test("the landing page is the title, subtitle, demonstration and one call to act
 
 test("opening /login directly shows the login page", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("SIGN IN");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
   await page.getByRole("link", { name: "← Back" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4173/");
   await expect(page.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
@@ -92,7 +92,7 @@ test.describe("a first sign-in", () => {
 
     // A new account lands in the tour, which ends by creating the first task.
     const tour = page.locator(".tour-popup");
-    await expect(tour.getByRole("heading")).toHaveText("Three tasks a day");
+    await expect(tour.getByRole("heading")).toHaveText("Five tasks a day");
     await finishTour(page);
     await expect(page.getByRole("button", { name: "Edit task title: Plan the week ahead" })).toBeVisible();
     await expect(tour).toHaveCount(0);
@@ -265,27 +265,11 @@ test("the cookie banner is a small corner card that never covers the button", as
   await expect(page.getByRole("region", { name: "Cookie preferences" })).toHaveCount(0);
 });
 
-test("the landing stays light: decodable compressed artwork, no planner mask", async ({ page }) => {
+test("the landing stays light: no background artwork and no webfont", async ({ page }) => {
   const requested: string[] = [];
   page.on("request", (request) => requested.push(new URL(request.url()).pathname));
   await openSignIn(page);
-  // An encoder can emit a file one engine decodes as solid black; check real pixels.
-  const mean = await page.evaluate(async () => {
-    const image = new Image();
-    image.src = "/prune-background.webp";
-    await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d")!;
-    context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) sum += data[i];
-    return sum / (data.length / 4);
-  });
-  expect(mean).toBeGreaterThan(40);
-  await expect.poll(() => requested.includes("/prune-background.webp") || requested.includes("/prune-background.png")).toBe(true);
-  expect(requested).not.toContain("/prune-background-mask.png");
-  expect(requested.filter((path) => path.endsWith(".ttf"))).not.toContain("/fonts/space-grotesk-variable.ttf");
+  await page.waitForLoadState("networkidle");
+  expect(requested.filter((path) => /prune-background|\/fonts\//.test(path))).toEqual([]);
+  expect(await page.evaluate(() => getComputedStyle(document.body, "::before").content)).toBe("none");
 });

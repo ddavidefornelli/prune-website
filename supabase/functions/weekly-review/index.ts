@@ -1,10 +1,10 @@
-// Supabase Edge Function (Deno): AI reviews, one per 10 completed tasks.
+// Supabase Edge Function (Deno): the weekly AI check-in, on the owner's check-in day.
 // Secrets: OPENAI_API_KEY, ALLOWED_ORIGINS and optional EXTRA_ALLOWED_ORIGINS
 // (added to, never replacing, the shared list); SUPABASE_URL, SUPABASE_ANON_KEY
 // and SUPABASE_SERVICE_ROLE_KEY are provided by the platform.
 //
 // This replaces the copy deployed from ../pro. The database decides which tasks
-// a review covers (planner_review_input) and enforces one paid call per batch.
+// a review covers (planner_review_input) and enforces one paid call per check-in.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { ApiError } from "../../../server/http.ts";
 import {

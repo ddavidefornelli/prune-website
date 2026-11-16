@@ -10,7 +10,12 @@ test.describe("signed in", () => {
     ];
     await openPlanner(page);
     const section = page.getByRole("region", { name: "Suggested from yesterday" });
-    await expect(section).toContainText("Unfinished · 25 min");
+    // Each suggestion fills an open slot, as on the landing page.
+    await expect(section.locator(".open-slot")).toHaveCount(2);
+    await expect(section.locator(".open-slot").first()).toContainText("Open slot");
+    await expect(section.locator(".open-slot").first()).toContainText("Carry over from yesterday");
+    await expect(section.locator(".open-slot").first()).toContainText("Finish the quarterly report · 25 min");
+    await expect(section.locator(".open-slot").nth(1)).toContainText("Follow up from yesterday");
     await section.getByRole("button", { name: /Finish the quarterly report/ }).click();
     await expect(page.getByRole("button", { name: "Edit task title: Finish the quarterly report", exact: true })).toBeVisible();
     await expect.poll(() => backend.data.todayTasks.map((task) => [task.outcome, task.estimatedMinutes]))
@@ -30,6 +35,7 @@ test.describe("signed in", () => {
     await openPlanner(page);
     await page.getByRole("navigation").getByRole("button", { name: "Tomorrow", exact: true }).click();
     const section = page.getByRole("region", { name: "Suggested from today" });
+    await expect(section).toContainText("Follow up from today");
     await section.getByRole("button", { name: /Review the launch checklist/ }).click();
     await expect.poll(() => backend.data.tomorrowTasks.map((task) => [task.outcome, task.estimatedMinutes]))
       .toEqual([["Review the launch checklist", 20]]);

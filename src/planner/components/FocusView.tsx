@@ -12,6 +12,7 @@ import type { PlanningClient } from "../api";
 import { PLANNER_LIMITS } from "../constants";
 import type { PlannerState } from "../create-planner";
 import type { Hints } from "../hints";
+import type { Task } from "../types";
 import { trackedSeconds } from "../task-model";
 import { formatDuration } from "../time";
 import { TaskTitle } from "./TaskTitle";
@@ -23,6 +24,8 @@ export function FocusView(props: {
   planner: PlannerState;
   client: PlanningClient;
   hints: Hints;
+  /** A task was finished here, on this device, and the plan is up to date. */
+  onCompleted?: (task: Task) => void;
 }) {
   const planner = untrack(() => props.planner);
   const task = () => planner.data()?.activeTask;
@@ -40,6 +43,9 @@ export function FocusView(props: {
       : 0;
   });
   const displayTime = () => formatDuration(remaining());
+  /** The face drops the hours while there are none: 29:53, not 00:29:53. */
+  const clockTime = () =>
+    remaining() >= 3600 ? displayTime() : displayTime().slice(3);
 
   // A live tab title keeps the session visible from any other tab.
   const baseTitle = document.title;
@@ -99,11 +105,16 @@ export function FocusView(props: {
                   type="button"
                   disabled={planner.busy()}
                   onClick={() => {
-                    void planner.mutate(async () => {
-                      await props.client.complete(active().id);
-                      planner.setPauseReasonOpen(false);
-                      planner.visit("today");
-                    });
+                    let done: Task | undefined;
+                    void planner
+                      .mutate(async () => {
+                        done = await props.client.complete(active().id);
+                        planner.setPauseReasonOpen(false);
+                        planner.visit("today");
+                      })
+                      .then((success) => {
+                        if (success && done) props.onCompleted?.(done);
+                      });
                   }}
                 >
                   Complete task
@@ -139,15 +150,31 @@ export function FocusView(props: {
                 />
               </svg>
               <span class="timer-face">
-                <span class="timer-value" id="focus-time">
-                  {displayTime()}
-                </span>
-                <span class="timer-caption">
+                <span class="timer-label">
                   {paused()
-                    ? "Paused · Tap to resume"
+                    ? "Paused"
                     : remaining() === 0
-                      ? "Time is up · Tap to pause"
-                      : "remaining · Tap to pause"}
+                      ? "Time is up"
+                      : "Remaining"}
+                </span>
+                <span class="timer-value" id="focus-time">
+                  {clockTime()}
+                </span>
+                <span class="timer-caption" aria-hidden="true">
+                  <svg viewBox="0 0 12 12" class="timer-icon">
+                    <Show
+                      when={paused()}
+                      fallback={
+                        <>
+                          <rect x="2" y="1.5" width="2.6" height="9" rx="1" />
+                          <rect x="7.4" y="1.5" width="2.6" height="9" rx="1" />
+                        </>
+                      }
+                    >
+                      <path d="M3 1.8v8.4a.8.8 0 0 0 1.2.7l7-4.2a.8.8 0 0 0 0-1.4l-7-4.2A.8.8 0 0 0 3 1.8Z" />
+                    </Show>
+                  </svg>
+                  {paused() ? "Resume" : "Pause"}
                 </span>
               </span>
             </button>

@@ -1,32 +1,41 @@
 import { createMemo, createUniqueId, For, Show, untrack } from "solid-js";
 import type { WeeklyOverview } from "../planner/types";
+import { WEEKDAYS } from "./check-in";
+import { CheckIn } from "./CheckIn";
 import type { WeeklyReviewState } from "./create-weekly-review";
-import { reviewRange } from "./format";
+import { reviewRange, reviewText } from "./format";
 import { reviewCountdown } from "./review-countdown";
-import { ReviewReport } from "./ReviewReport";
 
 const COUNTDOWN_LABELS = ["Days", "Hours", "Minutes", "Seconds"] as const;
 
-function ReviewCountdown(props: { data: WeeklyOverview; now: number }) {
+function NextCheckIn(props: {
+  data: WeeklyOverview;
+  now: number;
+  state: WeeklyReviewState;
+}) {
+  const selectId = createUniqueId();
   const countdown = createMemo(() =>
     reviewCountdown(props.data.week, props.now),
   );
   const preparing = () =>
     props.data.status === "pending" || props.data.status === "running";
+  const day = () => props.data.checkIn?.day ?? 0;
   return (
     <section
       class="review-countdown"
       classList={{ "is-preparing": preparing() }}
     >
       <h3 class="review-countdown-title">
-        {preparing() ? "Preparing your review…" : "Next review"}
+        {preparing()
+          ? "Writing your check-in…"
+          : `Next check-in · ${WEEKDAYS[day()]}`}
       </h3>
       <Show when={!preparing() && countdown()}>
         <div
           class="review-countdown-clock"
           role="timer"
           aria-live="off"
-          aria-label={`${countdown()?.values[0]} days, ${countdown()?.values[1]} hours, ${countdown()?.values[2]} minutes, ${countdown()?.values[3]} seconds until your next weekly review`}
+          aria-label={`${countdown()?.values[0]} days, ${countdown()?.values[1]} hours, ${countdown()?.values[2]} minutes, ${countdown()?.values[3]} seconds until your next check-in`}
         >
           <For each={COUNTDOWN_LABELS}>
             {(label, index) => (
@@ -42,61 +51,28 @@ function ReviewCountdown(props: { data: WeeklyOverview; now: number }) {
         <div class="review-countdown-track" aria-hidden="true">
           <span style={{ width: `${(countdown()?.progress ?? 0) * 100}%` }} />
         </div>
-        <p class="review-countdown-date" hidden={!countdown()?.due}>
-          Checking for your review…
-        </p>
       </Show>
-    </section>
-  );
-}
-
-/** Reviews come every 10 completed tasks; servers before that change send no progress. */
-function ReviewProgress(props: {
-  data: WeeklyOverview;
-  progress: { completed: number; target: number };
-}) {
-  const preparing = () =>
-    props.data.status === "pending" || props.data.status === "running";
-  const left = () =>
-    Math.max(0, props.progress.target - props.progress.completed);
-  return (
-    <section
-      class="review-countdown review-progress"
-      classList={{ "is-preparing": preparing() }}
-    >
-      <h3 class="review-countdown-title">
-        {preparing() ? "Preparing your review…" : "Next AI review"}
-      </h3>
-      <Show when={!preparing()}>
-        <p class="review-progress-count">
-          <span class="review-countdown-value">{props.progress.completed}</span>
-          <span class="review-progress-of">
-            / {props.progress.target} tasks done
-          </span>
-        </p>
-        <ol
-          class="review-progress-steps"
-          role="progressbar"
-          aria-label="Completed tasks toward your next AI review"
-          aria-valuemin={0}
-          aria-valuemax={props.progress.target}
-          aria-valuenow={props.progress.completed}
-        >
-          <For each={Array.from({ length: props.progress.target })}>
-            {(_, index) => (
-              <li
-                classList={{
-                  "is-done": index() < props.progress.completed,
-                }}
-              />
-            )}
-          </For>
-        </ol>
-        <p class="review-countdown-date">
-          Complete {left()} more {left() === 1 ? "task" : "tasks"} to get your
-          next review.
-        </p>
+      <Show when={props.data.checkIn}>
+        <div class="check-in-day">
+          <label for={selectId}>Check-in day</label>
+          <select
+            id={selectId}
+            value={day()}
+            disabled={props.state.saving() || preparing()}
+            onChange={(event) =>
+              void props.state.setDay(Number(event.currentTarget.value))
+            }
+          >
+            <For each={WEEKDAYS}>
+              {(name, index) => <option value={index()}>{name}</option>}
+            </For>
+          </select>
+        </div>
       </Show>
+      <p class="review-countdown-date">
+        Each check-in looks at the seven days before it: your trends, a plan for
+        next week, and a short note.
+      </p>
     </section>
   );
 }
@@ -104,18 +80,14 @@ function ReviewProgress(props: {
 function statusMessage(data: WeeklyOverview): string {
   const messages: Record<WeeklyOverview["status"], string> = {
     disabled:
-      "AI reviews are off for this account. Turning them on sends selected planner activity to OpenAI for a review every 10 completed tasks and for daily task suggestions. Once on, they can’t be turned off.",
+      "AI check-ins are off for this account. Turning them on sends a week of planner activity to OpenAI once a week for your check-in note, and for daily task suggestions. Once on, they can’t be turned off.",
     unavailable:
-      "Hosted AI reviews are temporarily unavailable. Your planner is unaffected.",
-    pending: data.progress
-      ? "Your review of your last 10 tasks is queued."
-      : `Your review for ${reviewRange(data.week.start, data.week.end)} is queued.`,
-    running: data.progress
-      ? "Reviewing your last 10 tasks… You can keep using prune."
-      : `Reviewing ${reviewRange(data.week.start, data.week.end)}… You can keep using prune.`,
-    failed: `${data.error ?? "Your AI review could not be generated."} We’ll retry automatically. Your previous reviews are unchanged.`,
-    no_data: `No tasks or stops were recorded for ${reviewRange(data.week.start, data.week.end)}. No AI request was made.`,
-    up_to_date: "Your latest AI review is ready.",
+      "Hosted AI check-ins are temporarily unavailable. Your planner is unaffected.",
+    pending: `Your check-in for ${reviewRange(data.week.start, data.week.end)} is queued.`,
+    running: `Writing your check-in for ${reviewRange(data.week.start, data.week.end)}… You can keep using prune.`,
+    failed: `${data.error ?? "Your check-in could not be written."} We’ll retry automatically. Your previous check-ins are unchanged.`,
+    no_data: `Nothing was planned for ${reviewRange(data.week.start, data.week.end)}, so there was nothing to check in on. No AI request was made.`,
+    up_to_date: "Your latest check-in is ready.",
   };
   return messages[data.status];
 }
@@ -132,7 +104,7 @@ export function WeeklyReview(props: {
       aria-labelledby={titleId}
       aria-busy={review.saving()}
     >
-      <h2 id={titleId}>AI review</h2>
+      <h2 id={titleId}>Weekly check-in</h2>
       <Show when={review.error()}>
         <p class="error" role="alert">
           {review.error()}
@@ -149,7 +121,7 @@ export function WeeklyReview(props: {
       </Show>
       <Show
         when={review.data()}
-        fallback={<p class="muted">Loading your AI review…</p>}
+        fallback={<p class="muted">Loading your check-in…</p>}
       >
         {(data) => (
           <>
@@ -162,14 +134,7 @@ export function WeeklyReview(props: {
               </p>
             </Show>
             <Show when={data().settings.enabled}>
-              <Show
-                when={data().progress}
-                fallback={<ReviewCountdown data={data()} now={props.now} />}
-              >
-                {(progress) => (
-                  <ReviewProgress data={data()} progress={progress()} />
-                )}
-              </Show>
+              <NextCheckIn data={data()} now={props.now} state={review} />
             </Show>
             {/* Reviews can't be turned off; only accounts that opted out earlier are disabled. */}
             <Show when={data().status === "disabled"}>
@@ -180,24 +145,37 @@ export function WeeklyReview(props: {
                   void review.enable();
                 }}
               >
-                Turn on AI reviews
+                Turn on AI check-ins
               </button>
             </Show>
-            <For each={data().reviews}>
-              {(report, index) => (
-                <Show
-                  when={index() === 0}
-                  fallback={
-                    <details class="weekly-history">
-                      <summary>Previous review {index()}</summary>
-                      <ReviewReport review={report} />
-                    </details>
-                  }
-                >
-                  <ReviewReport review={report} />
-                </Show>
+            <Show when={data().reviews[0]}>
+              {(latest) => (
+                <CheckIn
+                  review={latest()}
+                  history={data().reviews}
+                  plan={data().checkIn?.plan ?? null}
+                  state={review}
+                />
               )}
-            </For>
+            </Show>
+            <Show when={data().reviews.length > 1}>
+              <h3 class="check-in-history-title">Earlier check-ins</h3>
+              <For each={data().reviews.slice(1)}>
+                {(report) => (
+                  <details class="weekly-history">
+                    <summary>
+                      {reviewRange(report.weekStart, report.weekEnd)}
+                    </summary>
+                    <p>{reviewText(report.analysis.summary)}</p>
+                    <ol class="weekly-improvements">
+                      <For each={report.analysis.improvements}>
+                        {(tip) => <li>{reviewText(tip)}</li>}
+                      </For>
+                    </ol>
+                  </details>
+                )}
+              </For>
+            </Show>
           </>
         )}
       </Show>

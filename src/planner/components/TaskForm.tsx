@@ -1,5 +1,8 @@
 import {
+  createEffect,
   createSignal,
+  on,
+  untrack,
   createUniqueId,
   onCleanup,
   onMount,
@@ -13,14 +16,29 @@ import { EstimateDial } from "./EstimateDial";
 interface TaskFormProps {
   busy: boolean;
   autofocus?: boolean;
+  /** Where the estimate starts; the weekly check-in's plan may pad it. */
+  defaultMinutes?: number;
   onCreate: (outcome: string, minutes: number) => Promise<boolean>;
 }
 
 export function TaskForm(props: TaskFormProps) {
+  const start = () => props.defaultMinutes ?? ESTIMATE.defaultMinutes;
   const [outcome, setOutcome] = createSignal("");
-  const [minutes, setMinutes] = createSignal<number>(ESTIMATE.defaultMinutes);
+  const [minutes, setMinutes] = createSignal<number>(untrack(start));
   const [mobileMinutes, setMobileMinutes] = createSignal<number>(
-    ESTIMATE.defaultMinutes,
+    untrack(start),
+  );
+  // A plan accepted while the form is empty moves its starting estimate.
+  createEffect(
+    on(
+      start,
+      (value) => {
+        if (outcome()) return;
+        setMinutes(value);
+        setMobileMinutes(value);
+      },
+      { defer: true },
+    ),
   );
   const [mobile, setMobile] = createSignal(
     window.matchMedia(MOBILE_QUERY).matches,
@@ -42,8 +60,8 @@ export function TaskForm(props: TaskFormProps) {
     if (props.busy) return;
     if (await props.onCreate(parsed().outcome, estimate)) {
       setOutcome("");
-      setMinutes(ESTIMATE.defaultMinutes);
-      setMobileMinutes(ESTIMATE.defaultMinutes);
+      setMinutes(start());
+      setMobileMinutes(start());
       setEstimating(false);
     }
   }

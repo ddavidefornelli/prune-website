@@ -12,6 +12,8 @@ export interface PlannerQueries {
   delete_account: { isDeleted: boolean };
   weekly_overview: WeeklyOverview;
   set_weekly_ai_enabled: WeeklyOverview;
+  set_check_in_day: WeeklyOverview;
+  set_check_in_plan: WeeklyOverview;
   month_stats: MonthStats;
   email_preferences: EmailPreferences;
   set_email_preferences: EmailPreferences;

@@ -96,11 +96,11 @@ export function buildReminderEmail(
   const unsubscribeUrl = unsubscribePageUrl(siteUrl, reminder);
   if (reminder.kind === "comeback") {
     const line =
-      "Your plan is empty. Pick up to three tasks for today and start the first one. It takes a minute.";
+      "Your plan is empty. Pick up to five tasks for today and start the first one. It takes a minute.";
     return {
       subject: "Hop back in",
       html: layout({
-        preheader: "Three tasks. One day. Hop back in.",
+        preheader: "Five tasks. One day. Hop back in.",
         heading: "Hop back in.",
         body: `<p style="margin:0;font-size:16px;line-height:24px;color:#efeee7;">${escapeHtml(line)}</p>`,
         button: "START NOW",

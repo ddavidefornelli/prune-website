@@ -24,8 +24,6 @@ export function Session() {
         {(account) => <Planner client={client} account={account()} />}
       </Match>
       <Match when={session.phase() === "ready"}>
-        {/* No pixel layer here: at level 0 it draws nothing, yet its 1.2 MB
-            mask would be fetched. The CSS artwork still shows behind. */}
         <div id="app" class="is-landing">
           <SignIn
             client={client}

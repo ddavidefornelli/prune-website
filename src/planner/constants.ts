@@ -1,6 +1,6 @@
 /** Browser UI bounds mirror independently enforced database constraints. */
 export const PLANNER_LIMITS = {
-  tasksPerDay: 3,
+  tasksPerDay: 5,
   outcomeLength: 500,
   stopReasonLength: 1000,
 } as const;

@@ -16,6 +16,7 @@ import type {
   MonthStats,
   Task,
   TaskSuggestion,
+  CheckInPlan,
   WeeklyOverview,
 } from "./types.ts";
 
@@ -273,6 +274,17 @@ export class PlanningClient {
   async weeklyOverview(): Promise<WeeklyOverview> {
     this.assertOpen();
     return this.query("weekly_overview");
+  }
+
+  /** Never queued, like every preference. */
+  async setCheckInDay(day: number): Promise<WeeklyOverview> {
+    this.assertOpen();
+    return this.query("set_check_in_day", { day });
+  }
+
+  async setCheckInPlan(plan: CheckInPlan): Promise<WeeklyOverview> {
+    this.assertOpen();
+    return this.query("set_check_in_plan", { ...plan });
   }
 
   /** One-way: the server refuses to turn weekly reviews off. */

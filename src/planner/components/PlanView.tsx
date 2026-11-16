@@ -9,16 +9,21 @@ import {
   untrack,
 } from "solid-js";
 import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
-import { ReviewMeter } from "../../reviews/ReviewMeter";
+import { plannedEstimate } from "../../reviews/check-in";
+import { CheckInMeter } from "../../reviews/CheckInMeter";
 import type { PlanningClient } from "../api";
 import { PLANNER_LIMITS } from "../constants";
 import type { PlannerState } from "../create-planner";
 import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
 import type { Hints } from "../hints";
+import type { Insight } from "../insights";
 import { STARTERS } from "../starters";
+import { streakFor } from "../streak";
 import { formatDuration, previousDay } from "../time";
 import { DoneBadge } from "./DoneBadge";
 import { EstimateDial } from "./EstimateDial";
+import { InsightDrop } from "./InsightDrop";
+import { StreakCounter } from "./StreakCounter";
 import { TaskForm } from "./TaskForm";
 import { TaskTitle } from "./TaskTitle";
 
@@ -30,8 +35,14 @@ export function PlanView(props: {
   hints: Hints;
   firstRun: boolean;
   onShortcuts: () => void;
-  /** Today only: progress toward the next AI review. */
+  /** The weekly check-in: Today's meter, and the plan both days follow. */
   review?: WeeklyReviewState;
+  /** Today only: a fact about the owner's habits, dropped by a finished task. */
+  insight?: Insight | null;
+  onDismissInsight?: () => void;
+  /** Today only: a check-in that just landed. */
+  checkInReady?: boolean;
+  onDismissCheckIn?: () => void;
 }) {
   const planner = untrack(() => props.planner);
   const tomorrow = () => planner.view() === "tomorrow";
@@ -86,6 +97,12 @@ export function PlanView(props: {
     desktop && props.hints.visits() >= 3 && !props.hints.seen("shortcuts");
   const create = (outcome: string, minutes: number) =>
     planner.mutate(() => props.client.create(outcome, day(), minutes));
+  // The plan from the last check-in: a soft daily target under the hard cap,
+  // and the estimate new tasks start at.
+  const plan = () => props.review?.data()?.checkIn?.plan ?? null;
+  const target = () => plan()?.dailyTarget ?? PLANNER_LIMITS.tasksPerDay;
+  const targetWord = () =>
+    ["one", "two", "three", "four", "five"][target() - 1] ?? "five";
   const openSlots = () =>
     Math.max(0, PLANNER_LIMITS.tasksPerDay - tasks().length);
   // Tomorrow's proposals come from today's plan, so refresh them when it changes.
@@ -127,7 +144,7 @@ export function PlanView(props: {
       if (tomorrow())
         return (
           <>
-            Pick tomorrow&rsquo;s <em>three</em>.
+            Pick tomorrow&rsquo;s <em>{targetWord()}</em>.
           </>
         );
       if (firstPlan())
@@ -139,16 +156,16 @@ export function PlanView(props: {
       const yesterday = yesterdayCount();
       return yesterday ? (
         <>
-          {yesterday} down yesterday. Today&rsquo;s <em>three</em>?
+          {yesterday} down yesterday. Today&rsquo;s <em>{targetWord()}</em>?
         </>
       ) : (
         <>
-          Pick today&rsquo;s <em>three</em>.
+          Pick today&rsquo;s <em>{targetWord()}</em>.
         </>
       );
     }
     if (tomorrow())
-      return `${tasks().length} of ${PLANNER_LIMITS.tasksPerDay} planned\u00a0· ${formatMinutes(remainingSeconds)} of focus`;
+      return `${tasks().length} of ${target()} planned\u00a0· ${formatMinutes(remainingSeconds)} of focus`;
     if (finishAt === null)
       return `All done\u00a0· ${formatMinutes(focusedSeconds)} focused`;
     return `${completed} of ${tasks().length} done\u00a0· ${formatMinutes(remainingSeconds)} left\u00a0· finish around ${formatClock(finishAt)}`;
@@ -176,14 +193,52 @@ export function PlanView(props: {
                   "is-done":
                     !tomorrow() && tasks()[index]?.status === "completed",
                   "is-active": tasks()[index]?.status === "active",
+                  "is-extra": index >= target(),
                 }}
               />
             )}
           </Index>
         </ol>
       </header>
-      <Show when={!tomorrow() && props.review}>
-        {(review) => <ReviewMeter review={review()} />}
+      <Show when={!tomorrow() && !firstPlan() && planner.data()} keyed>
+        {(data) => <StreakCounter streak={streakFor(data)} />}
+      </Show>
+      <Show when={!tomorrow() && props.review && planner.data()}>
+        <CheckInMeter
+          review={props.review!}
+          today={planner.data()!.today}
+          onOpen={() => planner.visit("habits")}
+        />
+      </Show>
+      <Show when={!tomorrow() && props.checkInReady}>
+        <aside class="review-unlocked" role="status">
+          <p>
+            <strong>Weekly check-in</strong>
+            Your trends and next week&rsquo;s plan are ready.
+          </p>
+          <button
+            type="button"
+            class="primary-button"
+            onClick={() => planner.visit("habits")}
+          >
+            Open it
+          </button>
+          <button
+            type="button"
+            class="text-button"
+            onClick={() => props.onDismissCheckIn?.()}
+          >
+            Later
+          </button>
+        </aside>
+      </Show>
+      <Show when={!tomorrow() && props.insight} keyed>
+        {(insight) => (
+          <InsightDrop
+            insight={insight}
+            onDismiss={() => props.onDismissInsight?.()}
+          />
+        )}
       </Show>
       <ul class="task-list">
         <For each={tasks()}>
@@ -266,35 +321,43 @@ export function PlanView(props: {
       </ul>
       <Show when={suggestions().length}>
         <section
-          class="starters suggestions"
+          class="open-slots"
           aria-label={`Suggested from ${tomorrow() ? "today" : "yesterday"}`}
         >
-          <p class="muted">From {tomorrow() ? "today" : "yesterday"}</p>
-          <div class="starter-list">
-            <For each={suggestions()}>
-              {(item) => (
+          <For each={suggestions()}>
+            {(item) => (
+              <div class="open-slot">
+                <span class="open-slot-label">Open slot</span>
                 <button
                   type="button"
+                  class="slot-suggestion"
                   disabled={planner.busy()}
                   onClick={() =>
                     void create(item.outcome, item.estimatedMinutes)
                   }
                 >
-                  <span>{item.outcome}</span>
-                  <span class="muted">
-                    {item.basis === "carry_over" ? "Unfinished · " : ""}
-                    {item.estimatedMinutes} min
+                  <small>
+                    {item.basis === "carry_over" ? "Carry over" : "Follow up"}{" "}
+                    from {tomorrow() ? "today" : "yesterday"}
+                  </small>
+                  <span>
+                    {item.outcome}
+                    <span class="slot-suggestion-minutes">
+                      {" "}
+                      · {item.estimatedMinutes} min
+                    </span>
                   </span>
                 </button>
-              )}
-            </For>
-          </div>
+              </div>
+            )}
+          </For>
         </section>
       </Show>
       <Show when={openSlots() > 0}>
         <TaskForm
           busy={planner.busy()}
           autofocus={firstPlan() && desktop}
+          defaultMinutes={plannedEstimate(plan()?.estimateFactor)}
           onCreate={create}
         />
       </Show>
@@ -362,7 +425,7 @@ export function PlanView(props: {
               <p class="evening-title">
                 Tomorrow&rsquo;s still <em>blank</em>.
               </p>
-              <p class="evening-note">Lock in three before today fades.</p>
+              <p class="evening-note">Lock in five before today fades.</p>
             </div>
             <div class="evening-actions">
               <button

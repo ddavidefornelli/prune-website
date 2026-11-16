@@ -78,7 +78,7 @@ test("the target day is passed to the loader and defaults to today", async () =>
 test("an empty yesterday or a full today never calls or charges the provider", async () => {
   for (const loaded of [
     input({ sourceTasks: [] }),
-    input({ plannedTasks: [task("a"), task("b"), task("c")] }),
+    input({ plannedTasks: [task("a"), task("b"), task("c"), task("d"), task("e")] }),
   ]) {
     const { handle, calls } = handler({ loadInput: async () => loaded });
     const response = await handle(post());
@@ -129,7 +129,7 @@ test("model output is clamped, deduplicated and limited to open slots", () => {
         { outcome: "Over the limit", estimatedMinutes: 30, basis: "follow_up" },
       ],
     },
-    input({ plannedTasks: [task("Already planned")] }),
+    input({ plannedTasks: [task("Already planned"), task("Two"), task("Three")] }),
   );
   assert.deepEqual(result, [
     { outcome: "Finish the draft", estimatedMinutes: 5, basis: "carry_over" },
@@ -142,7 +142,7 @@ test("provider requests send only titles, statuses and timings, without storing"
   const body = providerBody(input());
   assert.equal(body.store, false);
   const payload = JSON.parse(body.messages[1].content);
-  assert.equal(payload.maxSuggestions, 3);
+  assert.equal(payload.maxSuggestions, 5);
   assert.deepEqual(Object.keys(payload.previousDay[0]).sort(), [
     "actualSeconds",
     "estimatedMinutes",

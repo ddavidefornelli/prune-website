@@ -20,7 +20,7 @@ export function dashboard(): Dashboard {
   return { revision: 0, today: day(), tomorrow: new Date(Date.now() + 86400000).toISOString().slice(0, 10), todayTasks: [], tomorrowTasks: [], activeTask: null, canPlanTomorrow: true, completions: [], serverNow: Math.floor(Date.now() / 1000) };
 }
 function overview(): WeeklyOverview {
-  return { settings: { enabled: true }, model: "gpt-4.1-mini", available: true, week: { start: day(), end: day(), nextUpdate: day(), nextUpdateAt: new Date(Date.now() + 5 * 86400000).toISOString() }, progress: { completed: 3, target: 10 }, status: "no_data", error: null, reviews: [] };
+  return { settings: { enabled: true }, model: "gpt-4.1-mini", available: true, week: { start: day(), end: day(), nextUpdate: day(), nextUpdateAt: new Date(Date.now() + 5 * 86400000).toISOString() }, checkIn: { day: 0, plan: null }, status: "no_data", error: null, reviews: [] };
 }
 export function review(): WeeklyReview {
   return { weekStart: day(), weekEnd: day(), generatedAt: Math.floor(Date.now() / 1000), model: "gpt-4.1-mini", activity: { tasks: [], stops: [], totalStops: 0, omittedStops: 0 }, analysis: { summary: "A steady start.", mainReasons: [], improvements: ["Keep your first focus session small."] } };
@@ -120,6 +120,8 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (action === "queue_protocol") { await send({ version: state.protocolVersion }); return; }
       if (action === "dashboard") { await send({ ...state.data, serverNow: Math.floor(Date.now() / 1000) }); return; }
       if (action === "weekly_overview") { await send(state.weekly); return; }
+      if (action === "set_check_in_day") { state.weekly.checkIn = { day: args.day, plan: state.weekly.checkIn?.plan ?? null }; await send(state.weekly); return; }
+      if (action === "set_check_in_plan") { state.weekly.checkIn = { day: state.weekly.checkIn?.day ?? 0, plan: { estimateFactor: args.estimateFactor, dailyTarget: args.dailyTarget, decidedFor: args.decidedFor } }; await send(state.weekly); return; }
       if (action === "email_preferences") { await send(state.emailPreferences); return; }
       if (action === "set_email_preferences") {
         state.emailPreferences = { daily: args.daily === true, comeback: args.comeback === true };
@@ -139,8 +141,8 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       if (state.rejectWrites) { await send({ code: "PT409", message: "Another device changed your plan." }, 409); return; }
       if (state.receipts.has(args._requestId)) { await send(state.receipts.get(args._requestId)); return; }
       if (args._revision !== state.data.revision) { await send({ code: "PT409", message: "Planner revision changed." }, 409); return; }
-      if (action === "create_task" && [...state.data.todayTasks, ...state.data.tomorrowTasks].filter((task) => task.plannedFor === args.day).length >= 3) {
-        await send({ code: "PT400", message: "Plan at most three tasks." }, 400); return;
+      if (action === "create_task" && [...state.data.todayTasks, ...state.data.tomorrowTasks].filter((task) => task.plannedFor === args.day).length >= 5) {
+        await send({ code: "PT400", message: "Plan at most five tasks." }, 400); return;
       }
       const command: QueuedAction = { requestId: args._requestId, action, args, timezone: body.p_timezone, at: args._at, revision: args._revision };
       const previousTask = state.data.activeTask;

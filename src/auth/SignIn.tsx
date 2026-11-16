@@ -43,8 +43,8 @@ export function SignIn(props: SignInProps) {
       fallback={
         <div class="landing">
           <h1>
-            DO LESS. <br class="landing-break" />
-            ACHIEVE MORE.
+            Do less. <br class="landing-break" />
+            Achieve more.
           </h1>
           <p class="landing-subtitle">
             Time is limited. Stop wasting time on stuff that doesn't move you

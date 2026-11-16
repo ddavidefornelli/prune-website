@@ -93,6 +93,16 @@ export interface MonthStats {
   focusSeconds: number;
 }
 
+/** What the owner accepted at a weekly check-in. */
+export interface CheckInPlan {
+  /** Multiplies the default estimate for new tasks, 0.5 to 3. */
+  estimateFactor: number;
+  /** Tasks to plan a day, 1 to 5. */
+  dailyTarget: number;
+  /** The last day of the check-in week this answers. */
+  decidedFor: string;
+}
+
 export interface WeeklyOverview {
   developmentUnlimited?: boolean;
   settings: { enabled: boolean };
@@ -104,8 +114,8 @@ export interface WeeklyOverview {
     nextUpdate: string;
     nextUpdateAt?: string;
   };
-  /** Completed tasks toward the next review; absent from servers that still review weekly. */
-  progress?: { completed: number; target: number };
+  /** The check-in day (0 is Sunday) and the plan accepted at the last one; absent from older servers. */
+  checkIn?: { day: number; plan: CheckInPlan | null };
   status:
     | "disabled"
     | "unavailable"

@@ -19,7 +19,7 @@ const SCREENS = [
     id: "today",
     label: "Today",
     caption:
-      "Today: three tasks, the one up next, and when you'll be done if you start now.",
+      "Today: up to five tasks, the one up next, and when you'll be done if you start now.",
   },
   {
     id: "focus",
@@ -36,7 +36,7 @@ const SCREENS = [
     id: "overview",
     label: "Overview",
     caption:
-      "Overview: a completion calendar and a free AI review of what held you back, every 10 tasks.",
+      "Overview: a completion calendar and a free weekly check-in: how your estimates held up, what you really finish, and a plan for next week.",
   },
 ] as const;
 type ScreenId = (typeof SCREENS)[number]["id"];
@@ -80,7 +80,8 @@ function markInView(element: HTMLElement): void {
 
 function clock(seconds: number): string {
   const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+  const hours = Math.floor(seconds / 3600);
+  return `${hours ? `${pad(hours)}:` : ""}${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
 }
 
 export function ProductPreview() {
@@ -269,7 +270,7 @@ function TimerRing(props: { remaining: number; total: number }) {
         />
       </svg>
       <span class="timer-digits">{clock(props.remaining)}</span>
-      <span class="timer-hint">remaining · Tap to pause</span>
+      <span class="timer-hint">Remaining</span>
     </div>
   );
 }
@@ -375,8 +376,8 @@ function OverviewMock() {
       </dl>
       <CalendarGrid />
       <div class="mock-review-ready">
-        <p class="mock-up-next">AI review</p>
-        <span>Your review of your last 10 tasks is ready</span>
+        <p class="mock-up-next">Weekly check-in</p>
+        <span>Your plan for next week is ready</span>
       </div>
     </>
   );
