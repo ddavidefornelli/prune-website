@@ -126,10 +126,10 @@ export function PlannerTour(props: PlannerTourProps) {
     if (!target?.isConnected || disposed) return;
     const rect = target.getBoundingClientRect();
     Object.assign(highlight.style, {
-      left: `${rect.left - 5}px`,
-      top: `${rect.top - 5}px`,
-      width: `${rect.width + 10}px`,
-      height: `${rect.height + 10}px`,
+      left: `${Math.max(4, rect.left - 10)}px`,
+      top: `${rect.top - 8}px`,
+      width: `${Math.min(window.innerWidth - 8, rect.width + 20)}px`,
+      height: `${rect.height + 16}px`,
     });
     const box = popup.getBoundingClientRect();
     const left = Math.max(

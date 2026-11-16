@@ -29,6 +29,10 @@ import { TaskTitle } from "./TaskTitle";
 
 const DESKTOP_QUERY = "(hover: hover) and (min-width: 760px)";
 
+/** Joins summary phrases so a narrow screen breaks the line only between them. */
+const phrases = (...parts: string[]) =>
+  parts.map((part) => part.replace(/ /g, "\u00a0")).join("\u00a0· ");
+
 export function PlanView(props: {
   planner: PlannerState;
   client: PlanningClient;
@@ -165,10 +169,17 @@ export function PlanView(props: {
       );
     }
     if (tomorrow())
-      return `${tasks().length} of ${target()} planned\u00a0· ${formatMinutes(remainingSeconds)} of focus`;
+      return phrases(
+        `${tasks().length} of ${target()} planned`,
+        `${formatMinutes(remainingSeconds)} of focus`,
+      );
     if (finishAt === null)
-      return `All done\u00a0· ${formatMinutes(focusedSeconds)} focused`;
-    return `${completed} of ${tasks().length} done\u00a0· ${formatMinutes(remainingSeconds)} left\u00a0· finish around ${formatClock(finishAt)}`;
+      return phrases("All done", `${formatMinutes(focusedSeconds)} focused`);
+    return phrases(
+      `${completed} of ${tasks().length} done`,
+      `${formatMinutes(remainingSeconds)} left`,
+      `finish around ${formatClock(finishAt)}`,
+    );
   };
 
   return (
