@@ -1,3 +1,4 @@
+import { Logo } from "../components/Logo";
 import { batch, createSignal, For, Show, untrack } from "solid-js";
 import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import type { PlanningClient } from "../planner/api";
@@ -114,6 +115,7 @@ export function Login(props: LoginProps) {
         ← Back
       </a>
       <section class="auth-panel" aria-labelledby="login-title">
+        <Logo class="auth-logo" />
         <h1 id="login-title">Sign in</h1>
         <Show
           when={sentTo()}

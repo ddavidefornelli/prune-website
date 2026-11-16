@@ -2080,3 +2080,49 @@ textarea,
     transform: translateX(-16px);
   }
 }
+
+/* The logo: the plum mark and the name, on the landing and sign-in pages. */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+}
+.logo-mark {
+  flex: none;
+  border-radius: 10px;
+}
+.logo-name {
+  font-size: 1.3333rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.landing-logo {
+  margin: 0 auto clamp(8px, 2svh, 20px);
+}
+.landing-logo .logo-name {
+  font-size: 1.1111rem;
+}
+.auth-logo {
+  margin: 0 0 20px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing-logo .logo-mark {
+    animation: logo-hello 900ms var(--ease-out) 200ms both;
+    transform-origin: 50% 90%;
+  }
+}
+@keyframes logo-hello {
+  0% {
+    transform: scale(0.6) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}

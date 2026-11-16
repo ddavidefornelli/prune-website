@@ -1,3 +1,4 @@
+import { Logo } from "../components/Logo";
 import { createSignal, onCleanup, Show, untrack } from "solid-js";
 import { ProductPreview } from "../components/ProductPreview";
 import type { PlanningClient } from "../planner/api";
@@ -42,6 +43,7 @@ export function SignIn(props: SignInProps) {
       when={loginOpen()}
       fallback={
         <div class="landing">
+          <Logo class="landing-logo" size={30} />
           <h1>
             Do less. <br class="landing-break" />
             Achieve more.
