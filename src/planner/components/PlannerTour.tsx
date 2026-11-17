@@ -1,6 +1,5 @@
 import {
   createEffect,
-  For,
   createSignal,
   createUniqueId,
   onCleanup,
@@ -11,9 +10,7 @@ import {
 import { Dialog } from "../../components/Dialog";
 import type { PlannerView } from "../constants";
 import { errorMessage } from "../errors";
-import { ESTIMATE } from "../constants";
-import { parseQuickEntry } from "../quick-entry";
-import { STARTERS } from "../starters";
+import { MOBILE_QUERY } from "../constants";
 
 export type TourView = Exclude<PlannerView, "profile" | "focus">;
 
@@ -22,6 +19,8 @@ interface Stop {
   target: string;
   title: string;
   text: string;
+  /** Hug the content: leave the target's top padding out of the highlight. */
+  trimTop?: boolean;
 }
 
 /** The weekly check-in, shown from the first visit. */
@@ -83,24 +82,23 @@ const EMPTY: readonly Stop[] = [
   ...AROUND,
   {
     view: "today",
-    // The form is inside the popup; highlight the plan it fills, not a second form.
-    target: ".plan-heading",
-    title: "Add your first task",
-    text: "Your plan starts here. Write one, or pick an idea. Add a time like 45m to set the estimate.",
+    // Point at the task row the first task will fill, not the page title.
+    target: ".task-form",
+    trimTop: true,
+    title: "What’s the most important thing you have to do today?",
+    text: "Type it in the green box and press Add. Add a time like 45m to set the estimate.",
   },
 ];
 
 interface PlannerTourProps {
-  /** Read once: whether Today has a planned task to point at and start. */
+  /**
+   * Whether Today has a planned task. Read once to pick the tour; after that,
+   * a task appearing ends the empty tour, since its last step is adding one.
+   */
   hasTask: boolean;
   onVisit: (view: TourView) => void;
   onDone: (started: boolean) => void;
   onStart: () => Promise<void>;
-  /**
-   * The empty tour's last step: creating the first task is required, and is
-   * the only way to finish. Resolves false (with the reason) when it failed.
-   */
-  onCreate: (outcome: string, minutes: number) => Promise<string | null>;
 }
 
 /** Only measurement/positioning is imperative; coach-mark content stays reactive. */
@@ -108,12 +106,13 @@ export function PlannerTour(props: PlannerTourProps) {
   const [index, setIndex] = createSignal(0);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
-  const [outcome, setOutcome] = createSignal("");
   const headingId = createUniqueId();
   const hasTask = untrack(() => props.hasTask);
   const stops = hasTask ? WITH_TASK : EMPTY;
   const stop = () => stops[index()]!;
   const last = () => index() === stops.length - 1;
+  /** The empty tour's last step: the user types into the real task form. */
+  const writing = () => last() && !hasTask;
   let popup!: HTMLElement;
   let highlight!: HTMLDivElement;
   let arrow!: HTMLSpanElement;
@@ -124,32 +123,80 @@ export function PlannerTour(props: PlannerTourProps) {
 
   const position = () => {
     if (!target?.isConnected || disposed) return;
-    const rect = target.getBoundingClientRect();
+    const box0 = target.getBoundingClientRect();
+    const trim = stop().trimTop
+      ? parseFloat(getComputedStyle(target).paddingTop) || 0
+      : 0;
+    const rect = {
+      left: box0.left,
+      width: box0.width,
+      top: box0.top + trim,
+      bottom: box0.bottom,
+      height: box0.height - trim,
+    };
+    // Even breathing room on every side, kept inside the viewport.
+    const padX = writing() ? 12 : 10;
+    const padY = writing() ? 12 : 8;
+    const frameLeft = Math.max(4, rect.left - padX);
+    const frameRight = Math.min(
+      document.documentElement.clientWidth - 4,
+      rect.left + rect.width + padX,
+    );
+    const frameTop = rect.top - padY;
+    const frameBottom = rect.bottom + padY;
+    const frameWidth = frameRight - frameLeft;
+    const frameHeight = frameBottom - frameTop;
     Object.assign(highlight.style, {
-      left: `${Math.max(4, rect.left - 10)}px`,
-      top: `${rect.top - 8}px`,
-      width: `${Math.min(window.innerWidth - 8, rect.width + 20)}px`,
-      height: `${rect.height + 16}px`,
+      left: `${frameLeft}px`,
+      top: `${frameTop}px`,
+      width: `${frameWidth}px`,
+      height: `${frameHeight}px`,
     });
+    // The overlay keeps blocking the page, except for a hole over the form.
+    const overlay = highlight.parentElement!;
+    if (writing()) {
+      // Cut along the frame's inner, rounded edge so the whole border shows.
+      const style = getComputedStyle(highlight);
+      const inset = parseFloat(style.borderTopWidth) || 0;
+      const [l, t] = [frameLeft + inset, frameTop + inset];
+      const [r, b] = [
+        frameLeft + frameWidth - inset,
+        frameTop + frameHeight - inset,
+      ];
+      const k = Math.max(
+        0,
+        Math.min(
+          (parseFloat(style.borderTopLeftRadius) || 0) - inset,
+          (r - l) / 2,
+          (b - t) / 2,
+        ),
+      );
+      const [w, h] = [window.innerWidth, window.innerHeight];
+      overlay.style.clipPath =
+        `path(evenodd, "M0 0H${w}V${h}H0Z` +
+        `M${l + k} ${t}H${r - k}A${k} ${k} 0 0 1 ${r} ${t + k}V${b - k}` +
+        `A${k} ${k} 0 0 1 ${r - k} ${b}H${l + k}A${k} ${k} 0 0 1 ${l} ${b - k}` +
+        `V${t + k}A${k} ${k} 0 0 1 ${l + k} ${t}Z")`;
+    } else overlay.style.clipPath = "";
+    // The popup hangs off the frame, centred on it, by the arrow's length.
     const box = popup.getBoundingClientRect();
+    const viewportWidth = document.documentElement.clientWidth;
+    const gap = 14;
+    const centre = frameLeft + frameWidth / 2;
     const left = Math.max(
       12,
-      Math.min(
-        window.innerWidth - box.width - 12,
-        rect.left + rect.width / 2 - box.width / 2,
-      ),
+      Math.min(viewportWidth - box.width - 12, centre - box.width / 2),
     );
-    const below = rect.bottom + box.height + 26 < window.innerHeight;
+    const roomBelow = window.innerHeight - frameBottom - gap - 12;
+    const roomAbove = frameTop - gap - 12;
+    const below = box.height <= roomBelow || roomBelow >= roomAbove;
     const top = below
-      ? rect.bottom + 18
-      : Math.max(12, rect.top - box.height - 18);
+      ? frameBottom + gap
+      : Math.max(12, frameTop - gap - box.height);
     Object.assign(popup.style, { left: `${left}px`, top: `${top}px` });
-    const x = Math.max(
-      left + 16,
-      Math.min(left + box.width - 24, rect.left + rect.width / 2),
-    );
+    const x = Math.max(left + 20, Math.min(left + box.width - 20, centre));
     Object.assign(arrow.style, {
-      left: `${x}px`,
+      left: `${x - 5}px`,
       top: `${below ? top - 5 : top + box.height - 5}px`,
     });
   };
@@ -163,6 +210,11 @@ export function PlannerTour(props: PlannerTourProps) {
   // The tour can't be skipped: no Skip button, and Escape does nothing.
   // It ends only from its last step.
 
+  // The empty tour ends once the first task exists, from the real form.
+  createEffect(() => {
+    if (!hasTask && props.hasTask) props.onDone(false);
+  });
+
   createEffect(() => {
     const current = stop();
     props.onVisit(current.view);
@@ -174,8 +226,17 @@ export function PlannerTour(props: PlannerTourProps) {
         app?.querySelector<HTMLElement>(current.target) ??
         app?.querySelector<HTMLElement>("nav button[aria-current]") ??
         null;
-      target?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      heading.focus({ preventScroll: true });
+      target?.scrollIntoView({
+        block: writing() ? "center" : "nearest",
+        inline: "nearest",
+      });
+      // On a phone, focusing the field would cover the hint with the keyboard.
+      const field = writing()
+        ? target?.querySelector<HTMLInputElement>("input")
+        : null;
+      if (field && !window.matchMedia(MOBILE_QUERY).matches)
+        field.focus({ preventScroll: true });
+      else heading.focus({ preventScroll: true });
       schedule();
     });
   });
@@ -193,22 +254,6 @@ export function PlannerTour(props: PlannerTourProps) {
     });
   });
 
-  async function create(text: string, fallbackMinutes: number): Promise<void> {
-    if (busy() || !text.trim()) return;
-    const parsed = parseQuickEntry(text.trim());
-    setBusy(true);
-    setError("");
-    try {
-      const failure = await props.onCreate(
-        parsed.outcome,
-        parsed.minutes ?? fallbackMinutes,
-      );
-      if (failure && !disposed) setError(failure);
-    } finally {
-      if (!disposed) setBusy(false);
-    }
-  }
-
   async function start(): Promise<void> {
     if (busy()) return;
     setBusy(true);
@@ -225,6 +270,8 @@ export function PlannerTour(props: PlannerTourProps) {
   return (
     <Dialog
       class="planner-tour-dialog"
+      classList={{ "is-writing": writing() }}
+      modal={!writing()}
       aria-labelledby={headingId}
       onDismiss={() => {}}
       preventCancel
@@ -234,6 +281,7 @@ export function PlannerTour(props: PlannerTourProps) {
           highlight = element;
         }}
         class="tour-highlight"
+        classList={{ "is-writing": writing() }}
         aria-hidden="true"
       />
       <section
@@ -257,60 +305,10 @@ export function PlannerTour(props: PlannerTourProps) {
           {stop().title}
         </h2>
         <p class="muted">{stop().text}</p>
-        <Show when={last() && !hasTask}>
-          <form
-            class="tour-task-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void create(outcome(), ESTIMATE.defaultMinutes);
-            }}
-          >
-            <input
-              aria-label="Your first task"
-              placeholder="e.g. Write the intro 45m"
-              maxLength={500}
-              value={outcome()}
-              disabled={busy()}
-              onInput={(event) => setOutcome(event.currentTarget.value)}
-            />
-            <div class="tour-starters" role="group" aria-label="Ideas">
-              <For each={STARTERS}>
-                {(starter) => (
-                  <button
-                    type="button"
-                    disabled={busy()}
-                    onClick={() =>
-                      void create(starter.outcome, starter.minutes)
-                    }
-                  >
-                    {starter.outcome}
-                    <span>{starter.minutes} min</span>
-                  </button>
-                )}
-              </For>
-            </div>
-            <div class="tour-actions">
-              <button
-                type="button"
-                disabled={busy()}
-                onClick={() => setIndex(index() - 1)}
-              >
-                Back
-              </button>
-              <button
-                type="submit"
-                class="tour-primary"
-                disabled={busy() || !outcome().trim()}
-              >
-                Add task
-              </button>
-            </div>
-          </form>
-        </Show>
         <p class="error" role="alert" hidden={!error()}>
           {error()}
         </p>
-        <div class="tour-actions" hidden={last() && !hasTask}>
+        <div class="tour-actions">
           <Show when={index() > 0}>
             <button
               type="button"

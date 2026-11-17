@@ -90,23 +90,6 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     }
   }
 
-  /** The tour's last stop starts the first planned task, as its button would. */
-  /** The tour's last step: the first task must be created to finish onboarding. */
-  async function createFirstTask(
-    outcome: string,
-    minutes: number,
-  ): Promise<string | null> {
-    const today = planner.data()?.today;
-    if (!today) return "Your plan is still loading. Try again.";
-    const created = await planner.mutate(() =>
-      client.create(outcome, today, minutes),
-    );
-    if (!created) return planner.error() || "Couldn’t add the task.";
-    finishTour();
-    planner.visit("today");
-    return null;
-  }
-
   async function startFirstTask(): Promise<void> {
     const task = planner.data()?.todayTasks.find((t) => t.status === "planned");
     if (!task) return;
@@ -240,7 +223,6 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
               if (!started) planner.visit("today");
             }}
             onStart={startFirstTask}
-            onCreate={createFirstTask}
           />
         </Show>
         <Show when={shortcuts()}>

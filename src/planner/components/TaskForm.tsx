@@ -70,6 +70,8 @@ export function TaskForm(props: TaskFormProps) {
     <>
       <form
         class="task-form"
+        // Empty is handled below without the browser's "fill out" bubble.
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           // An empty Add is an invitation to type, not an error to report.

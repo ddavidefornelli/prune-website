@@ -17,7 +17,6 @@ import type { PlannerState } from "../create-planner";
 import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
 import type { Hints } from "../hints";
 import type { Insight } from "../insights";
-import { STARTERS } from "../starters";
 import { streakFor } from "../streak";
 import { formatDuration, previousDay } from "../time";
 import { DoneBadge } from "./DoneBadge";
@@ -375,25 +374,11 @@ export function PlanView(props: {
         />
       </Show>
       <Show when={firstPlan()}>
-        <section class="starters" aria-label="Starting ideas">
+        <section class="starters" aria-label="First task">
           <p class="muted">
-            Or start with one of these. When you write your own, add a time like{" "}
-            <q>45m</q> to set the estimate.
+            What’s the most important thing you have to do today? Start with
+            that. Add a time like <q>45m</q> to set the estimate.
           </p>
-          <div class="starter-list">
-            <For each={STARTERS}>
-              {(starter) => (
-                <button
-                  type="button"
-                  disabled={planner.busy()}
-                  onClick={() => void create(starter.outcome, starter.minutes)}
-                >
-                  <span>{starter.outcome}</span>
-                  <span class="muted">{starter.minutes} min</span>
-                </button>
-              )}
-            </For>
-          </div>
         </section>
       </Show>
       <Switch>

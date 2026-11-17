@@ -212,13 +212,17 @@ export async function synced(page: Page) {
  * The tour can't be skipped: step through it and finish from the last step.
  * An empty account must create its first task there (a starting idea here).
  */
-export async function finishTour(page: Page, starter: RegExp = /Plan the week ahead/) {
+export async function finishTour(page: Page, task = "Plan the week ahead 30m") {
   const tour = page.locator(".tour-popup");
   const notNow = tour.getByRole("button", { name: "Not now", exact: true });
-  const firstTask = tour.getByRole("textbox", { name: "Your first task" });
-  while (!(await notNow.isVisible()) && !(await firstTask.isVisible()))
+  const writing = page.locator(".tour-highlight.is-writing");
+  while (!(await notNow.isVisible()) && !(await writing.isVisible()))
     await tour.getByRole("button", { name: "Next", exact: true }).click();
   if (await notNow.isVisible()) await notNow.click();
-  else await tour.getByRole("group", { name: "Ideas" }).getByRole("button", { name: starter }).click();
+  else {
+    // The last step is typed into the planner's own form, not the popup.
+    await page.locator("#app .task-form").getByRole("textbox", { name: "Outcome" }).fill(task);
+    await page.locator("#app .task-form").getByRole("button", { name: "Add task" }).click();
+  }
   await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
 }

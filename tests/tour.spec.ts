@@ -15,7 +15,7 @@ for (const width of [1100, 390]) {
     await openWithTour(page);
     const tour = page.locator(".planner-tour-dialog");
     const popup = page.locator(".tour-popup");
-    const titles = ["Five tasks a day", "A weekly check-in", "Plan ahead", "See your progress", "Add your first task"];
+    const titles = ["Five tasks a day", "A weekly check-in", "Plan ahead", "See your progress", "What’s the most important thing you have to do today?"];
     for (const [index, view] of ["today", "today", "tomorrow", "habits", "today"].entries()) {
       await expect(popup.getByRole("heading")).toHaveText(titles[index]!);
       await expect(popup).toContainText(`${index + 1} / 5`);
@@ -36,10 +36,23 @@ for (const width of [1100, 390]) {
         await popup.getByRole("button", { name: "Next", exact: true }).click();
       }
     }
-    // The first task is required: nothing closes the tour until it exists.
-    const first = popup.getByRole("textbox", { name: "Your first task" });
-    const add = popup.getByRole("button", { name: "Add task", exact: true });
-    await expect(add).toBeDisabled();
+    // The first task is required, typed into the planner's own form, which is
+    // framed in green; nothing else on the page can be used meanwhile.
+    const form = page.locator("#app .task-form");
+    const first = form.getByRole("textbox", { name: "Outcome" });
+    const add = form.getByRole("button", { name: "Add task" });
+    await expect(popup.getByRole("textbox")).toHaveCount(0);
+    await expect(page.locator(".tour-highlight.is-writing")).toBeVisible();
+    expect(await page.locator(".tour-highlight").evaluate((el) => getComputedStyle(el).borderTopColor)).toBe("rgb(52, 199, 89)");
+    // Clicks reach the form, but not the navigation around it.
+    const hit = (selector: string) =>
+      page.locator(selector).first().evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return top === el || el.contains(top);
+      });
+    expect(await hit("#app .task-form input")).toBe(true);
+    expect(await hit("nav button[aria-current]")).toBe(false);
     await page.keyboard.press("Escape");
     await expect(popup).toBeVisible();
     await page.reload();

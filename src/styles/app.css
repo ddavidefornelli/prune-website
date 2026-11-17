@@ -53,8 +53,6 @@ textarea,
 .email-code-digit,
 .error,
 .sync-bar,
-.starter-list button,
-.tour-starters button,
 .review-countdown-unit,
 .review-stats > div,
 .weekly-reason,
@@ -1128,38 +1126,6 @@ textarea,
   font-size: 0.7778rem;
   line-height: 1.6;
 }
-.starter-list {
-  display: grid;
-  gap: 8px;
-}
-.starter-list button {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 52px;
-  padding: 12px 16px;
-  text-align: left;
-  background: var(--surface);
-  transition:
-    border-color 200ms ease,
-    transform 200ms var(--ease-out);
-}
-.starter-list button:hover:not(:disabled) {
-  transform: translateX(4px);
-}
-.starter-list .muted {
-  flex: none;
-  font-size: 0.7222rem;
-}
-@media (min-width: 760px) {
-  .starter-list {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-  .starter-list button {
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-}
 .hint-card {
   display: flex;
   flex-wrap: wrap;
@@ -2120,12 +2086,31 @@ textarea,
 .planner-tour-dialog::backdrop {
   background: transparent;
 }
+/* Without modality it stays above the page by stacking alone. */
+.planner-tour-dialog.is-writing {
+  z-index: 100;
+}
 .tour-highlight {
   position: fixed;
   border: 2px solid var(--text);
   border-radius: var(--radius-control);
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.32);
   pointer-events: none;
+}
+/* While typing the first task, the green frame is the focus indicator, and
+   the hint under the form would only repeat the popup. */
+body:has(.tour-highlight.is-writing) #app .task-form input:focus-visible {
+  outline: none;
+}
+body:has(.planner-tour-dialog) .starters {
+  visibility: hidden;
+}
+/* The step where you type into the form itself: a clear green frame. */
+.tour-highlight.is-writing {
+  border: 3px solid var(--positive);
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--positive) 30%, transparent),
+    0 0 0 9999px rgb(0 0 0 / 0.32);
 }
 .tour-popup {
   position: fixed;
@@ -2186,37 +2171,6 @@ textarea,
 .tour-actions button {
   padding: 8px 16px;
   font-size: 0.6667rem;
-}
-.tour-task-form {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-.tour-task-form input {
-  width: 100%;
-  min-height: 44px;
-  padding: 0 12px;
-  font-size: 0.8889rem;
-}
-.tour-starters {
-  display: grid;
-  gap: 6px;
-}
-.tour-starters button {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  font-size: 0.7222rem;
-  text-align: left;
-}
-.tour-starters button span {
-  flex: none;
-  color: var(--muted);
-}
-.tour-task-form .tour-actions {
-  margin-top: 2px;
 }
 .tour-actions .tour-primary:disabled {
   opacity: 0.45;
