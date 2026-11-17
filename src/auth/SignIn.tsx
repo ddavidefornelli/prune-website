@@ -53,6 +53,20 @@ export function SignIn(props: SignInProps) {
             forward.
           </p>
           <ProductPreview />
+          <p class="landing-price">
+            <span class="visually-hidden">
+              Early access: usually $20 a month, now free.
+            </span>
+            <span class="landing-price-tag" aria-hidden="true">
+              Early access
+            </span>
+            <span class="landing-price-was" aria-hidden="true">
+              $20/mo
+            </span>
+            <span class="landing-price-now" aria-hidden="true">
+              Free
+            </span>
+          </p>
           <a
             class="landing-cta"
             href={LOGIN_PATH}
