@@ -31,6 +31,8 @@ export function FocusView(props: {
   planner: PlannerState;
   client: PlanningClient;
   hints: Hints;
+  /** Complete task was pressed here; the plan is about to change. */
+  onCompleting?: () => void;
   /** A task was finished here, on this device, and the plan is up to date. */
   onCompleted?: (task: Task) => void;
 }) {
@@ -135,6 +137,7 @@ export function FocusView(props: {
                   disabled={planner.busy()}
                   onClick={() => {
                     let done: Task | undefined;
+                    props.onCompleting?.();
                     void planner
                       .mutate(async () => {
                         done = await props.client.complete(active().id);

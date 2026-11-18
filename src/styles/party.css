@@ -1,0 +1,647 @@
+/* The streak party: the plum dances with its guitar the moment today's streak
+   is kept, and a trumpet band jumps out when the horns come in. Full screen on a soft lavender glow; the dance is picked at random
+   (data-dance), and reduced motion gets the same card standing still. */
+.streak-party {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: radial-gradient(
+    circle at 50% 34%,
+    var(--surface) 0,
+    var(--pearl-pale) 42%,
+    color-mix(in srgb, var(--pearl) 70%, var(--pearl-pale)) 100%
+  );
+  cursor: pointer;
+  animation: party-in 260ms ease-out both;
+}
+.streak-party::backdrop {
+  background: transparent;
+}
+.streak-party.is-milestone {
+  background:
+    radial-gradient(circle at 50% 34%, #fff8dc 0, #ffe7a8 30%, transparent 60%),
+    radial-gradient(
+      circle at 50% 34%,
+      var(--surface) 0,
+      var(--pearl-pale) 42%,
+      var(--pearl) 100%
+    );
+}
+
+.party-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: max(24px, env(safe-area-inset-top)) 16px
+    max(24px, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+/* The dancer. */
+.party-stage {
+  position: relative;
+  width: min(78vw, 340px, 44vh);
+  aspect-ratio: 732 / 440;
+  margin-bottom: 4px;
+}
+.party-pop,
+.party-dancer {
+  width: 100%;
+  height: 100%;
+}
+.party-pop {
+  animation: party-pop 620ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.party-dancer {
+  transform-origin: 50% 92%;
+}
+.party-plum {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.party-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 38%;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--pearl-deep);
+  opacity: 0.18;
+  transform: translateX(-50%);
+}
+.plum-strum,
+.trumpeter,
+.trumpeter-bob,
+.trumpeter-cheek,
+.trumpet,
+.plum-foot,
+.plum-leaf,
+.plum-eyes,
+.plum-mouth {
+  transform-box: fill-box;
+}
+.plum-strum,
+.trumpeter-cheek {
+  transform-origin: 50% 50%;
+}
+
+/* The trumpet band: behind the guitarist, hidden until the horns come in. */
+.party-band {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.trumpeter {
+  transform-origin: 50% 100%;
+  opacity: 0;
+}
+.trumpeter-left {
+  --from: 170px;
+}
+.trumpeter-right {
+  --from: -170px;
+}
+.trumpeter-bob {
+  transform-origin: 50% 100%;
+}
+.trumpet {
+  transform-origin: 100% 50%;
+}
+.is-brass .trumpeter {
+  opacity: 1;
+}
+.plum-foot {
+  transform-origin: 50% 100%;
+}
+.plum-leaf {
+  transform-origin: 0% 100%;
+}
+.plum-eyes,
+.plum-mouth {
+  transform-origin: 50% 50%;
+}
+
+/* The count, the cheer and the week. */
+.party-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  line-height: 1;
+}
+.party-count strong {
+  display: inline-block;
+  min-width: 1.2ch;
+  font-family: var(--mono);
+  font-size: clamp(4rem, 18vw, 6.5rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+  animation: party-flip 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.party-flame {
+  width: clamp(40px, 11vw, 60px);
+  height: clamp(50px, 14vw, 75px);
+}
+.party-flame svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 100%;
+}
+.party-unit {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.streak-party h2 {
+  margin: 14px 0 0;
+  font-size: clamp(1.6rem, 7vw, 2.4rem);
+  font-weight: 900;
+  line-height: 1.05;
+  animation: party-rise 500ms 260ms ease-out both;
+}
+.party-week {
+  display: flex;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.party-week li {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.party-ember {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.party-ember svg {
+  width: 14px;
+  height: 18px;
+  fill: var(--border);
+}
+.party-week [data-state="done"] .party-ember {
+  background: #ffe1c2;
+}
+.party-week [data-state="done"] .party-ember svg {
+  fill: var(--flame-mid);
+}
+/* Today's ember lights last, with a pop. */
+.party-week [data-state="done"]:has(+ [data-state="ahead"]) .party-ember,
+.party-week [data-state="done"]:last-child .party-ember {
+  animation: party-ember 600ms 1000ms cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.party-go {
+  margin-top: 26px;
+  min-width: 200px;
+  padding: 15px 28px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  /* The plum's own purple, deep enough for white text. */
+  background: #5b52d6;
+  color: #fff;
+  box-shadow: 0 8px 22px rgb(91 82 214 / 0.35);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  animation: party-rise 500ms 500ms ease-out both;
+}
+.party-go:hover {
+  background: #4a41c2;
+}
+
+/* Confetti: thrown up from the plum, then raining down. */
+.party-confetti {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.party-bit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: calc(16px * var(--s));
+  height: calc(16px * var(--s));
+  opacity: 0;
+  animation: party-bit var(--dur) var(--delay) cubic-bezier(0.25, 0.6, 0.4, 1)
+    both;
+}
+.party-bit svg,
+.party-bit i {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.party-bit i {
+  height: 60%;
+  border-radius: 3px;
+  background: hsl(var(--hue) 90% 62%);
+}
+.party-bit b {
+  display: block;
+  font-size: calc(20px * var(--s));
+  line-height: 1;
+  color: hsl(var(--hue) 75% 52%);
+}
+.party-bit[data-bit="spark"] b {
+  color: hsl(calc(40 + var(--hue) / 12) 100% 55%);
+}
+
+@keyframes party-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes party-pop {
+  0% {
+    transform: scale(0) rotate(-20deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes party-flip {
+  0% {
+    transform: translateY(40%) scale(0.4) rotateX(80deg);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes party-rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+@keyframes party-ember {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 10px rgb(255 138 0 / 0.18);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes party-bit {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0) rotate(0);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(calc(var(--x) * 60vw), calc(var(--up) * -100vh))
+      scale(1) rotate(calc(var(--turn) * 0.2));
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--x) * 110vw), 75vh) scale(1)
+      rotate(var(--turn));
+  }
+}
+
+/* Every dance strums the guitar, taps the feet, bobs the leaf and blinks;
+   the band jumps out with the horns and plays on the beat. */
+@media (prefers-reduced-motion: no-preference) {
+  .plum-strum {
+    animation: strum 0.22s ease-in-out infinite alternate;
+  }
+  .is-brass .trumpeter {
+    animation: trumpeter-in 560ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  }
+  .is-brass .trumpeter-bob {
+    animation: trumpeter-bob 0.44s 0.56s ease-in-out infinite alternate;
+  }
+  .is-brass .trumpeter-right .trumpeter-bob {
+    animation-delay: 0.78s;
+  }
+  .is-brass .trumpet {
+    animation: blast 0.22s 0.56s ease-in-out infinite alternate;
+  }
+  .is-brass .trumpeter-cheek {
+    animation: puff 0.22s 0.56s ease-in-out infinite alternate;
+  }
+  .plum-foot-left {
+    animation: foot 0.44s ease-in-out infinite alternate;
+  }
+  .plum-foot-right {
+    animation: foot 0.44s 0.22s ease-in-out infinite alternate;
+  }
+  .plum-leaf {
+    animation: leaf 0.44s ease-in-out infinite alternate;
+  }
+  .plum-eyes {
+    animation: blink 2.6s 0.8s infinite;
+  }
+  .plum-mouth {
+    animation: sing 0.44s ease-in-out infinite alternate;
+  }
+  .party-flame svg {
+    animation: flicker 0.5s ease-in-out infinite alternate;
+  }
+  .party-dancer {
+    animation: var(--dance) var(--beat, 0.88s) 0.5s ease-in-out infinite;
+  }
+  .party-shadow {
+    animation: var(--shadow, none) var(--beat, 0.88s) 0.5s ease-in-out infinite;
+  }
+  .streak-party[data-dance="shimmy"] {
+    --dance: shimmy;
+  }
+  .streak-party[data-dance="hop"] {
+    --dance: hop;
+    --shadow: hop-shadow;
+    --beat: 0.66s;
+  }
+  .streak-party[data-dance="spin"] {
+    --dance: spin;
+    --shadow: spin-shadow;
+    --beat: 2.2s;
+  }
+  /* Turn around the middle, so the guitar never sweeps over the count. */
+  .streak-party[data-dance="spin"] .party-dancer {
+    transform-origin: 50% 55%;
+  }
+  .streak-party[data-dance="wiggle"] {
+    --dance: wiggle;
+    --beat: 0.5s;
+  }
+  .streak-party[data-dance="wiggle"] .plum-strum {
+    animation-duration: 0.14s;
+  }
+  .streak-party[data-dance="conga"] {
+    --dance: conga;
+    --shadow: conga-shadow;
+    --beat: 1.76s;
+  }
+  .streak-party.is-milestone .party-count strong {
+    animation:
+      party-flip 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both,
+      throb 0.88s 0.6s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-party,
+  .party-pop,
+  .party-count strong,
+  .streak-party h2,
+  .party-go,
+  .party-week .party-ember {
+    animation: none !important;
+  }
+}
+
+@keyframes strum {
+  from {
+    transform: translate(6px, -16px);
+  }
+  to {
+    transform: translate(-6px, 14px);
+  }
+}
+/* Out from behind the guitarist: low and tucked in, then up and out. */
+@keyframes trumpeter-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--from), 60px) scale(0.6);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes trumpeter-bob {
+  from {
+    transform: translateY(0) rotate(-3deg);
+  }
+  to {
+    transform: translateY(-14px) rotate(3deg);
+  }
+}
+@keyframes blast {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(6deg) scale(1.06);
+  }
+}
+@keyframes puff {
+  from {
+    transform: scale(0.9);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}
+@keyframes foot {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-14px) rotate(-8deg);
+  }
+}
+@keyframes leaf {
+  from {
+    transform: rotate(-8deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+@keyframes blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes sing {
+  from {
+    transform: scale(0.85, 0.7);
+  }
+  to {
+    transform: scale(1.05, 1.1);
+  }
+}
+@keyframes flicker {
+  from {
+    transform: scale(0.94, 0.9) rotate(-3deg);
+  }
+  to {
+    transform: scale(1.06, 1.08) rotate(3deg);
+  }
+}
+@keyframes throb {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes shimmy {
+  0%,
+  100% {
+    transform: translateX(-16px) rotate(-6deg);
+  }
+  50% {
+    transform: translateX(16px) rotate(6deg);
+  }
+}
+@keyframes hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.08, 0.9);
+  }
+  15% {
+    transform: translateY(0) scale(0.94, 1.08);
+  }
+  50% {
+    transform: translateY(-22%) scale(1);
+  }
+  85% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+}
+@keyframes hop-shadow {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateX(-50%) scale(0.6);
+    opacity: 0.08;
+  }
+}
+@keyframes spin {
+  0%,
+  100% {
+    transform: none;
+  }
+  10% {
+    transform: scale(1.08, 0.88);
+  }
+  30% {
+    transform: translateY(-16%) rotate(0);
+  }
+  55% {
+    transform: translateY(-16%) rotate(360deg);
+  }
+  70% {
+    transform: translateY(0) rotate(360deg) scale(1.1, 0.88);
+  }
+  80%,
+  99.9% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spin-shadow {
+  0%,
+  100%,
+  75% {
+    transform: translateX(-50%) scale(1);
+  }
+  30%,
+  55% {
+    transform: translateX(-50%) scale(0.55);
+    opacity: 0.08;
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+@keyframes conga {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  12% {
+    transform: translate(-12%, -10%) rotate(-8deg);
+  }
+  25% {
+    transform: translateX(-24%) rotate(-4deg);
+  }
+  37% {
+    transform: translate(-12%, -10%) rotate(-8deg);
+  }
+  50% {
+    transform: translateX(0);
+  }
+  62% {
+    transform: translate(12%, -10%) rotate(8deg);
+  }
+  75% {
+    transform: translateX(24%) rotate(4deg);
+  }
+  87% {
+    transform: translate(12%, -10%) rotate(8deg);
+  }
+}
+@keyframes conga-shadow {
+  0%,
+  50%,
+  100% {
+    transform: translateX(-50%);
+  }
+  25% {
+    transform: translateX(-74%);
+  }
+  75% {
+    transform: translateX(-26%);
+  }
+}

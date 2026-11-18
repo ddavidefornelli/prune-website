@@ -9,3 +9,10 @@ rain.m4a
 
 white-noise.m4a
   Pink noise generated for prune. No third-party material.
+
+streak-party.m4a
+  "Con Carne (7 sec edit)" by grumpynora, from Pixabay
+  https://pixabay.com/sound-effects/musical-con-carne-7-sec-edit-565752/
+  Pixabay Content License: https://pixabay.com/service/license-summary/
+  Changes: trimmed to 7 seconds with a short fade, level adjusted,
+  re-encoded as AAC.

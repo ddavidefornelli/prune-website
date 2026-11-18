@@ -1,5 +1,6 @@
 @import "./base.css";
 @import "./preview.css";
+@import "./party.css";
 
 :root {
   -webkit-text-size-adjust: 100%;

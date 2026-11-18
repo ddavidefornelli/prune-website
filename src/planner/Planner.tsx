@@ -18,6 +18,8 @@ import { PlannerNavigation } from "./components/PlannerNavigation";
 import { ONBOARDING, PlannerTour } from "./components/PlannerTour";
 import { FirstTaskDialog } from "./components/FirstTaskDialog";
 import { FocusTimeDialog } from "./components/FocusTimeDialog";
+import { StreakParty } from "./components/StreakParty";
+import { type Streak, streakFor } from "./streak";
 import { takeStartLink } from "./deep-link";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { VIEW_LABELS } from "./constants";
@@ -32,6 +34,9 @@ import {
 } from "./onboarding";
 import { createShortcuts } from "./shortcuts";
 import type { Account, Task } from "./types";
+
+/** How long after pressing Complete task the streak may light the party. */
+const PARTY_WINDOW_MS = 15_000;
 
 export function Planner(props: { client: PlanningClient; account: Account }) {
   const client = untrack(() => props.client);
@@ -68,6 +73,22 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   });
   createEffect(() => {
     if (planner.view() === "habits") setCheckInReady(false);
+  });
+  // The streak party: today's streak lit up by a task finished here. A sync
+  // from another device lights it quietly, so it never interrupts typing.
+  const [party, setParty] = createSignal<Streak | null>(null);
+  let litToday: { day: string; lit: boolean } | null = null;
+  let completingAt = -Infinity;
+  createEffect(() => {
+    const data = planner.data();
+    if (!data) return;
+    const lit = !streakFor(data).open;
+    const finishedHere = performance.now() - completingAt < PARTY_WINDOW_MS;
+    if (lit && litToday?.day === data.today && !litToday.lit && finishedHere) {
+      completingAt = -Infinity;
+      setParty(streakFor(data));
+    }
+    litToday = { day: data.today, lit };
   });
   let firstRunChecked = false;
   let previousView = planner.view();
@@ -227,6 +248,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                   planner={planner}
                   client={props.client}
                   hints={hints}
+                  onCompleting={() => (completingAt = performance.now())}
                   onCompleted={taskCompleted}
                 />
               </Match>
@@ -294,6 +316,11 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
               onSaved={(state) => setSchedule(state)}
               onClose={() => setFocusPicker(null)}
             />
+          )}
+        </Show>
+        <Show when={party()} keyed>
+          {(streak) => (
+            <StreakParty streak={streak} onClose={() => setParty(null)} />
           )}
         </Show>
         <Show when={shortcuts()}>

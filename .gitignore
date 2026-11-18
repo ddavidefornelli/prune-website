@@ -12,3 +12,7 @@ playwright-report/
 
 # Contentsquare wizard (generated)
 .cs-wizard/
+
+# Candidate sounds auditioned in the party preview: licensed for use in the
+# app, not for sharing as files, so they stay local.
+src/dev/sounds/

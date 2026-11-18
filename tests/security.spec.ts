@@ -31,10 +31,17 @@ test("stored task titles and AI output render as text, never executable HTML", a
 
 test("normal planner, calendar and profile workflows do not violate CSP", async ({ page }) => {
   const violations: string[] = [];
-  await page.exposeFunction("__reportCsp", (directive: string) => violations.push(directive));
+  await page.exposeFunction("__reportCsp", (directive: string, blocked: string) => {
+    // The production CSP allows the live site's /sounds/ folder, not this
+    // preview origin (tests/security-policy.test.mjs covers that entry), so
+    // the streak party's sound is the one expected block here.
+    const url = URL.canParse(blocked) ? new URL(blocked) : null;
+    if (directive === "connect-src" && url?.origin === new URL(page.url()).origin && url.pathname.startsWith("/sounds/")) return;
+    violations.push(directive);
+  });
   await page.addInitScript(() => {
     document.addEventListener("securitypolicyviolation", (event) => {
-      void (globalThis as typeof globalThis & { __reportCsp: (directive: string) => Promise<void> }).__reportCsp(event.effectiveDirective);
+      void (globalThis as typeof globalThis & { __reportCsp: (directive: string, blocked: string) => Promise<void> }).__reportCsp(event.effectiveDirective, event.blockedURI);
     });
   });
   await openPlanner(page);
