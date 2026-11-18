@@ -224,14 +224,17 @@ export async function synced(page: Page) {
  * An empty account must create its first task there (a starting idea here).
  */
 /** Walks the tour, adds a first task on its card, then answers the focus-time question with "Not now". */
+/** The first-run pitch's buttons, scene by scene. */
+export const TOUR_BUTTONS = ["Show me how", "I want that", "What else?", "Let’s go"];
+
 export async function finishTour(page: Page, task = "Plan the week ahead") {
-  const tour = page.locator(".tour-popup");
+  const tour = page.locator(".planner-tour-dialog");
   await expect(tour).toBeVisible();
-  while (await tour.isVisible())
-    await tour.getByRole("button", { name: "Next", exact: true }).click();
+  for (const next of TOUR_BUTTONS)
+    await tour.getByRole("button", { name: next }).click();
   const card = page.locator(".first-task-dialog");
   await card.getByRole("textbox", { name: "Your first task" }).fill(task);
-  await card.getByRole("button", { name: "Add task", exact: true }).click();
+  await card.getByRole("button", { name: "Commit to it", exact: true }).click();
   await expect(card).toHaveCount(0);
   const picker = page.locator(".focus-time-dialog");
   await expect(picker).toBeVisible();

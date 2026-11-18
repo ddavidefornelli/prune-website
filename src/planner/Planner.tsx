@@ -342,7 +342,6 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
         </main>
         <Show when={tour()}>
           <PlannerTour
-            onVisit={planner.visit}
             onFinish={() => {
               setTour(false);
               client.track("tour_finished");
@@ -355,7 +354,6 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
         <Show when={firstTask()}>
           <FirstTaskDialog
             step={ONBOARDING.task}
-            total={ONBOARDING.total}
             onAdd={addFirstTask}
             onLater={() => {
               client.track("first_task_later");
@@ -368,8 +366,14 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
             <FocusTimeDialog
               client={props.client}
               schedule={schedule() ?? null}
-              onboardingSteps={
-                mode === "onboarding" ? ONBOARDING.total : undefined
+              onboarding={mode === "onboarding"}
+              firstTask={
+                mode === "onboarding" && plannedToday()
+                  ? {
+                      outcome: plannedToday()!.outcome,
+                      minutes: plannedToday()!.estimatedMinutes,
+                    }
+                  : undefined
               }
               onStartNow={
                 mode === "onboarding" && plannedToday()

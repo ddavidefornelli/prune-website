@@ -1,4 +1,4 @@
-import { test, expect, openPlanner, synced } from "./helpers/browser";
+import { test, expect, openPlanner, synced, TOUR_BUTTONS } from "./helpers/browser";
 import type { Page } from "@playwright/test";
 
 /** The focus time lives on Overview, not Today. */
@@ -11,22 +11,21 @@ test.use({ signedIn: true, firstVisit: true });
 
 const planned = (day: string, outcome: string): Task => ({ id: "existing", outcome, isPriority: false, plannedFor: day, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: Math.floor(Date.now() / 1000), resources: [] });
 
-const TITLES = ["Five tasks a day", "Plan ahead", "Watch your progress"];
+const TITLES = ["Busy isn’t done.", "Lock in.", "Get sharper.", "Light it up."];
 
-/** The three steps of the tour, each on its part of the app; ends on the first-task card. */
+/** The three scenes of the pitch; ends on the first-task card. */
 async function walkTour(page: Page) {
-  const popup = page.locator(".tour-popup");
-  for (const [index, view] of ["today", "tomorrow", "habits"].entries()) {
-    await expect(popup.getByRole("heading")).toHaveText(TITLES[index]!);
-    await expect(popup).toContainText(`${index + 1} / 6`);
-    await expect(page.locator("#app")).toHaveAttribute("data-view", view);
-    await expect(popup).toBeInViewport({ ratio: 1 });
-    await expect(page.locator(".tour-highlight")).toBeInViewport({ ratio: 1 });
-    await popup.getByRole("button", { name: "Next", exact: true }).click();
+  const popup = page.locator(".planner-tour-dialog");
+  for (const [index, title] of TITLES.entries()) {
+    await expect(popup.getByRole("heading")).toHaveText(title);
+    await expect(popup.getByRole("list", { name: `Step ${index + 1} of 7` })).toBeVisible();
+    const next = popup.getByRole("button", { name: TOUR_BUTTONS[index]! });
+    await expect(next).toBeInViewport({ ratio: 1 });
+    await next.click();
   }
   await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
   const card = page.locator(".first-task-dialog");
-  await expect(card).toContainText("4 / 6");
+  await expect(card.getByRole("list", { name: "Step 5 of 7" })).toBeVisible();
   await expect(page.locator("#app")).toHaveAttribute("data-view", "today");
   return card;
 }
@@ -35,20 +34,21 @@ for (const width of [1100, 390]) {
   test(`a new account tours the app, adds a first task, then sets a focus time and reminders, at ${width}px`, async ({ page, backend }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/");
-    const popup = page.locator(".tour-popup");
+    const popup = page.locator(".planner-tour-dialog");
     await expect(popup.getByRole("heading")).toHaveText(TITLES[0]!);
     // It can't be skipped, and Back works.
     await expect(popup.getByRole("button", { name: /skip/i })).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(popup).toBeVisible();
-    await popup.getByRole("button", { name: "Next", exact: true }).click();
+    await popup.getByRole("button", { name: TOUR_BUTTONS[0]! }).click();
+    await expect(popup.getByRole("heading")).toHaveText(TITLES[1]!);
     await popup.getByRole("button", { name: "Back", exact: true }).click();
     const card = await walkTour(page);
 
     // The first task: a question, a box and a tap for the estimate.
-    await expect(card.getByRole("heading")).toHaveText("What’s the one thing you want done today?");
+    await expect(card.getByRole("heading")).toHaveText("What’s today’s win?");
     await expect(card).toBeInViewport({ ratio: 1 });
-    const add = card.getByRole("button", { name: "Add task", exact: true });
+    const add = card.getByRole("button", { name: "Commit to it", exact: true });
     await expect(add).toBeDisabled();
     await expect(card.getByRole("button", { name: "30 min" })).toHaveAttribute("aria-pressed", "true");
     await page.keyboard.press("Escape");
@@ -62,12 +62,12 @@ for (const width of [1100, 390]) {
 
     // Then the focus time, and what it gets you.
     const picker = page.locator(".focus-time-dialog");
-    await expect(picker).toContainText("5 / 6");
-    await expect(picker.getByRole("heading")).toHaveText("When do you want to focus each day?");
+    await expect(picker.getByRole("list", { name: "Step 6 of 7" })).toBeVisible();
+    await expect(picker.getByRole("heading")).toHaveText("When do you lock in?");
     await expect(picker).toBeInViewport({ ratio: 1 });
     await expect(picker.getByRole("button", { name: "Start now instead" })).toBeVisible();
     await picker.getByRole("button", { name: /Afternoon/ }).click();
-    await expect(picker).toContainText("6 / 6");
+    await expect(picker.getByRole("list", { name: "Step 7 of 7" })).toBeVisible();
     await expect(picker.getByRole("heading")).toHaveText("Every day at 14:00.");
     expect(backend.schedule).toEqual({ focusMinute: 14 * 60, weekdaysOnly: false, pushDevices: 0 });
     await expect(picker).toContainText("We’ll email you then");
@@ -97,7 +97,7 @@ for (const width of [1100, 390]) {
     await expect(line).toContainText("14:00 · every day");
     await line.getByRole("button", { name: "Change" }).click();
     await expect(picker.getByRole("button", { name: /Afternoon/ })).toHaveAttribute("aria-pressed", "true");
-    await expect(picker).not.toContainText("/ 6");
+    await expect(picker.locator(".tour-progress")).toHaveCount(0);
     await expect(picker.getByRole("button", { name: "Start now instead" })).toHaveCount(0);
     await picker.getByRole("button", { name: /Other/ }).click();
     await picker.getByLabel("Your focus time").fill("07:45");
@@ -115,7 +115,7 @@ test("Later skips the first task without a placeholder, and the focus time still
   const card = await walkTour(page);
   await card.getByRole("button", { name: "Later", exact: true }).click();
   const picker = page.locator(".focus-time-dialog");
-  await expect(picker).toContainText("5 / 6");
+  await expect(picker.getByRole("list", { name: "Step 6 of 7" })).toBeVisible();
   // Nothing to start yet.
   await expect(picker.getByRole("button", { name: "Start now instead" })).toHaveCount(0);
   await picker.getByRole("button", { name: /Morning/ }).click();

@@ -1,19 +1,20 @@
 import { createSignal, createUniqueId, For } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import { ESTIMATE, MOBILE_QUERY, PLANNER_LIMITS } from "../constants";
+import { OnboardingScreen } from "./PlannerTour";
 
 const ESTIMATES = [15, 30, 45, 60] as const;
 const label = (minutes: number) =>
   minutes === 60 ? "1 hour" : `${minutes} min`;
 
 /**
- * Onboarding's first task, on the same card as the focus-time steps that
- * follow: one question, a box, a tap for the estimate. "Later" goes on
- * without a task, so nobody types a placeholder just to get in.
+ * Onboarding's first task, drawn like the pitch before it: the task is the
+ * hero card (the "kept" card from the first scene, now with your words), a
+ * tap for the estimate, one big button. "Later" goes on without a task, so
+ * nobody types a placeholder just to get in.
  */
 export function FirstTaskDialog(props: {
   step: number;
-  total: number;
   /** Resolves true once the task is saved (or queued offline). */
   onAdd: (outcome: string, minutes: number) => Promise<boolean>;
   onLater: () => void;
@@ -27,13 +28,13 @@ export function FirstTaskDialog(props: {
   async function add(): Promise<void> {
     if (busy() || !ready()) return;
     setBusy(true);
-    // On failure the planner shows its own error; the card stays to retry.
+    // On failure the planner shows its own error; the screen stays to retry.
     if (!(await props.onAdd(outcome().trim(), minutes()))) setBusy(false);
   }
 
   return (
     <Dialog
-      class="pause-dialog focus-time-dialog first-task-dialog"
+      class="onboarding-dialog first-task-dialog"
       aria-labelledby={headingId}
       preventCancel
       onDismiss={() => {}}
@@ -45,68 +46,82 @@ export function FirstTaskDialog(props: {
       }}
     >
       <form
-        class="pause-form"
         onSubmit={(event) => {
           event.preventDefault();
           void add();
         }}
       >
-        <div class="pause-heading">
-          <span class="tour-step">
-            {props.step} / {props.total}
-          </span>
-          <h2 id={headingId} tabIndex={-1}>
-            What’s the one thing you want done today?
-          </h2>
-          <p class="muted">Just one. You can add up to five a day later.</p>
-        </div>
-        <input
-          class="first-task-input"
-          type="text"
-          aria-label="Your first task"
-          placeholder="e.g. Finish the slides"
-          maxLength={PLANNER_LIMITS.outcomeLength}
-          autocomplete="off"
-          enterkeyhint="done"
-          value={outcome()}
-          disabled={busy()}
-          onInput={(event) => setOutcome(event.currentTarget.value)}
-        />
-        <fieldset class="first-task-estimate">
-          <legend>How long will it take?</legend>
-          <div class="first-task-chips">
-            <For each={ESTIMATES}>
-              {(value) => (
-                <button
-                  type="button"
-                  class="first-task-chip"
-                  aria-pressed={minutes() === value}
-                  disabled={busy()}
-                  onClick={() => setMinutes(value)}
-                >
-                  {label(value)}
-                </button>
-              )}
-            </For>
-          </div>
-        </fieldset>
-        <button
-          type="submit"
-          class="primary-button first-task-add"
-          disabled={busy() || !ready()}
+        <OnboardingScreen
+          step={props.step}
+          headingId={headingId}
+          eyebrow="Your first win"
+          title="What’s today’s win?"
+          text="The one thing you’ll finish today. Nail it and your streak lights up for the first time."
+          glow="var(--pearl-deep)"
+          actions={
+            <>
+              <button
+                type="submit"
+                class="tour-primary"
+                disabled={busy() || !ready()}
+              >
+                Commit to it
+                <span aria-hidden="true" class="tour-arrow">
+                  →
+                </span>
+              </button>
+              <button
+                type="button"
+                class="tour-later"
+                disabled={busy()}
+                onClick={() => props.onLater()}
+              >
+                Later
+              </button>
+            </>
+          }
         >
-          Add task
-        </button>
-        <div class="focus-time-footer">
-          <button
-            type="button"
-            class="text-button"
-            disabled={busy()}
-            onClick={() => props.onLater()}
-          >
-            Later
-          </button>
-        </div>
+          <div class="win-controls">
+            <label class="win-card" classList={{ "is-set": ready() }}>
+              <span class="win-check" aria-hidden="true">
+                ✓
+              </span>
+              <input
+                class="win-input"
+                type="text"
+                aria-label="Your first task"
+                placeholder="e.g. Finish the slides"
+                maxLength={PLANNER_LIMITS.outcomeLength}
+                autocomplete="off"
+                enterkeyhint="done"
+                value={outcome()}
+                disabled={busy()}
+                onInput={(event) => setOutcome(event.currentTarget.value)}
+              />
+              <span class="win-minutes" aria-hidden="true">
+                {minutes()}m
+              </span>
+            </label>
+            <fieldset class="win-estimate">
+              <legend>How long will it take?</legend>
+              <div class="win-chips">
+                <For each={ESTIMATES}>
+                  {(value) => (
+                    <button
+                      type="button"
+                      class="win-chip"
+                      aria-pressed={minutes() === value}
+                      disabled={busy()}
+                      onClick={() => setMinutes(value)}
+                    >
+                      {label(value)}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </fieldset>
+          </div>
+        </OnboardingScreen>
       </form>
     </Dialog>
   );

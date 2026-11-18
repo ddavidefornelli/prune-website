@@ -1,6 +1,7 @@
 @import "./base.css";
 @import "./preview.css";
 @import "./party.css";
+@import "./tour.css";
 
 :root {
   -webkit-text-size-adjust: 100%;
@@ -72,12 +73,10 @@ textarea,
 .review-countdown,
 .weekly-report,
 .review-timing-comparison,
-.pause-dialog,
-.tour-popup {
+.pause-dialog {
   border-radius: var(--radius-card);
 }
-.pause-dialog,
-.tour-popup {
+.pause-dialog {
   box-shadow: var(--shadow-float);
 }
 .review-bar-track,
@@ -2069,134 +2068,23 @@ textarea,
   padding-right: 96px;
 }
 
-/* First-run tour: coach marks anchored to the live planner. */
-.planner-tour-dialog {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  overflow: hidden;
-}
-.planner-tour-dialog::backdrop {
-  background: transparent;
-}
-/* Without modality it stays above the page by stacking alone. */
-.planner-tour-dialog.is-writing {
-  z-index: 100;
-}
-.tour-highlight {
-  position: fixed;
-  border: 2px solid var(--text);
-  border-radius: var(--radius-control);
-  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.32);
-  pointer-events: none;
-}
-/* While typing the first task, the green frame is the focus indicator, and
-   the hint under the form would only repeat the popup. */
-body:has(.tour-highlight.is-writing) #app .task-form input:focus-visible {
-  outline: none;
-}
-body:has(.planner-tour-dialog) .starters {
-  visibility: hidden;
-}
-/* The step where you type into the form itself: a clear green frame. */
-.tour-highlight.is-writing {
-  border: 3px solid var(--positive);
-  box-shadow:
-    0 0 0 5px color-mix(in srgb, var(--positive) 30%, transparent),
-    0 0 0 9999px rgb(0 0 0 / 0.32);
-}
-.tour-popup {
-  position: fixed;
-  width: min(18.3333rem, calc(100vw - 24px));
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.tour-arrow {
-  position: fixed;
-  width: 10px;
-  height: 10px;
-  transform: rotate(45deg);
-  background: var(--surface);
-  pointer-events: none;
-}
-.tour-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+/* Onboarding cards' step counter ("4 / 6"). */
 .tour-step {
   color: var(--muted);
   font-size: 0.6111rem;
   letter-spacing: 0.12em;
 }
-.tour-top button {
-  flex: none;
-  padding: 8px;
-  border-color: transparent;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.6667rem;
-}
-.tour-popup h2 {
-  margin: 8px 0;
-  font-size: 1rem;
-}
-/* Focus lands here only so screen readers start at the words. */
-.tour-popup h2:focus-visible {
-  outline: none;
-}
-.tour-popup .muted {
-  margin: 0;
-  font-size: 0.7778rem;
-  line-height: 1.5;
-}
-.tour-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-.tour-actions button {
-  padding: 8px 16px;
-  font-size: 0.6667rem;
-}
-.tour-actions .tour-primary:disabled {
-  opacity: 0.45;
-}
-.tour-actions .tour-primary,
-.tour-actions .tour-primary:hover:not(:disabled) {
-  color: var(--on-accent);
-  background: var(--action);
-  border-color: var(--action);
-}
 
 /* Color roles: a black pill marks the one thing to do next on a screen (Start
-   focus, Complete task, Plan tomorrow, the tour's Next, a dialog's submit).
+   focus, Complete task, Plan tomorrow, a dialog's submit).
    Everything else is white or grey. Hover only lifts the black. */
 @media (hover: hover) {
   #app .task > button:not(:disabled):hover,
-  #app .focus-actions > button:not(:disabled):hover,
-  .tour-actions .tour-primary:hover:not(:disabled) {
+  #app .focus-actions > button:not(:disabled):hover {
     background: var(--action-hover);
     border-color: var(--action-hover);
     color: var(--on-accent);
   }
-}
-.tour-actions[hidden] {
-  display: none;
 }
 
 /* An open slot on Today or Tomorrow with a task suggested for it, as on the
@@ -2554,62 +2442,3 @@ body:has(.planner-tour-dialog) .starters {
   font-weight: 700;
 }
 
-/* Onboarding's first task: the same card as the focus-time steps. */
-#app .first-task-input {
-  width: 100%;
-  min-height: 52px;
-  margin: 0;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 1rem;
-}
-#app .first-task-input:focus-visible {
-  border-color: var(--text);
-  outline: none;
-}
-.first-task-estimate {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-.first-task-estimate legend {
-  margin-bottom: 8px;
-  padding: 0;
-  color: var(--muted);
-  font-size: 0.7778rem;
-  font-weight: 600;
-}
-.first-task-chips {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-#app .first-task-chip {
-  min-height: 44px;
-  margin: 0;
-  padding: 8px 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.8333rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-#app .first-task-chip[aria-pressed="true"] {
-  border-color: var(--pearl-deep);
-  background: var(--pearl-pale);
-  color: var(--pearl-deep);
-}
-#app .first-task-add {
-  width: 100%;
-}
-#app .first-task-add:disabled {
-  opacity: 0.35;
-}

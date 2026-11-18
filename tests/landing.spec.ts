@@ -91,8 +91,8 @@ test.describe("a first sign-in", () => {
     expect(backend.requests.some((request) => request.path === "/auth/v1/token?grant_type=pkce" && request.body.auth_code === "fixture-oauth-code")).toBe(true);
 
     // A new account lands in the tour, which ends by creating the first task.
-    const tour = page.locator(".tour-popup");
-    await expect(tour.getByRole("heading")).toHaveText("Five tasks a day");
+    const tour = page.locator(".planner-tour-dialog");
+    await expect(tour.getByRole("heading")).toHaveText("Busy isn’t done.");
     await finishTour(page);
     await expect(page.getByRole("button", { name: "Edit task title: Plan the week ahead" })).toBeVisible();
     await expect(tour).toHaveCount(0);
