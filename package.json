@@ -25,7 +25,8 @@
     "check:production": "node --experimental-strip-types scripts/check-production.mjs",
     "email:test": "node --experimental-strip-types scripts/send-test-reminder.ts",
     "email:live": "node --experimental-strip-types scripts/send-live-reminder.ts",
-    "push:keys": "node scripts/generate-vapid-keys.mjs"
+    "push:keys": "node scripts/generate-vapid-keys.mjs",
+    "dashboard": "node --experimental-strip-types scripts/dashboard.ts"
   },
   "dependencies": {
     "@contentsquare/tag-sdk": "^1.1.0",

@@ -3,6 +3,7 @@ import {
   createResource,
   createSignal,
   Match,
+  onCleanup,
   Show,
   Switch,
   untrack,
@@ -37,6 +38,8 @@ import type { Account, Task } from "./types";
 
 /** How long after pressing Complete task the streak may light the party. */
 const PARTY_WINDOW_MS = 15_000;
+/** Away at least this long and back: counted as another visit in the history. */
+const RETURN_AFTER_MS = 30 * 60_000;
 
 export function Planner(props: { client: PlanningClient; account: Account }) {
   const client = untrack(() => props.client);
@@ -129,7 +132,10 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     const added = await planner.mutate(() =>
       client.create(outcome, today, minutes),
     );
-    if (added) endFirstTask();
+    if (added) {
+      client.track("first_task_added", { minutes });
+      endFirstTask();
+    }
     return added;
   }
 
@@ -166,7 +172,14 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     if (!data || firstRunChecked) return;
     firstRunChecked = true;
     const account = props.account.accountKey;
-    setFirstRun(shouldOfferOnboarding(data, account, localStorage));
+    const isNew = shouldOfferOnboarding(data, account, localStorage);
+    setFirstRun(isNew);
+    client.track("planner_opened", {
+      new_account: isNew,
+      from: startLink ? "reminder" : "app",
+      active_task: Boolean(data.activeTask),
+      today_tasks: data.todayTasks.length,
+    });
     if (startLink) {
       if (data.activeTask) planner.visit("focus");
       else if (plannedToday()) {
@@ -175,8 +188,53 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
       }
     }
     // Right after sign-in, once per account and device.
-    setTour(shouldOfferTour(data, account, localStorage));
+    const showTour = shouldOfferTour(data, account, localStorage);
+    setTour(showTour);
+    if (showTour) client.track("tour_shown");
   });
+  // A planner left open in a tab or on the phone's home screen never reloads, so
+  // coming back to it after a while also counts as opening it (from: "back").
+  let hiddenSince = 0;
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") {
+      hiddenSince = Date.now();
+      return;
+    }
+    if (hiddenSince && Date.now() - hiddenSince >= RETURN_AFTER_MS) {
+      const data = untrack(planner.data);
+      client.track("planner_opened", {
+        new_account: false,
+        from: "back",
+        active_task: Boolean(data?.activeTask),
+        today_tasks: data?.todayTasks.length ?? 0,
+      });
+    }
+    hiddenSince = 0;
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  onCleanup(() =>
+    document.removeEventListener("visibilitychange", onVisibility),
+  );
+  // Journey history: what the owner was asked, and what went wrong on screen.
+  createEffect((wasOpen: boolean) => {
+    const mode = focusPicker();
+    if (mode && !wasOpen) client.track("focus_time_shown", { mode });
+    return Boolean(mode);
+  }, false);
+  createEffect((wasBlocked: boolean) => {
+    const blocked = planner.syncBlocked();
+    if (blocked && !wasBlocked) client.track("change_rejected");
+    return blocked;
+  }, false);
+  createEffect((previous: string) => {
+    const error = planner.error();
+    if (error && error !== previous)
+      client.track("error_shown", {
+        view: untrack(planner.view),
+        online: navigator.onLine,
+      });
+    return error;
+  }, "");
   createEffect(() => {
     if (firstRun() && planner.data()?.todayTasks.length) finishFirstRun();
   });
@@ -287,8 +345,10 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
             onVisit={planner.visit}
             onFinish={() => {
               setTour(false);
+              client.track("tour_finished");
               planner.visit("today");
               setFirstTask(true);
+              client.track("first_task_shown");
             }}
           />
         </Show>
@@ -297,7 +357,10 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
             step={ONBOARDING.task}
             total={ONBOARDING.total}
             onAdd={addFirstTask}
-            onLater={endFirstTask}
+            onLater={() => {
+              client.track("first_task_later");
+              endFirstTask();
+            }}
           />
         </Show>
         <Show when={focusPicker()} keyed>
@@ -313,8 +376,19 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                   ? startFirstTask
                   : undefined
               }
-              onSaved={(state) => setSchedule(state)}
-              onClose={() => setFocusPicker(null)}
+              onSaved={(state) => {
+                setSchedule(state);
+                client.track("focus_time_saved", {
+                  mode,
+                  minute: state.focusMinute ?? "none",
+                  weekdays_only: state.weekdaysOnly,
+                  push_devices: state.pushDevices,
+                });
+              }}
+              onClose={() => {
+                setFocusPicker(null);
+                client.track("focus_time_closed", { mode });
+              }}
             />
           )}
         </Show>

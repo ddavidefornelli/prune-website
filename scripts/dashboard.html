@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>prune metrics</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f2; --surface: #fcfcfb; --border: #e4e3df; --grid: #ebeae6;
+    --text: #0b0b0b; --text-2: #52514e; --muted: #7a7974;
+    --bar: #2a78d6; --bar-old: #b4b3ad;
+    --good: #1d7a34; --good-bg: #e7f3ea;
+    --warn: #a86400; --warn-bg: #fbf1e1;
+    --wait: #52514e; --wait-bg: #ecebe7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121211; --surface: #1a1a19; --border: #2e2e2c; --grid: #262624;
+      --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e88;
+      --bar: #3987e5; --bar-old: #5c5b57;
+      --good: #4cbf68; --good-bg: #17291c;
+      --warn: #e2a43c; --warn-bg: #2d2311;
+      --wait: #c3c2b7; --wait-bg: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --border: #2e2e2c; --grid: #262624;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e88;
+    --bar: #3987e5; --bar-old: #5c5b57;
+    --good: #4cbf68; --good-bg: #17291c;
+    --warn: #e2a43c; --warn-bg: #2d2311;
+    --wait: #c3c2b7; --wait-bg: #262624;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 24px; margin: 0; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: var(--text-2); font-size: 14px; margin: 0; }
+  button { font: inherit; font-weight: 600; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .answer { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+  .answer + p { margin: 0; color: var(--text-2); }
+  .number { display: flex; align-items: center; gap: 16px; }
+  .number .big { font-size: 40px; font-weight: 800; min-width: 96px; font-variant-numeric: tabular-nums; }
+  .number .what { flex: 1; }
+  .number .what b { display: block; font-size: 16px; }
+  .number .what span { color: var(--text-2); font-size: 14px; }
+  .badge { font-size: 13px; font-weight: 700; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+  .badge.good { color: var(--good); background: var(--good-bg); }
+  .badge.warn { color: var(--warn); background: var(--warn-bg); }
+  .badge.wait { color: var(--wait); background: var(--wait-bg); }
+  .chart { position: relative; margin-top: 12px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { fill: var(--muted); font-size: 12px; }
+  svg text.val { fill: var(--text-2); font-weight: 600; }
+  .key { display: flex; gap: 16px; font-size: 13px; color: var(--text-2); margin-top: 8px; flex-wrap: wrap; }
+  .key span { display: inline-flex; gap: 6px; align-items: center; }
+  .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .dash { width: 16px; border-top: 2px dashed var(--text-2); display: inline-block; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; box-shadow: 0 4px 16px rgb(0 0 0 / .12); white-space: nowrap; display: none; }
+  .foot { font-size: 13px; color: var(--muted); }
+  label.self { font-size: 13px; color: var(--text-2); display: inline-flex; gap: 6px; align-items: center; }
+  .error { color: var(--warn); }
+  @media (max-width: 480px) { .number { flex-wrap: wrap; } .number .big { font-size: 34px; min-width: 80px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>How is prune doing?</h1>
+      <p class="sub" id="updated">Loading…</p>
+    </div>
+    <button id="refresh" type="button">Refresh</button>
+  </header>
+
+  <section class="card" id="answer"></section>
+
+  <section id="numbers"></section>
+
+  <section class="card">
+    <h2>New people each week</h2>
+    <p class="sub">How many people signed up.</p>
+    <div class="chart" id="signups"></div>
+  </section>
+
+  <section class="card">
+    <h2>Came back the next day, each week</h2>
+    <p class="sub">Out of the people who signed up that week, how many came back the day after. Aim for the dashed line.</p>
+    <div class="chart" id="returns"></div>
+    <div class="key">
+      <span><i class="sw" style="background:var(--bar-old)"></i>Before reminders</span>
+      <span><i class="sw" style="background:var(--bar)"></i>With reminders</span>
+      <span><i class="dash"></i>Goal (2 in 10)</span>
+    </div>
+  </section>
+
+  <p class="foot">
+    <label class="self"><input type="checkbox" id="self" /> Count my own account too</label><br />
+    Reminders counted from <span id="sinceText"></span>. Numbers with only a few people jump around a lot: look at the trend over several weeks.
+  </p>
+</main>
+
+<script>
+// The day reminders went live. Change it here if it is different.
+const REMINDERS_SINCE = "2026-11-16";
+const DAY = 86400000;
+const sinceDay = Math.floor(Date.parse(REMINDERS_SINCE + "T00:00:00Z") / DAY);
+let data = null;
+
+const $ = (id) => document.getElementById(id);
+const today = () => Math.floor(Date.now() / DAY);
+const signupDay = (a) => Math.floor(Date.parse(a.signup) / DAY);
+const mondayOf = (day) => day - ((day + 3) % 7);
+const fmt = (day) => new Date(day * DAY).toLocaleDateString(undefined, { timeZone: "UTC", month: "short", day: "numeric" });
+const activeBetween = (a, from, to) => a.activeDays.some((d) => d >= from && d <= to);
+
+$("sinceText").textContent = new Date(sinceDay * DAY).toLocaleDateString(undefined, { timeZone: "UTC", month: "long", day: "numeric" });
+try { $("self").checked = localStorage.getItem("dash.self") === "1"; } catch {}
+
+// Out of people old enough to measure, how many pass the test.
+function count(people, minDaysOld, test) {
+  const ready = people.filter((a) => today() - signupDay(a) >= minDaysOld);
+  return { of: ready.length, yes: ready.filter(test).length };
+}
+const checks = [
+  {
+    title: "Tried a focus session on their first day",
+    help: "Shows if people understand the app right away.",
+    goal: 0.6, goalText: "6 in 10",
+    run: (p) => count(p, 1, (a) => a.activated),
+  },
+  {
+    title: "Came back the next day",
+    help: "The most important number right now.",
+    goal: 0.2, goalText: "2 in 10",
+    run: (p) => count(p, 2, (a) => activeBetween(a, 1, 1)),
+  },
+  {
+    title: "Still using it after a month",
+    help: "Shows if it became a habit.",
+    goal: 0.1, goalText: "1 in 10",
+    run: (p) => count(p, 29, (a) => activeBetween(a, 22, 28)),
+  },
+];
+
+function badge(c, goal) {
+  if (c.of < 5) return `<span class="badge wait">Need more people</span>`;
+  return c.yes / c.of >= goal
+    ? `<span class="badge good">✓ Good</span>`
+    : `<span class="badge warn">Not there yet</span>`;
+}
+const share = (c) => (c.of ? `${Math.round((c.yes / c.of) * 100)}%` : "—");
+
+function render() {
+  if (!data) return;
+  const people = data.accounts.filter((a) => $("self").checked || !a.self);
+  const newPeople = people.filter((a) => signupDay(a) >= sinceDay);
+  const oldPeople = people.filter((a) => signupDay(a) < sinceDay);
+
+  $("updated").textContent = `${people.length} people signed up so far · updated ${new Date(data.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+
+  // The one-line answer.
+  const nextDay = checks[1].run(newPeople);
+  const weeks = Math.floor((today() - sinceDay) / 7);
+  let answer, why;
+  if (newPeople.length < 100 || weeks < 6) {
+    answer = "Too early to decide. Keep going.";
+    why = `Wait until at least 100 people have signed up with reminders on (now ${newPeople.length}) and 6 weeks have passed (now ${weeks}).`;
+  } else if (nextDay.yes / nextDay.of < 0.1) {
+    answer = "Time to change direction.";
+    why = "Even with reminders, fewer than 1 in 10 people come back the next day. Try a different audience or a different promise.";
+  } else {
+    answer = "It's working. Keep going.";
+    why = "People come back. Now focus on getting more of them, and test if they would pay.";
+  }
+  $("answer").innerHTML = `<p class="answer">${answer}</p><p>${why}</p>`;
+
+  // The three numbers, for people who joined with reminders on.
+  $("numbers").innerHTML = checks.map((ch) => {
+    const now = ch.run(newPeople);
+    const before = ch.run(oldPeople);
+    const line = now.of
+      ? `${now.yes} out of ${now.of} people`
+      : "No one to measure yet";
+    return `<div class="card number">
+      <div class="big">${share(now)}</div>
+      <div class="what">
+        <b>${ch.title}</b>
+        <span>${line} · goal ${ch.goalText}${before.of ? ` · before reminders: ${before.yes} out of ${before.of}` : ""}</span><br />
+        <span>${ch.help}</span>
+      </div>
+      ${badge(now, ch.goal)}
+    </div>`;
+  }).join("");
+
+  // Weekly groups.
+  const weeksMap = new Map();
+  for (const a of people) {
+    const w = mondayOf(signupDay(a));
+    if (!weeksMap.has(w)) weeksMap.set(w, []);
+    weeksMap.get(w).push(a);
+  }
+  const rows = [...weeksMap.entries()].sort((x, y) => x[0] - y[0]).slice(-10);
+  barChart($("signups"), rows.map(([w, p]) => ({
+    label: fmt(w), value: p.length, text: String(p.length),
+    tip: `Week of ${fmt(w)}: ${p.length} people signed up`, color: "var(--bar)",
+  })), { percent: false });
+  barChart($("returns"), rows.map(([w, p]) => {
+    const c = checks[1].run(p);
+    return {
+      label: fmt(w), value: c.of ? c.yes / c.of : null, text: c.of ? share(c) : "too new",
+      tip: c.of ? `Week of ${fmt(w)}: ${c.yes} out of ${c.of} came back` : `Week of ${fmt(w)}: too new to measure`,
+      color: w >= mondayOf(sinceDay) ? "var(--bar)" : "var(--bar-old)",
+    };
+  }), { percent: true, goal: 0.2 });
+}
+
+function barChart(el, bars, { percent, goal }) {
+  if (!bars.length) { el.innerHTML = `<p class="sub">No signups yet.</p>`; return; }
+  const W = 560, H = 200, pad = { l: 8, r: 8, t: 22, b: 26 };
+  const maxVal = Math.max(...bars.map((b) => b.value ?? 0), goal ?? 0, percent ? 0.3 : 1);
+  const top = maxVal * 1.1;
+  const slot = (W - pad.l - pad.r) / bars.length;
+  const bw = Math.min(44, slot * 0.6);
+  const yOf = (v) => H - pad.b - (v / top) * (H - pad.t - pad.b);
+  let svg = `<line x1="${pad.l}" x2="${W - pad.r}" y1="${H - pad.b}" y2="${H - pad.b}" stroke="var(--grid)" />`;
+  if (goal !== undefined) {
+    svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${yOf(goal)}" y2="${yOf(goal)}" stroke="var(--text-2)" stroke-width="1.5" stroke-dasharray="5 4" />`;
+  }
+  bars.forEach((b, i) => {
+    const cx = pad.l + slot * i + slot / 2;
+    const x = cx - bw / 2;
+    if (b.value !== null) {
+      const y = yOf(b.value), h = H - pad.b - y, r = Math.min(4, h);
+      svg += h > 0.5
+        ? `<path d="M${x},${H - pad.b} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${H - pad.b} Z" fill="${b.color}" />`
+        : `<line x1="${x}" x2="${x + bw}" y1="${H - pad.b - 1}" y2="${H - pad.b - 1}" stroke="${b.color}" stroke-width="2" />`;
+      svg += `<text class="val" x="${cx}" y="${y - 6}" text-anchor="middle">${b.text}</text>`;
+    } else {
+      svg += `<text x="${cx}" y="${H - pad.b - 6}" text-anchor="middle">${b.text}</text>`;
+    }
+    svg += `<text x="${cx}" y="${H - 6}" text-anchor="middle">${b.label}</text>`;
+    svg += `<rect class="hit" x="${pad.l + slot * i}" y="0" width="${slot}" height="${H}" fill="transparent" />`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img">${svg}</svg><div class="tip"></div>`;
+  const tip = el.querySelector(".tip");
+  el.querySelectorAll(".hit").forEach((hit, i) => {
+    hit.addEventListener("mousemove", (e) => {
+      const box = el.getBoundingClientRect();
+      tip.textContent = bars[i].tip;
+      tip.style.display = "block";
+      let x = e.clientX - box.left + 12;
+      if (x + tip.offsetWidth > box.width) x = e.clientX - box.left - tip.offsetWidth - 12;
+      tip.style.left = `${x}px`;
+      tip.style.top = `${e.clientY - box.top - tip.offsetHeight - 8}px`;
+    });
+    hit.addEventListener("mouseleave", () => (tip.style.display = "none"));
+  });
+}
+
+async function load() {
+  $("refresh").disabled = true;
+  $("updated").textContent = "Loading…";
+  try {
+    const res = await fetch("/api/data", { cache: "no-store" });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    data = body;
+    render();
+  } catch (e) {
+    $("updated").innerHTML = "";
+    $("updated").append(Object.assign(document.createElement("span"), { className: "error", textContent: `Could not load the data: ${e.message}` }));
+  } finally {
+    $("refresh").disabled = false;
+  }
+}
+
+$("refresh").addEventListener("click", load);
+$("self").addEventListener("change", () => { try { localStorage.setItem("dash.self", $("self").checked ? "1" : "0"); } catch {} render(); });
+load();
+</script>
+</body>
+</html>

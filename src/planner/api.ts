@@ -24,6 +24,23 @@ import type {
 
 type SuggestionTarget = "today" | "tomorrow";
 
+/** Must match the allowlist in planner_track (20261122000100_planner_history.sql). */
+export type JourneyEvent =
+  | "planner_opened"
+  | "tour_shown"
+  | "tour_finished"
+  | "first_task_shown"
+  | "first_task_added"
+  | "first_task_later"
+  | "focus_time_shown"
+  | "focus_time_saved"
+  | "focus_time_closed"
+  | "change_rejected"
+  | "error_shown";
+
+/** Short codes only (no typed text): the server rejects anything else. */
+export type JourneyDetail = Record<string, string | number | boolean>;
+
 interface PlanningClientOptions {
   cloud?: CloudTransport;
 }
@@ -290,6 +307,16 @@ export class PlanningClient {
       args,
       timezone: this.timezone,
     });
+  }
+
+  /**
+   * Records a step of the owner's journey in their server-side history
+   * (planner_history). Best effort: never queued, never retried, never thrown;
+   * an older backend without planner_track simply records nothing.
+   */
+  track(event: JourneyEvent, detail: JourneyDetail = {}): void {
+    if (this.disposed || !this.accountKey) return;
+    void this.cloud.execute("planner_track", { event, detail }).catch(() => {});
   }
 
   schedule(): Promise<ScheduleState> {

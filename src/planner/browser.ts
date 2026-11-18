@@ -377,6 +377,13 @@ export class BrowserCloud implements CloudTransport {
         );
         break;
       }
+      case "planner_track":
+        result = await this.post(
+          SUPABASE_ROUTES.track,
+          { p_event: args.event, p_detail: args.detail },
+          this.accountKey,
+        );
+        break;
       case "generate_weekly_review":
         result = await this.post(SUPABASE_ROUTES.weeklyReview, {
           timezone: args.timezone,

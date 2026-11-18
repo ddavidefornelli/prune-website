@@ -49,6 +49,8 @@ export interface Backend {
   /** Answers planner_schedule; null makes it fail like an unmigrated backend. */
   schedule: { focusMinute: number | null; weekdaysOnly: boolean; pushDevices: number } | null;
   receipts: Map<string, unknown>;
+  /** planner_track calls, in order: [event, detail]. */
+  journey: [string, Record<string, unknown>][];
 }
 
 export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: boolean; firstVisit: boolean }>({
@@ -56,7 +58,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
   expired: [false, { option: true }],
   firstVisit: [false, { option: true }],
   backend: async ({ context, signedIn, expired, firstVisit }, use) => {
-    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, emailPreferences: { daily: true, comeback: true }, schedule: { focusMinute: null, weekdaysOnly: false, pushDevices: 0 }, receipts: new Map() };
+    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, emailPreferences: { daily: true, comeback: true }, schedule: { focusMinute: null, weekdaysOnly: false, pushDevices: 0 }, receipts: new Map(), journey: [] };
     // Seed once per browser context, not on reload/sign-out or each new tab.
     await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey, tourKey }) => {
       if (localStorage.getItem("prune:test:seeded")) return;
@@ -108,6 +110,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
         return;
       }
       if (url.pathname === "/functions/v1/task-suggestions") { await send({ day: body.target === "tomorrow" ? state.data.tomorrow : state.data.today, suggestions: state.suggestions }); return; }
+      if (url.pathname === "/rest/v1/rpc/planner_track") { state.journey.push([body.p_event, body.p_detail]); await route.fulfill({ status: 204, headers }); return; }
       if (url.pathname === "/rest/v1/rpc/planner_schedule") {
         if (!state.schedule) { await send({ code: "PT400", message: "Unknown action." }, 404); return; }
         const args = body.p_args ?? {};

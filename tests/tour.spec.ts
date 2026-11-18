@@ -78,6 +78,16 @@ for (const width of [1100, 390]) {
     await picker.getByRole("button", { name: "Done", exact: true }).click();
     await expect(picker).toHaveCount(0);
 
+    // Every step lands in the account's history, without the task's title.
+    await expect.poll(() => backend.journey.map(([event]) => event)).toEqual([
+      "planner_opened", "tour_shown", "tour_finished", "first_task_shown", "first_task_added",
+      "focus_time_shown", "focus_time_saved", "focus_time_closed",
+    ]);
+    expect(backend.journey[0]![1]).toMatchObject({ new_account: true, from: "app" });
+    expect(backend.journey[4]![1]).toEqual({ minutes: 45 });
+    expect(backend.journey[6]![1]).toMatchObject({ mode: "onboarding", minute: 14 * 60 });
+    expect(JSON.stringify(backend.journey)).not.toContain("Write the intro");
+
     // Remembered: a reload brings back none of it; Overview shows the time and can change it.
     await page.reload();
     await expect(page.locator(".task")).toHaveCount(1);
@@ -142,6 +152,28 @@ test("accounts that already have tasks get no tour, and Overview offers the focu
   await page.locator(".focus-time-dialog").getByRole("button", { name: /Evening/ }).click();
   await page.locator(".focus-time-dialog").getByRole("button", { name: "Done", exact: true }).click();
   await expect(line).toContainText("19:00");
+});
+
+test("coming back to a planner left open counts as another visit, a quick glance does not", async ({ page, backend }) => {
+  backend.data.todayTasks.push(planned(backend.data.today, "Write a first draft"));
+  await openPlanner(page);
+  await expect.poll(() => backend.journey.map(([event]) => event)).toEqual(["planner_opened"]);
+  // Hide the tab, move the clock on, show it again.
+  const away = (minutes: number) => page.evaluate((ms) => {
+    const set = (state: string) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    set("hidden");
+    const realNow = Date.now.bind(Date);
+    Date.now = () => realNow() + ms;
+    set("visible");
+    Date.now = realNow;
+  }, minutes * 60_000);
+  await away(5);
+  await away(45);
+  await expect.poll(() => backend.journey.map(([event]) => event)).toEqual(["planner_opened", "planner_opened"]);
+  expect(backend.journey[1]![1]).toEqual({ new_account: false, from: "back", active_task: false, today_tasks: 1 });
 });
 
 test("a reminder link starts the next planned task", async ({ page, backend }) => {
