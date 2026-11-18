@@ -137,24 +137,24 @@ test("the batch limit holds and an unsubscribe token turns off one kind only", a
 
 const reminder = (overrides = {}) => ({ userId: owner, email: "owner@example.test", kind: "daily", tasks: ["Write report"], unsubscribeToken: other, ...overrides });
 
-test("the email shows the tasks, a START NOW button and an unsubscribe link, with task text escaped", () => {
+test("the email shows the tasks, a START WORKING button and an unsubscribe link, with task text escaped", () => {
   const email = buildReminderEmail(reminder({ tasks: ['<img src=x onerror="alert(1)">', "Call Ana & Bo"] }), SITE);
-  assert.equal(email.subject, 'Time to focus: <img src=x onerror="alert(1)">');
+  assert.equal(email.subject, 'Get it done: <img src=x onerror="alert(1)">');
   assert.ok(!email.html.includes("<img"));
   assert.ok(email.html.includes("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;"));
   assert.ok(email.html.includes("Call Ana &amp; Bo"));
-  assert.match(email.html, /bgcolor="#e5202b"[^>]*>\s*<a href="https:\/\/www\.prune\.win\/\?start=next"[^>]*>START NOW<\/a>/);
+  assert.match(email.html, /bgcolor="#e5202b"[^>]*>\s*<a href="https:\/\/www\.prune\.win\/\?start=next"[^>]*>START WORKING<\/a>/);
   assert.ok(email.html.includes(`https://www.prune.win/?unsubscribe=${other}&amp;kind=daily`));
   assert.ok(email.text.includes("- Call Ana & Bo"));
-  assert.equal(buildReminderEmail(reminder(), SITE).subject, "Time to focus: Write report");
+  assert.equal(buildReminderEmail(reminder(), SITE).subject, "Get it done: Write report");
   // Nothing planned at the focus time: ask for the one thing instead.
   const empty = buildReminderEmail(reminder({ tasks: [] }), SITE);
-  assert.equal(empty.subject, "What’s the one thing today?");
-  assert.ok(empty.text.includes("PLAN IT: https://www.prune.win/\n"));
+  assert.equal(empty.subject, "What will you get done today?");
+  assert.ok(empty.text.includes("PLAN AND START: https://www.prune.win/\n"));
   const comeback = buildReminderEmail(reminder({ kind: "comeback", tasks: [] }), SITE);
-  assert.equal(comeback.subject, "Hop back in");
+  assert.equal(comeback.subject, "Ready to get work done?");
   assert.ok(email.html.includes("border-radius:0;"), "square corners, like the app's buttons");
-  assert.ok(comeback.html.includes("START NOW"));
+  assert.ok(comeback.html.includes("GET TO WORK"));
   assert.ok(comeback.html.includes("kind=comeback"));
 });
 

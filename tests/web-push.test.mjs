@@ -97,19 +97,19 @@ const reminder = (kind, tasks = []) => ({ userId: "u1", email: "a@example.test",
 
 test("the focus-time notification starts the timer, or asks for the one thing", () => {
   assert.deepEqual(buildReminderPush(reminder("daily", ["A", "B"]), SITE), {
-    title: "Time to focus", body: "A · B", url: "https://www.prune.win/?start=next", tag: "prune-focus",
+    title: "Time to get it done", body: "A · B", url: "https://www.prune.win/?start=next", tag: "prune-focus",
   });
-  assert.equal(buildReminderPush(reminder("daily"), SITE).title, "What’s the one thing today?");
+  assert.equal(buildReminderPush(reminder("daily"), SITE).title, "What will you get done today?");
   assert.equal(buildReminderPush(reminder("daily"), SITE).url, SITE);
   assert.equal(buildReminderPush(reminder("comeback"), SITE).tag, "prune-comeback");
 });
 
 test("reminders from the earlier claim function still render as focus-time reminders", () => {
   const session = buildReminderEmail(reminder("session", ["Write report"]), SITE);
-  assert.equal(session.subject, "Time to focus: Write report");
+  assert.equal(session.subject, "Get it done: Write report");
   assert.ok(session.html.includes("kind=daily"));
   const activation = buildReminderEmail(reminder("activation"), SITE);
-  assert.equal(activation.subject, "What’s the one thing today?");
+  assert.equal(activation.subject, "What will you get done today?");
   assert.ok(activation.html.includes("kind=comeback"));
 });
 
@@ -145,8 +145,8 @@ test("the job pushes to every device after the email settles, never for a releas
   const response = await handler(new Request("https://fn.example.test/", { method: "POST", headers: { Authorization: "Bearer s3cret" } }));
   assert.deepEqual(await response.json(), { sent: 1, retry: 1, rejected: 0, released: 1, pushed: 1 });
   assert.deepEqual(pushes.sort(), [
-    ["https://push.example.test/a", "Time to focus", "Write report"],
-    ["https://push.example.test/b", "Time to focus", "Write report"],
+    ["https://push.example.test/a", "Time to get it done", "Write report"],
+    ["https://push.example.test/b", "Time to get it done", "Write report"],
   ]);
   assert.deepEqual(recorded.sort(), [["https://push.example.test/a", "sent"], ["https://push.example.test/b", "gone"]]);
 });

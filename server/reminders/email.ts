@@ -128,53 +128,53 @@ export function buildReminderEmail(
   const unsubscribeUrl = unsubscribePageUrl(siteUrl, reminder);
   if (reminder.kind === "comeback") {
     const line =
-      "Your plan is empty. Pick up to five tasks for today and start the first one. It takes a minute.";
+      "Pick what matters today, start the first task and get the day moving. A minute to plan, then real work done.";
     return {
-      subject: "Hop back in",
+      subject: "Ready to get work done?",
       html: layout({
-        preheader: "Five tasks. One day. Hop back in.",
-        heading: "Hop back in.",
+        preheader: "One task, one timer, real progress.",
+        heading: "Ready to get work done?",
         body: paragraph(line),
-        button: "START NOW",
+        button: "GET TO WORK",
         buttonUrl: siteUrl,
         unsubscribeUrl,
         footer:
           "You get this at most once a week while you are away from prune. ",
       }),
-      text: `Hop back in.\n\n${line}\n\nSTART NOW: ${siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
+      text: `Ready to get work done?\n\n${line}\n\nGET TO WORK: ${siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
     };
   }
   const tasks = reminder.tasks.map(clip);
   if (!tasks.length) {
     const line =
-      "Nothing is planned yet. Write down the one task that would make today a good day, then start the timer.";
+      "It’s your focus time. Write down the one task that would move your work forward, start the timer and end the day knowing you got it done.";
     return {
-      subject: "What’s the one thing today?",
+      subject: "What will you get done today?",
       html: layout({
-        preheader: "It’s your focus time.",
-        heading: "What’s the one thing today?",
+        preheader: "It’s your focus time. Time to make progress.",
+        heading: "What will you get done today?",
         body: paragraph(line),
-        button: "PLAN IT",
+        button: "PLAN AND START",
         buttonUrl: siteUrl,
         unsubscribeUrl,
         footer: FOCUS_FOOTER,
       }),
-      text: `What’s the one thing today?\n\n${line}\n\nPLAN IT: ${siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
+      text: `What will you get done today?\n\n${line}\n\nPLAN AND START: ${siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
     };
   }
   const start = startUrl(siteUrl);
   return {
-    subject: `Time to focus: ${tasks[0]}`,
+    subject: `Get it done: ${tasks[0]}`,
     html: layout({
       preheader: tasks.join(" · "),
-      heading: "Time to focus.",
-      body: taskRows(tasks),
-      button: "START NOW",
+      heading: "Time to get it done.",
+      body: `${paragraph("Your focus time is here. Start the first task and keep the momentum going.")}${taskRows(tasks)}`,
+      button: "START WORKING",
       buttonUrl: start,
       unsubscribeUrl,
       footer: FOCUS_FOOTER,
     }),
-    text: `Time to focus.\n\n${tasks.map((task) => `- ${task}`).join("\n")}\n\nSTART NOW: ${start}\n\nStop these emails: ${unsubscribeUrl}\n`,
+    text: `Time to get it done.\n\nYour focus time is here. Start the first task and keep the momentum going.\n\n${tasks.map((task) => `- ${task}`).join("\n")}\n\nSTART WORKING: ${start}\n\nStop these emails: ${unsubscribeUrl}\n`,
   };
 }
 
@@ -185,22 +185,22 @@ export function buildReminderPush(
 ): { title: string; body: string; url: string; tag: string } {
   if (reminder.kind === "comeback")
     return {
-      title: "Hop back in",
-      body: "Pick today’s tasks and start the first one.",
+      title: "Ready to get work done?",
+      body: "Pick what matters today, start the timer and feel the progress.",
       url: siteUrl,
       tag: "prune-comeback",
     };
   const tasks = reminder.tasks.map(clip);
   return tasks.length
     ? {
-        title: "Time to focus",
+        title: "Time to get it done",
         body: tasks.join(" · "),
         url: startUrl(siteUrl),
         tag: "prune-focus",
       }
     : {
-        title: "What’s the one thing today?",
-        body: "It’s your focus time. Plan one task and start the timer.",
+        title: "What will you get done today?",
+        body: "It’s your focus time. Name one task, start the timer, make progress.",
         url: siteUrl,
         tag: "prune-focus",
       };
