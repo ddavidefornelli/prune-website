@@ -139,14 +139,18 @@ const reminder = (overrides = {}) => ({ userId: owner, email: "owner@example.tes
 
 test("the email shows the tasks, a START NOW button and an unsubscribe link, with task text escaped", () => {
   const email = buildReminderEmail(reminder({ tasks: ['<img src=x onerror="alert(1)">', "Call Ana & Bo"] }), SITE);
-  assert.equal(email.subject, "2 tasks waiting today");
+  assert.equal(email.subject, 'Time to focus: <img src=x onerror="alert(1)">');
   assert.ok(!email.html.includes("<img"));
   assert.ok(email.html.includes("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;"));
   assert.ok(email.html.includes("Call Ana &amp; Bo"));
-  assert.match(email.html, /bgcolor="#e5202b"[^>]*>\s*<a href="https:\/\/www\.prune\.win\/"[^>]*>START NOW<\/a>/);
+  assert.match(email.html, /bgcolor="#e5202b"[^>]*>\s*<a href="https:\/\/www\.prune\.win\/\?start=next"[^>]*>START NOW<\/a>/);
   assert.ok(email.html.includes(`https://www.prune.win/?unsubscribe=${other}&amp;kind=daily`));
   assert.ok(email.text.includes("- Call Ana & Bo"));
-  assert.equal(buildReminderEmail(reminder(), SITE).subject, "1 task waiting today");
+  assert.equal(buildReminderEmail(reminder(), SITE).subject, "Time to focus: Write report");
+  // Nothing planned at the focus time: ask for the one thing instead.
+  const empty = buildReminderEmail(reminder({ tasks: [] }), SITE);
+  assert.equal(empty.subject, "What’s the one thing today?");
+  assert.ok(empty.text.includes("PLAN IT: https://www.prune.win/\n"));
   const comeback = buildReminderEmail(reminder({ kind: "comeback", tasks: [] }), SITE);
   assert.equal(comeback.subject, "Hop back in");
   assert.ok(email.html.includes("border-radius:0;"), "square corners, like the app's buttons");
@@ -183,7 +187,7 @@ test("the job needs its secret, sends every claim and reports counts only", asyn
   const { run, sent, released } = job();
   const response = await run();
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { sent: 2, retry: 0, rejected: 0, released: 0 });
+  assert.deepEqual(await response.json(), { sent: 2, retry: 0, rejected: 0, released: 0, pushed: 0 });
   assert.deepEqual(sent.map((email) => [email.to, email.kind]).sort(), [["other@example.test", "comeback"], ["owner@example.test", "daily"]]);
   assert.equal(sent.find((email) => email.kind === "daily").oneClickUrl, `https://project.supabase.co/functions/v1/email-unsubscribe?token=${other}&kind=daily`);
   assert.deepEqual(released, []);
@@ -191,7 +195,7 @@ test("the job needs its secret, sends every claim and reports counts only", asyn
 
 test("only retryable failures release their claim", async () => {
   const { run, released } = job({ send: async (email) => { if (email.kind === "daily") throw new Error("network"); return "rejected"; } });
-  assert.deepEqual(await (await run()).json(), { sent: 0, retry: 1, rejected: 1, released: 1 });
+  assert.deepEqual(await (await run()).json(), { sent: 0, retry: 1, rejected: 1, released: 1, pushed: 0 });
   assert.deepEqual(released, [[owner, "daily"]]);
   assert.equal((await job({ claim: async () => { throw new Error("db"); } }).run()).status, 500);
 });
@@ -202,7 +206,7 @@ test("an account-level refusal stops the run and releases every unsent claim", a
   const { run, released } = job({ concurrency: 1, claim: async () => many, send: async () => { attempts += 1; return attempts === 1 ? "sent" : "halt"; } });
   const response = await run();
   assert.equal(response.status, 502);
-  assert.deepEqual(await response.json(), { error: "provider_refused", sent: 1, retry: 0, rejected: 0, released: 5 });
+  assert.deepEqual(await response.json(), { error: "provider_refused", sent: 1, retry: 0, rejected: 0, released: 5, pushed: 0 });
   assert.equal(attempts, 2, "no further sends after the refusal");
   assert.deepEqual(released.map(([userId]) => userId).sort(), ["user-1", "user-2", "user-3", "user-4", "user-5"]);
   // With parallel workers, every claim is still either sent or released.

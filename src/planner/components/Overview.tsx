@@ -1,14 +1,22 @@
-import { untrack } from "solid-js";
+import { Show, untrack } from "solid-js";
 import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
 import { WeeklyReview } from "../../reviews/WeeklyReview";
+import { CheckInMeter } from "../../reviews/CheckInMeter";
+import { streakFor } from "../streak";
+import { StreakCounter } from "./StreakCounter";
 import type { PlanningClient } from "../api";
 import type { PlannerState } from "../create-planner";
+import type { ScheduleState } from "../types";
 import { ActivityCalendar } from "./ActivityCalendar";
+import { FocusTimeLine } from "./FocusTimeLine";
 
 export function Overview(props: {
   planner: PlannerState;
   client: PlanningClient;
   review: WeeklyReviewState;
+  /** The daily focus time; absent on a backend that cannot store one. */
+  schedule?: ScheduleState | null;
+  onChangeFocusTime?: () => void;
 }) {
   const planner = untrack(() => props.planner);
   const client = untrack(() => props.client);
@@ -26,6 +34,29 @@ export function Overview(props: {
             Profile
           </button>
         </div>
+        {/* The streak and the check-in, stacked on phones, side by side on laptops. */}
+        <div class="today-panels">
+          <Show when={planner.data()} keyed>
+            {(data) => <StreakCounter streak={streakFor(data)} />}
+          </Show>
+          <CheckInMeter
+            review={props.review}
+            today={planner.data()!.today}
+            onOpen={() =>
+              document
+                .querySelector(".weekly-overview")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          />
+        </div>
+        <Show when={props.schedule} keyed>
+          {(schedule) => (
+            <FocusTimeLine
+              schedule={schedule}
+              onChange={() => props.onChangeFocusTime?.()}
+            />
+          )}
+        </Show>
         <ActivityCalendar
           today={planner.data()!.today}
           completions={planner.data()!.completions}

@@ -1,9 +1,13 @@
 import {
   buildReminderEmail,
+  buildReminderPush,
+  unsubscribeKind,
   type Reminder,
   type ReminderEmail,
   type ReminderKind,
+  type UnsubscribeKind,
 } from "./email.ts";
+import type { PushPayload, PushResult, PushTarget } from "./web-push.ts";
 
 /**
  * `retry` when the provider may accept the same email later (network, 429, 5xx).
@@ -29,6 +33,18 @@ export type ReminderDependencies = {
   claim: () => Promise<Reminder[]>;
   release: (userId: string, kind: ReminderKind) => Promise<void>;
   send: (email: OutgoingEmail) => Promise<SendResult>;
+  /**
+   * Browser push, best effort and optional (absent while VAPID keys are not
+   * configured). Sent after the email is settled, never for a claim that is
+   * released, so a retried email does not repeat the notification.
+   */
+  push?: {
+    targets: (
+      userIds: string[],
+    ) => Promise<(PushTarget & { userId: string })[]>;
+    send: (target: PushTarget, payload: PushPayload) => Promise<PushResult>;
+    record: (endpoint: string, result: PushResult) => Promise<void>;
+  };
   concurrency?: number;
 };
 
@@ -55,7 +71,7 @@ export function sameSecret(given: string, expected: string): boolean {
 export function oneClickUrl(endpoint: string, reminder: Reminder): string {
   const url = new URL(endpoint);
   url.searchParams.set("token", reminder.unsubscribeToken);
-  url.searchParams.set("kind", reminder.kind);
+  url.searchParams.set("kind", unsubscribeKind(reminder.kind));
   return url.toString();
 }
 
@@ -83,7 +99,37 @@ export function createReminderHandler(
     } catch {
       return json(500, { error: "claim_failed" });
     }
-    const counts = { sent: 0, retry: 0, rejected: 0, released: 0 };
+    const counts = { sent: 0, retry: 0, rejected: 0, released: 0, pushed: 0 };
+    // Push endpoints for this run, by account. Without them, email still goes out.
+    const devices = new Map<string, PushTarget[]>();
+    if (deps.push && reminders.length) {
+      try {
+        for (const target of await deps.push.targets(
+          reminders.map((reminder) => reminder.userId),
+        )) {
+          const list = devices.get(target.userId) ?? [];
+          list.push(target);
+          devices.set(target.userId, list);
+        }
+      } catch {
+        /* Email only this run. */
+      }
+    }
+    const notify = async (reminder: Reminder) => {
+      const push = deps.push;
+      const targets = devices.get(reminder.userId);
+      if (!push || !targets) return;
+      const payload = buildReminderPush(reminder, deps.siteUrl);
+      await Promise.all(
+        targets.map(async (target) => {
+          const result = await push
+            .send(target, payload)
+            .catch((): PushResult => "failed");
+          if (result === "sent") counts.pushed += 1;
+          await push.record(target.endpoint, result).catch(() => {});
+        }),
+      );
+    };
     const queue = [...reminders];
     let halted = false;
     const release = async (reminder: Reminder) => {
@@ -111,6 +157,7 @@ export function createReminderHandler(
         }
         counts[result] += 1;
         if (result === "retry") await release(next);
+        else await notify(next);
       }
     };
     await Promise.all(
@@ -124,7 +171,7 @@ export function createReminderHandler(
 }
 
 export type UnsubscribeDependencies = {
-  unsubscribe: (token: string, kind: ReminderKind) => Promise<void>;
+  unsubscribe: (token: string, kind: UnsubscribeKind) => Promise<void>;
   allowedOrigins: Set<string>;
 };
 
@@ -160,7 +207,10 @@ export function createUnsubscribeHandler(
     const params = new URL(request.url).searchParams;
     const token = params.get("token") ?? "";
     const kind = params.get("kind");
-    if (!UUID.test(token) || (kind !== "daily" && kind !== "comeback"))
+    if (
+      !UUID.test(token) ||
+      (kind !== "daily" && kind !== "comeback" && kind !== "session")
+    )
       return empty(400);
     try {
       await deps.unsubscribe(token, kind);

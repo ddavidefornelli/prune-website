@@ -3,7 +3,7 @@ import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import type { PlanningClient } from "../planner/api";
 import { ActivityCalendar } from "../planner/components/ActivityCalendar";
 import type { PlannerState } from "../planner/create-planner";
-import { EmailReminders } from "./EmailReminders";
+import { Reminders } from "./Reminders";
 import { profileStats, todayFocusSeconds } from "./profile-stats";
 
 function focusMinutes(seconds: number): string {
@@ -97,7 +97,7 @@ export function Profile(props: {
           </>
         )}
       </Show>
-      <EmailReminders client={props.client} />
+      <Reminders client={props.client} />
       <div class="profile-links">
         <PrivacyPolicyButton />
         <button

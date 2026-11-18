@@ -78,6 +78,15 @@ export interface WeeklyReview {
 
 /** A month of the owner's own tasks, counted on the server. */
 /** Which reminder emails the account receives. */
+/** The owner's daily focus time, when prune reminds them to work. */
+export interface ScheduleState {
+  /** Minutes after local midnight; null when not chosen (reminders at 09:00, only for planned tasks). */
+  focusMinute: number | null;
+  weekdaysOnly: boolean;
+  /** Browsers with notifications on for this account. */
+  pushDevices: number;
+}
+
 export interface EmailPreferences {
   /** One email on days when planned tasks are still unfinished. */
   daily: boolean;

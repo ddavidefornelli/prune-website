@@ -368,6 +368,15 @@ export class BrowserCloud implements CloudTransport {
         );
         break;
       }
+      case "planner_schedule": {
+        const params = args.args as Record<string, unknown>;
+        result = await this.post(
+          SUPABASE_ROUTES.schedule,
+          { p_action: args.action, p_args: params, p_timezone: args.timezone },
+          this.accountKey,
+        );
+        break;
+      }
       case "generate_weekly_review":
         result = await this.post(SUPABASE_ROUTES.weeklyReview, {
           timezone: args.timezone,

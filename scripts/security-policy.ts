@@ -25,6 +25,11 @@ export const CONTENTSQUARE_IMAGES = ["https://*.contentsquare.net"];
 export const CONTENTSQUARE_RESOURCES = PRODUCTION_ORIGINS.flatMap((origin) =>
   ["/assets/", "/fonts/", "/prune-icon.png", "/prune-touch-icon.png", "/favicon.png", "/apple-touch-icon.png"].map((path) => `${origin}${path}`));
 
+// The service worker (notifications only) and the web app manifest, by exact
+// path: never 'self', which would include /api/.
+export const WORKER_SOURCES = PRODUCTION_ORIGINS.map((origin) => `${origin}/sw.js`);
+export const MANIFEST_SOURCES = PRODUCTION_ORIGINS.map((origin) => `${origin}/manifest.webmanifest`);
+
 export function integrity(content: string | Uint8Array): string {
   return `sha384-${createHash("sha384").update(content).digest("base64")}`;
 }
@@ -47,12 +52,12 @@ export function securityHeaders(apiOrigin: string, scriptHashes: string[]): Reco
     `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), ...ERROR_LOG_CONNECTIONS, ...SOUND_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" ")}`,
     `img-src 'self' ${CONTENTSQUARE_IMAGES.join(" ")}`,
     "font-src 'self'",
-    "manifest-src 'none'",
+    `manifest-src ${MANIFEST_SOURCES.join(" ")}`,
     "media-src 'none'",
     "object-src 'none'",
     "child-src 'none'",
     "frame-src 'none'",
-    "worker-src 'none'",
+    `worker-src ${WORKER_SOURCES.join(" ")}`,
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",
@@ -132,10 +137,10 @@ export function hardenHtml(html: string, assets: Map<string, string | Uint8Array
   html = html.replace(/<link\b[^>]*>/gi, (tag) => {
     const attributes = assetAttributes(tag, "link");
     if (attributes.get("rel") !== "stylesheet") {
-      // Only non-executable, same-origin icon metadata is expected alongside
+      // Only non-executable, same-origin icon and manifest metadata is expected alongside
       // styles. Do not silently miss a differently quoted/encoded stylesheet,
       // module preload or a newly introduced resource hint.
-      if (!["icon", "apple-touch-icon"].includes(attributes.get("rel") ?? "") || !/^\/(?!\/)[A-Za-z0-9_./-]+$/.test(attributes.get("href") ?? "")) {
+      if (!["icon", "apple-touch-icon", "manifest"].includes(attributes.get("rel") ?? "") || !/^\/(?!\/)[A-Za-z0-9_./-]+$/.test(attributes.get("href") ?? "")) {
         throw new Error("Unexpected production HTML link.");
       }
       return tag;

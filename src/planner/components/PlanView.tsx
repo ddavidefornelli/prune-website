@@ -10,19 +10,16 @@ import {
 } from "solid-js";
 import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
 import { plannedEstimate } from "../../reviews/check-in";
-import { CheckInMeter } from "../../reviews/CheckInMeter";
 import type { PlanningClient } from "../api";
 import { PLANNER_LIMITS } from "../constants";
 import type { PlannerState } from "../create-planner";
 import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
 import type { Hints } from "../hints";
 import type { Insight } from "../insights";
-import { streakFor } from "../streak";
 import { formatDuration, previousDay } from "../time";
 import { DoneBadge } from "./DoneBadge";
 import { EstimateDial } from "./EstimateDial";
 import { InsightDrop } from "./InsightDrop";
-import { StreakCounter } from "./StreakCounter";
 import { TaskForm } from "./TaskForm";
 import { TaskTitle } from "./TaskTitle";
 
@@ -210,18 +207,6 @@ export function PlanView(props: {
           </Index>
         </ol>
       </header>
-      <div class="today-panels">
-        <Show when={!tomorrow() && !firstPlan() && planner.data()} keyed>
-          {(data) => <StreakCounter streak={streakFor(data)} />}
-        </Show>
-        <Show when={!tomorrow() && props.review && planner.data()}>
-          <CheckInMeter
-            review={props.review!}
-            today={planner.data()!.today}
-            onOpen={() => planner.visit("habits")}
-          />
-        </Show>
-      </div>
       <Show when={!tomorrow() && props.checkInReady}>
         <aside class="review-unlocked" role="status">
           <p>

@@ -41,9 +41,12 @@ test("CSP and SRI use hashes of exact emitted bytes, with explicit managed analy
   assert.ok(!built.headers["Content-Security-Policy"].includes("unsafe-"));
   assert.equal(csp["style-src"], "'self'");
   assert.equal(csp["font-src"], "'self'");
-  for (const name of ["default-src", "script-src-attr", "style-src-attr", "object-src", "child-src", "frame-src", "worker-src", "base-uri", "form-action", "manifest-src", "media-src", "frame-ancestors"]) {
+  for (const name of ["default-src", "script-src-attr", "style-src-attr", "object-src", "child-src", "frame-src", "base-uri", "form-action", "media-src", "frame-ancestors"]) {
     assert.equal(csp[name], "'none'", name);
   }
+  // The notification worker and the manifest are allowed by exact path only.
+  assert.equal(csp["worker-src"], "https://www.prune.win/sw.js https://prune.win/sw.js");
+  assert.equal(csp["manifest-src"], "https://www.prune.win/manifest.webmanifest https://prune.win/manifest.webmanifest");
   assert.ok(!built.html.includes("frame-ancestors"), "HTTP-only directives do not belong in meta");
   assert.equal(built.headers["Cross-Origin-Resource-Policy"], "same-origin");
   assert.equal(built.headers["X-Frame-Options"], "DENY");

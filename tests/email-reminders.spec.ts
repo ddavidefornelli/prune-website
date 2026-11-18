@@ -8,8 +8,8 @@ test.describe("signed in", () => {
   test("Profile turns each reminder email on or off and restores the switch when saving fails", async ({ page, backend }) => {
     await openPlanner(page);
     await visitProfile(page);
-    const daily = page.getByRole("checkbox", { name: /Daily reminder/ });
-    const comeback = page.getByRole("checkbox", { name: /Come-back reminder/ });
+    const daily = page.getByRole("checkbox", { name: /Email reminder/ });
+    const comeback = page.getByRole("checkbox", { name: /Come-back email/ });
     await expect(daily).toBeChecked();
     await expect(comeback).toBeChecked();
 

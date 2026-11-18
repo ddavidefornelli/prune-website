@@ -46,6 +46,8 @@ export interface Backend {
   /** Answers month_stats; null makes the call fail like an unmigrated backend. */
   monthStats: Omit<MonthStats, "month"> | null;
   emailPreferences: { daily: boolean; comeback: boolean };
+  /** Answers planner_schedule; null makes it fail like an unmigrated backend. */
+  schedule: { focusMinute: number | null; weekdaysOnly: boolean; pushDevices: number } | null;
   receipts: Map<string, unknown>;
 }
 
@@ -54,7 +56,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
   expired: [false, { option: true }],
   firstVisit: [false, { option: true }],
   backend: async ({ context, signedIn, expired, firstVisit }, use) => {
-    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, emailPreferences: { daily: true, comeback: true }, receipts: new Map() };
+    const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, emailPreferences: { daily: true, comeback: true }, schedule: { focusMinute: null, weekdaysOnly: false, pushDevices: 0 }, receipts: new Map() };
     // Seed once per browser context, not on reload/sign-out or each new tab.
     await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey, tourKey }) => {
       if (localStorage.getItem("prune:test:seeded")) return;
@@ -106,6 +108,12 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
         return;
       }
       if (url.pathname === "/functions/v1/task-suggestions") { await send({ day: body.target === "tomorrow" ? state.data.tomorrow : state.data.today, suggestions: state.suggestions }); return; }
+      if (url.pathname === "/rest/v1/rpc/planner_schedule") {
+        if (!state.schedule) { await send({ code: "PT400", message: "Unknown action." }, 404); return; }
+        const args = body.p_args ?? {};
+        if (body.p_action === "set_focus_time") Object.assign(state.schedule, { focusMinute: args.minute, weekdaysOnly: args.weekdaysOnly });
+        await send(state.schedule); return;
+      }
       if (url.pathname !== "/rest/v1/rpc/planner_call") { await send({ error: "Unexpected fixture route" }, 404); return; }
       if (state.offline) { await route.abort("internetdisconnected"); return; }
       const action = body.p_action;
@@ -212,17 +220,18 @@ export async function synced(page: Page) {
  * The tour can't be skipped: step through it and finish from the last step.
  * An empty account must create its first task there (a starting idea here).
  */
-export async function finishTour(page: Page, task = "Plan the week ahead 30m") {
+/** Walks the tour, adds a first task on its card, then answers the focus-time question with "Not now". */
+export async function finishTour(page: Page, task = "Plan the week ahead") {
   const tour = page.locator(".tour-popup");
-  const notNow = tour.getByRole("button", { name: "Not now", exact: true });
-  const writing = page.locator(".tour-highlight.is-writing");
-  while (!(await notNow.isVisible()) && !(await writing.isVisible()))
+  await expect(tour).toBeVisible();
+  while (await tour.isVisible())
     await tour.getByRole("button", { name: "Next", exact: true }).click();
-  if (await notNow.isVisible()) await notNow.click();
-  else {
-    // The last step is typed into the planner's own form, not the popup.
-    await page.locator("#app .task-form").getByRole("textbox", { name: "Outcome" }).fill(task);
-    await page.locator("#app .task-form").getByRole("button", { name: "Add task" }).click();
-  }
-  await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
+  const card = page.locator(".first-task-dialog");
+  await card.getByRole("textbox", { name: "Your first task" }).fill(task);
+  await card.getByRole("button", { name: "Add task", exact: true }).click();
+  await expect(card).toHaveCount(0);
+  const picker = page.locator(".focus-time-dialog");
+  await expect(picker).toBeVisible();
+  await picker.getByRole("button", { name: "Not now", exact: true }).click();
+  await expect(picker).toHaveCount(0);
 }

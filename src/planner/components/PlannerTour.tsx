@@ -5,12 +5,9 @@ import {
   onCleanup,
   onMount,
   Show,
-  untrack,
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import type { PlannerView } from "../constants";
-import { errorMessage } from "../errors";
-import { MOBILE_QUERY } from "../constants";
 
 export type TourView = Exclude<PlannerView, "profile" | "focus">;
 
@@ -19,100 +16,54 @@ interface Stop {
   target: string;
   title: string;
   text: string;
-  /** Hug the content: leave the target's top padding out of the highlight. */
-  trimTop?: boolean;
 }
 
-/** The weekly check-in, shown from the first visit. */
-const REVIEW: Stop = {
-  view: "today",
-  target: ".review-meter",
-  title: "A weekly check-in",
-  text: "Three days after you start, then once a week, prune looks back at your last seven days: how your estimates held up, how many tasks you really finish, and a plan for next week.",
-};
-
-const AROUND: readonly Stop[] = [
-  {
-    view: "tomorrow",
-    target: "nav button[aria-current]",
-    title: "Plan ahead",
-    text: "Add tomorrow’s tasks here.",
-  },
-  {
-    view: "habits",
-    target: "nav button[aria-current]",
-    title: "See your progress",
-    text: "Your activity and AI reviews live here.",
-  },
-];
-
-/** With a planned task: point at it, then end by starting its timer. */
-const WITH_TASK: readonly Stop[] = [
-  {
-    view: "today",
-    target: ".task .editable-title",
-    title: "Your task is here",
-    text: "Tap the title to edit it. Keep today to five tasks.",
-  },
-  {
-    view: "today",
-    target: ".task .task-estimate",
-    title: "Adjust your estimate",
-    text: "Turn this dial to change the minutes.",
-  },
-  REVIEW,
-  ...AROUND,
-  {
-    view: "today",
-    target: ".task > button",
-    title: "Ready to focus?",
-    text: "Start your task’s timer when you’re ready. You can pause anytime.",
-  },
-];
-
-/** A new, empty planner: explain the rule, then require the first task. */
-const EMPTY: readonly Stop[] = [
+/**
+ * A new, empty planner: a short look around the real screens. Onboarding
+ * then continues on one card: the first task (FirstTaskDialog), the focus
+ * time and its reminders (FocusTimeDialog).
+ */
+const STOPS: readonly Stop[] = [
   {
     view: "today",
     target: ".plan-heading",
     title: "Five tasks a day",
-    text: "That’s the whole rule. Fewer tasks, more focus.",
+    text: "That’s the whole rule. Plan a few things that matter, then do them one at a time.",
   },
-  REVIEW,
-  ...AROUND,
   {
-    view: "today",
-    // Point at the task row the first task will fill, not the page title.
-    target: ".task-form",
-    trimTop: true,
-    title: "What’s the most important thing you have to do today?",
-    text: "Type it in the green box and press Add. Add a time like 45m to set the estimate.",
+    view: "tomorrow",
+    target: "nav button[aria-current]",
+    title: "Plan ahead",
+    text: "Add tomorrow’s tasks the evening before, so the morning starts with a plan.",
+  },
+  {
+    view: "habits",
+    target: ".today-panels",
+    title: "Watch your progress",
+    text: "Your streak, your weekly check-in and your focus time live in Overview.",
   },
 ];
 
+/** Onboarding's step numbers: the tour, then the first task and the focus time's two screens. */
+export const ONBOARDING = {
+  task: STOPS.length + 1,
+  focus: STOPS.length + 2,
+  total: STOPS.length + 3,
+} as const;
+
 interface PlannerTourProps {
-  /**
-   * Whether Today has a planned task. Read once to pick the tour; after that,
-   * a task appearing ends the empty tour, since its last step is adding one.
-   */
-  hasTask: boolean;
   onVisit: (view: TourView) => void;
-  onDone: (started: boolean) => void;
-  onStart: () => Promise<void>;
+  /** The last step's Next: on to the first task. */
+  onFinish: () => void;
 }
 
 /** Only measurement/positioning is imperative; coach-mark content stays reactive. */
 export function PlannerTour(props: PlannerTourProps) {
   const [index, setIndex] = createSignal(0);
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal("");
   const headingId = createUniqueId();
-  const hasTask = untrack(() => props.hasTask);
-  const stops = hasTask ? WITH_TASK : EMPTY;
+  const stops = STOPS;
   const stop = () => stops[index()]!;
   const last = () => index() === stops.length - 1;
-  /** The empty tour's last step: the user types into the real task form. */
-  const writing = () => last() && !hasTask;
   let popup!: HTMLElement;
   let highlight!: HTMLDivElement;
   let arrow!: HTMLSpanElement;
@@ -124,19 +75,10 @@ export function PlannerTour(props: PlannerTourProps) {
   const position = () => {
     if (!target?.isConnected || disposed) return;
     const box0 = target.getBoundingClientRect();
-    const trim = stop().trimTop
-      ? parseFloat(getComputedStyle(target).paddingTop) || 0
-      : 0;
-    const rect = {
-      left: box0.left,
-      width: box0.width,
-      top: box0.top + trim,
-      bottom: box0.bottom,
-      height: box0.height - trim,
-    };
+    const rect = box0;
     // Even breathing room on every side, kept inside the viewport.
-    const padX = writing() ? 12 : 10;
-    const padY = writing() ? 12 : 8;
+    const padX = 10;
+    const padY = 8;
     const frameLeft = Math.max(4, rect.left - padX);
     const frameRight = Math.min(
       document.documentElement.clientWidth - 4,
@@ -152,32 +94,6 @@ export function PlannerTour(props: PlannerTourProps) {
       width: `${frameWidth}px`,
       height: `${frameHeight}px`,
     });
-    // The overlay keeps blocking the page, except for a hole over the form.
-    const overlay = highlight.parentElement!;
-    if (writing()) {
-      // Cut along the frame's inner, rounded edge so the whole border shows.
-      const style = getComputedStyle(highlight);
-      const inset = parseFloat(style.borderTopWidth) || 0;
-      const [l, t] = [frameLeft + inset, frameTop + inset];
-      const [r, b] = [
-        frameLeft + frameWidth - inset,
-        frameTop + frameHeight - inset,
-      ];
-      const k = Math.max(
-        0,
-        Math.min(
-          (parseFloat(style.borderTopLeftRadius) || 0) - inset,
-          (r - l) / 2,
-          (b - t) / 2,
-        ),
-      );
-      const [w, h] = [window.innerWidth, window.innerHeight];
-      overlay.style.clipPath =
-        `path(evenodd, "M0 0H${w}V${h}H0Z` +
-        `M${l + k} ${t}H${r - k}A${k} ${k} 0 0 1 ${r} ${t + k}V${b - k}` +
-        `A${k} ${k} 0 0 1 ${r - k} ${b}H${l + k}A${k} ${k} 0 0 1 ${l} ${b - k}` +
-        `V${t + k}A${k} ${k} 0 0 1 ${l + k} ${t}Z")`;
-    } else overlay.style.clipPath = "";
     // The popup hangs off the frame, centred on it, by the arrow's length.
     const box = popup.getBoundingClientRect();
     const viewportWidth = document.documentElement.clientWidth;
@@ -204,21 +120,10 @@ export function PlannerTour(props: PlannerTourProps) {
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(position);
   };
-  const finish = () => {
-    if (!busy()) props.onDone(false);
-  };
   // The tour can't be skipped: no Skip button, and Escape does nothing.
-  // It ends only from its last step.
-
-  // The empty tour ends once the first task exists, from the real form.
-  createEffect(() => {
-    if (!hasTask && props.hasTask) props.onDone(false);
-  });
-
   createEffect(() => {
     const current = stop();
     props.onVisit(current.view);
-    setError("");
     queueMicrotask(() => {
       if (disposed) return;
       const app = document.getElementById("app");
@@ -226,17 +131,8 @@ export function PlannerTour(props: PlannerTourProps) {
         app?.querySelector<HTMLElement>(current.target) ??
         app?.querySelector<HTMLElement>("nav button[aria-current]") ??
         null;
-      target?.scrollIntoView({
-        block: writing() ? "center" : "nearest",
-        inline: "nearest",
-      });
-      // On a phone, focusing the field would cover the hint with the keyboard.
-      const field = writing()
-        ? target?.querySelector<HTMLInputElement>("input")
-        : null;
-      if (field && !window.matchMedia(MOBILE_QUERY).matches)
-        field.focus({ preventScroll: true });
-      else heading.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      heading.focus({ preventScroll: true });
       schedule();
     });
   });
@@ -254,24 +150,9 @@ export function PlannerTour(props: PlannerTourProps) {
     });
   });
 
-  async function start(): Promise<void> {
-    if (busy()) return;
-    setBusy(true);
-    try {
-      await props.onStart();
-      if (!disposed) props.onDone(true);
-    } catch (cause) {
-      if (!disposed) setError(errorMessage(cause));
-    } finally {
-      if (!disposed) setBusy(false);
-    }
-  }
-
   return (
     <Dialog
       class="planner-tour-dialog"
-      classList={{ "is-writing": writing() }}
-      modal={!writing()}
       aria-labelledby={headingId}
       onDismiss={() => {}}
       preventCancel
@@ -281,7 +162,6 @@ export function PlannerTour(props: PlannerTourProps) {
           highlight = element;
         }}
         class="tour-highlight"
-        classList={{ "is-writing": writing() }}
         aria-hidden="true"
       />
       <section
@@ -292,7 +172,7 @@ export function PlannerTour(props: PlannerTourProps) {
       >
         <div class="tour-top">
           <span class="tour-step">
-            {index() + 1} / {stops.length}
+            {index() + 1} / {ONBOARDING.total}
           </span>
         </div>
         <h2
@@ -305,47 +185,19 @@ export function PlannerTour(props: PlannerTourProps) {
           {stop().title}
         </h2>
         <p class="muted">{stop().text}</p>
-        <p class="error" role="alert" hidden={!error()}>
-          {error()}
-        </p>
         <div class="tour-actions">
           <Show when={index() > 0}>
-            <button
-              type="button"
-              disabled={busy()}
-              onClick={() => setIndex(index() - 1)}
-            >
+            <button type="button" onClick={() => setIndex(index() - 1)}>
               Back
             </button>
           </Show>
-          <Show
-            when={last()}
-            fallback={
-              <button
-                type="button"
-                class="tour-primary"
-                onClick={() => setIndex(index() + 1)}
-              >
-                Next
-              </button>
-            }
+          <button
+            type="button"
+            class="tour-primary"
+            onClick={() => (last() ? props.onFinish() : setIndex(index() + 1))}
           >
-            <Show when={hasTask} fallback={null}>
-              <button type="button" disabled={busy()} onClick={finish}>
-                Not now
-              </button>
-              <button
-                type="button"
-                class="tour-primary"
-                disabled={busy()}
-                onClick={() => {
-                  void start();
-                }}
-              >
-                Start focusing
-              </button>
-            </Show>
-          </Show>
+            Next
+          </button>
         </div>
       </section>
       <span

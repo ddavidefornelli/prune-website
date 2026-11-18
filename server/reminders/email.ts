@@ -1,10 +1,20 @@
-export type ReminderKind = "daily" | "comeback";
+/**
+ * "daily" is the focus-time reminder. "session" and "activation" only come
+ * from the claim function before 20261121000100_focus_time.sql and are sent
+ * as focus-time reminders too.
+ */
+export type ReminderKind = "daily" | "comeback" | "session" | "activation";
+/** The switches an unsubscribe link can turn off. "session" stays for old links. */
+export type UnsubscribeKind = "daily" | "comeback" | "session";
+
+export const unsubscribeKind = (kind: ReminderKind): UnsubscribeKind =>
+  kind === "comeback" || kind === "activation" ? "comeback" : "daily";
 
 export interface Reminder {
   userId: string;
   email: string;
   kind: ReminderKind;
-  /** Today's unfinished task outcomes; empty for a come-back email. */
+  /** Today's unfinished tasks; empty when nothing is planned and for a come-back email. */
   tasks: string[];
   unsubscribeToken: string;
 }
@@ -39,7 +49,14 @@ export function unsubscribePageUrl(
 ): string {
   const url = new URL("/", siteUrl);
   url.searchParams.set("unsubscribe", reminder.unsubscribeToken);
-  url.searchParams.set("kind", reminder.kind);
+  url.searchParams.set("kind", unsubscribeKind(reminder.kind));
+  return url.toString();
+}
+
+/** Opens the planner and starts the next planned task (see src/planner/deep-link.ts). */
+export function startUrl(siteUrl: string): string {
+  const url = new URL("/", siteUrl);
+  url.searchParams.set("start", "next");
   return url.toString();
 }
 
@@ -51,7 +68,7 @@ function layout(parts: {
   heading: string;
   body: string;
   button: string;
-  siteUrl: string;
+  buttonUrl: string;
   unsubscribeUrl: string;
   footer: string;
 }): string {
@@ -74,7 +91,7 @@ function layout(parts: {
 <tr><td style="padding-bottom:36px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr><td align="center" bgcolor="#e5202b" style="background:#e5202b;border-radius:0;">
-<a href="${escapeHtml(parts.siteUrl)}" style="display:block;padding:22px 16px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:28px;font-weight:bold;letter-spacing:2px;color:#ffffff;text-decoration:none;">${escapeHtml(parts.button)}</a>
+<a href="${escapeHtml(parts.buttonUrl)}" style="display:block;padding:22px 16px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:28px;font-weight:bold;letter-spacing:2px;color:#ffffff;text-decoration:none;">${escapeHtml(parts.button)}</a>
 </td></tr>
 </table>
 </td></tr>
@@ -89,6 +106,21 @@ ${escapeHtml(parts.footer)}
 </html>`;
 }
 
+const paragraph = (text: string) =>
+  `<p style="margin:0 0 12px;font-size:16px;line-height:24px;color:#efeee7;">${escapeHtml(text)}</p>`;
+
+function taskRows(tasks: string[]): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">\n${tasks
+    .map(
+      (task) =>
+        `<tr><td style="padding:14px 16px;font-size:16px;line-height:22px;color:#efeee7;background:#1e1e1e;border-bottom:2px solid #000000;">${escapeHtml(task)}</td></tr>`,
+    )
+    .join("\n")}\n</table>`;
+}
+
+const FOCUS_FOOTER =
+  "You get this at your focus time. Change it in prune under Profile. ";
+
 export function buildReminderEmail(
   reminder: Reminder,
   siteUrl: string,
@@ -102,9 +134,9 @@ export function buildReminderEmail(
       html: layout({
         preheader: "Five tasks. One day. Hop back in.",
         heading: "Hop back in.",
-        body: `<p style="margin:0;font-size:16px;line-height:24px;color:#efeee7;">${escapeHtml(line)}</p>`,
+        body: paragraph(line),
         button: "START NOW",
-        siteUrl,
+        buttonUrl: siteUrl,
         unsubscribeUrl,
         footer:
           "You get this at most once a week while you are away from prune. ",
@@ -113,30 +145,63 @@ export function buildReminderEmail(
     };
   }
   const tasks = reminder.tasks.map(clip);
-  const count = tasks.length;
-  const heading =
-    count === 1
-      ? "1 task is waiting today."
-      : `${count} tasks are waiting today.`;
-  const rows = tasks
-    .map(
-      (task) =>
-        `<tr><td style="padding:14px 16px;font-size:16px;line-height:22px;color:#efeee7;background:#1e1e1e;border-bottom:2px solid #000000;">${escapeHtml(task)}</td></tr>`,
-    )
-    .join("\n");
+  if (!tasks.length) {
+    const line =
+      "Nothing is planned yet. Write down the one task that would make today a good day, then start the timer.";
+    return {
+      subject: "What’s the one thing today?",
+      html: layout({
+        preheader: "It’s your focus time.",
+        heading: "What’s the one thing today?",
+        body: paragraph(line),
+        button: "PLAN IT",
+        buttonUrl: siteUrl,
+        unsubscribeUrl,
+        footer: FOCUS_FOOTER,
+      }),
+      text: `What’s the one thing today?\n\n${line}\n\nPLAN IT: ${siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
+    };
+  }
+  const start = startUrl(siteUrl);
   return {
-    subject:
-      count === 1 ? "1 task waiting today" : `${count} tasks waiting today`,
+    subject: `Time to focus: ${tasks[0]}`,
     html: layout({
       preheader: tasks.join(" · "),
-      heading,
-      body: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">\n${rows}\n</table>`,
+      heading: "Time to focus.",
+      body: taskRows(tasks),
       button: "START NOW",
-      siteUrl,
+      buttonUrl: start,
       unsubscribeUrl,
-      footer:
-        "You get this on days when tasks you planned are still unfinished. ",
+      footer: FOCUS_FOOTER,
     }),
-    text: `${heading}\n\n${tasks.map((task) => `- ${task}`).join("\n")}\n\nSTART NOW: ${siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
+    text: `Time to focus.\n\n${tasks.map((task) => `- ${task}`).join("\n")}\n\nSTART NOW: ${start}\n\nStop these emails: ${unsubscribeUrl}\n`,
   };
+}
+
+/** The same reminder as a browser notification. Task text travels encrypted. */
+export function buildReminderPush(
+  reminder: Reminder,
+  siteUrl: string,
+): { title: string; body: string; url: string; tag: string } {
+  if (reminder.kind === "comeback")
+    return {
+      title: "Hop back in",
+      body: "Pick today’s tasks and start the first one.",
+      url: siteUrl,
+      tag: "prune-comeback",
+    };
+  const tasks = reminder.tasks.map(clip);
+  return tasks.length
+    ? {
+        title: "Time to focus",
+        body: tasks.join(" · "),
+        url: startUrl(siteUrl),
+        tag: "prune-focus",
+      }
+    : {
+        title: "What’s the one thing today?",
+        body: "It’s your focus time. Plan one task and start the timer.",
+        url: siteUrl,
+        tag: "prune-focus",
+      };
 }

@@ -7,6 +7,7 @@ export const SUPABASE_ROUTES = {
   signOut: "/auth/v1/logout",
   authSettings: "/auth/v1/settings",
   planner: "/rest/v1/rpc/planner_call",
+  schedule: "/rest/v1/rpc/planner_schedule",
   weeklyReview: "/functions/v1/weekly-review",
   taskSuggestions: "/functions/v1/task-suggestions",
   emailUnsubscribe: "/functions/v1/email-unsubscribe",

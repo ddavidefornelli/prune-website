@@ -4,7 +4,10 @@ import { SUPABASE_ROUTES } from "../shared/api-routes";
 
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type UnsubscribeRequest = { token: string; kind: "daily" | "comeback" };
+export type UnsubscribeRequest = {
+  token: string;
+  kind: "daily" | "comeback" | "session";
+};
 
 /** Reads the link from a reminder email: /?unsubscribe=<token>&kind=<kind>. */
 export function unsubscribeRequest(search: string): UnsubscribeRequest | null {
@@ -12,7 +15,8 @@ export function unsubscribeRequest(search: string): UnsubscribeRequest | null {
   const token = params.get("unsubscribe");
   const kind = params.get("kind");
   if (!token || !TOKEN.test(token)) return null;
-  if (kind !== "daily" && kind !== "comeback") return null;
+  if (kind !== "daily" && kind !== "comeback" && kind !== "session")
+    return null;
   return { token, kind };
 }
 
@@ -25,7 +29,9 @@ export function Unsubscribe(props: { request: UnsubscribeRequest }) {
     "ask",
   );
   const name = () =>
-    props.request.kind === "daily" ? "daily reminder" : "come-back";
+    ({ daily: "daily reminder", comeback: "come-back", session: "start-time" })[
+      props.request.kind
+    ];
 
   const confirm = async () => {
     setState("busy");

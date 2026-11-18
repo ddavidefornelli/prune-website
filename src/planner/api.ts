@@ -8,12 +8,14 @@ import type {
 } from "./commands.ts";
 import { WEEKLY_AI_VERSION } from "./constants.ts";
 import { errorCode } from "./errors.ts";
+import { forgetPush } from "./push.ts";
 import type { LocalQueue } from "./local-queue.ts";
 import type {
   AuthStatus,
   Dashboard,
   EmailPreferences,
   MonthStats,
+  ScheduleState,
   Task,
   TaskSuggestion,
   CheckInPlan,
@@ -209,6 +211,8 @@ export class PlanningClient {
   }
 
   async signOut(): Promise<void> {
+    // A signed-out browser must not keep receiving this account's task titles.
+    await forgetPush((endpoint) => this.removePushSubscription(endpoint));
     await this.withQueueStopped(() => this.request("sign_out"));
   }
 
@@ -273,6 +277,43 @@ export class PlanningClient {
   ): Promise<EmailPreferences> {
     this.assertOpen();
     return this.query("set_email_preferences", { ...preferences });
+  }
+
+  /** Never queued, like every preference. */
+  private scheduleCall(
+    action: string,
+    args: Record<string, unknown> = {},
+  ): Promise<ScheduleState> {
+    this.assertOpen();
+    return this.request("planner_schedule", {
+      action,
+      args,
+      timezone: this.timezone,
+    });
+  }
+
+  schedule(): Promise<ScheduleState> {
+    return this.scheduleCall("schedule");
+  }
+
+  /** `minute` after local midnight, or null to clear the focus time. */
+  setFocusTime(
+    minute: number | null,
+    weekdaysOnly: boolean,
+  ): Promise<ScheduleState> {
+    return this.scheduleCall("set_focus_time", { minute, weekdaysOnly });
+  }
+
+  savePushSubscription(subscription: {
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  }): Promise<ScheduleState> {
+    return this.scheduleCall("save_push", subscription);
+  }
+
+  removePushSubscription(endpoint: string): Promise<ScheduleState> {
+    return this.scheduleCall("remove_push", { endpoint });
   }
 
   async weeklyOverview(): Promise<WeeklyOverview> {

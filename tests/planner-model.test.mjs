@@ -81,12 +81,12 @@ test("onboarding is scoped to an account and never offered over existing history
   assert.equal(shouldOfferOnboarding(dashboard(), "alice", { getItem() { throw new Error("Storage unavailable"); } }), true);
 });
 
-test("the tour is offered once per account, with or without tasks, never over a running timer", () => {
+test("the tour is offered once per account, only to an empty planner, never over a running timer", () => {
   const { storage } = persistence();
   const data = dashboard();
   assert.equal(shouldOfferTour(data, "alice", storage), true);
-  data.completions = [{ day: data.today, count: 4 }];
-  assert.equal(shouldOfferTour(data, "alice", storage), true, "existing accounts get it too");
+  assert.equal(shouldOfferTour({ ...data, completions: [{ day: data.today, count: 4 }] }, "alice", storage), false, "history: no tour");
+  assert.equal(shouldOfferTour({ ...data, tomorrowTasks: [{ id: "t" }] }, "alice", storage), false, "tasks: no tour");
   storage.setItem(tourKey("alice"), "done");
   assert.equal(shouldOfferTour(data, "alice", storage), false);
   assert.equal(shouldOfferTour(data, "bob", storage), true);

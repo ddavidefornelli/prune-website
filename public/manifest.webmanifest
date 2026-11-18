@@ -1,0 +1,14 @@
+{
+  "name": "prune",
+  "short_name": "prune",
+  "description": "Five tasks a day. One at a time.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f2f2",
+  "theme_color": "#f2f2f2",
+  "icons": [
+    { "src": "/prune-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/prune-icon.png", "sizes": "64x64", "type": "image/png", "purpose": "any" }
+  ]
+}

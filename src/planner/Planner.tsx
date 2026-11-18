@@ -1,5 +1,6 @@
 import {
   createEffect,
+  createResource,
   createSignal,
   Match,
   Show,
@@ -14,7 +15,10 @@ import { FocusView } from "./components/FocusView";
 import { Overview } from "./components/Overview";
 import { PlanView } from "./components/PlanView";
 import { PlannerNavigation } from "./components/PlannerNavigation";
-import { PlannerTour } from "./components/PlannerTour";
+import { ONBOARDING, PlannerTour } from "./components/PlannerTour";
+import { FirstTaskDialog } from "./components/FirstTaskDialog";
+import { FocusTimeDialog } from "./components/FocusTimeDialog";
+import { takeStartLink } from "./deep-link";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { VIEW_LABELS } from "./constants";
 import { createPlanner } from "./create-planner";
@@ -37,8 +41,22 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   const [firstRun, setFirstRun] = createSignal(false);
   const [shortcuts, setShortcuts] = createSignal(false);
   const [tour, setTour] = createSignal(false);
+  // Onboarding's step after the tour; the tour counts as seen once it is answered.
+  const [firstTask, setFirstTask] = createSignal(false);
   const [insight, setInsight] = createSignal<Insight | null>(null);
   const [checkInReady, setCheckInReady] = createSignal(false);
+  // The focus-time question; `onboarding` also offers to start right away.
+  const [focusPicker, setFocusPicker] = createSignal<
+    "onboarding" | "change" | null
+  >(null);
+  // Missing on an older backend: the focus-time features stay hidden.
+  const [schedule, { mutate: setSchedule }] = createResource(() =>
+    client.schedule().catch(() => null),
+  );
+  // A link from a reminder (/?start=next) opens the timer on the next task.
+  const startLink = takeStartLink();
+  const plannedToday = () =>
+    planner.data()?.todayTasks.find((t) => t.status === "planned") ?? null;
   // A check-in that lands while the planner is open is announced on Today.
   let newestReview: number | null = null;
   createEffect(() => {
@@ -81,6 +99,27 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     }
   }
 
+  async function addFirstTask(
+    outcome: string,
+    minutes: number,
+  ): Promise<boolean> {
+    const today = planner.data()?.today;
+    if (!today) return false;
+    const added = await planner.mutate(() =>
+      client.create(outcome, today, minutes),
+    );
+    if (added) endFirstTask();
+    return added;
+  }
+
+  /** After the first task (or Later): remember the tour, then ask for the focus time. */
+  function endFirstTask(): void {
+    setFirstTask(false);
+    finishTour();
+    // Only with a backend that can save a focus time.
+    if (schedule()) setFocusPicker("onboarding");
+  }
+
   function finishTour(): void {
     setTour(false);
     try {
@@ -107,6 +146,13 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     firstRunChecked = true;
     const account = props.account.accountKey;
     setFirstRun(shouldOfferOnboarding(data, account, localStorage));
+    if (startLink) {
+      if (data.activeTask) planner.visit("focus");
+      else if (plannedToday()) {
+        void startFirstTask().catch(() => planner.visit("today"));
+        return;
+      }
+    }
     // Right after sign-in, once per account and device.
     setTour(shouldOfferTour(data, account, localStorage));
   });
@@ -189,6 +235,8 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                   planner={planner}
                   client={props.client}
                   review={review}
+                  schedule={schedule() ?? null}
+                  onChangeFocusTime={() => setFocusPicker("change")}
                 />
               </Match>
               <Match
@@ -214,16 +262,39 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
         </main>
         <Show when={tour()}>
           <PlannerTour
-            hasTask={
-              !!planner.data()?.todayTasks.some((t) => t.status === "planned")
-            }
             onVisit={planner.visit}
-            onDone={(started) => {
-              finishTour();
-              if (!started) planner.visit("today");
+            onFinish={() => {
+              setTour(false);
+              planner.visit("today");
+              setFirstTask(true);
             }}
-            onStart={startFirstTask}
           />
+        </Show>
+        <Show when={firstTask()}>
+          <FirstTaskDialog
+            step={ONBOARDING.task}
+            total={ONBOARDING.total}
+            onAdd={addFirstTask}
+            onLater={endFirstTask}
+          />
+        </Show>
+        <Show when={focusPicker()} keyed>
+          {(mode) => (
+            <FocusTimeDialog
+              client={props.client}
+              schedule={schedule() ?? null}
+              onboardingSteps={
+                mode === "onboarding" ? ONBOARDING.total : undefined
+              }
+              onStartNow={
+                mode === "onboarding" && plannedToday()
+                  ? startFirstTask
+                  : undefined
+              }
+              onSaved={(state) => setSchedule(state)}
+              onClose={() => setFocusPicker(null)}
+            />
+          )}
         </Show>
         <Show when={shortcuts()}>
           <ShortcutSheet onDismiss={() => setShortcuts(false)} />

@@ -1,4 +1,9 @@
 import { test, expect, synced } from "./helpers/browser";
+import type { Page } from "@playwright/test";
+
+/** The streak and the check-in meter live on Overview. */
+const visit = (page: Page, name: "Overview" | "Today") =>
+  page.getByRole("navigation").getByRole("button", { name, exact: true }).click();
 
 const SHOTS = process.env.INSIGHT_SHOTS;
 const dayBefore = (day: string, days: number) => new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
@@ -15,8 +20,8 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
       backend.data.todayTasks = [{ id: "insight-task", outcome: "Write the report", isPriority: false, plannedFor: today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow, resources: [] }];
       await page.goto("/");
       await expect(page.locator(".insight-drop")).toHaveCount(0);
-      const meter = page.locator(".review-meter");
-      await expect(meter).toContainText("Weekly check-in");
+      // Today keeps to the plan: the streak and check-in are on Overview.
+      await expect(page.locator(".review-meter")).toHaveCount(0);
 
       await page.getByRole("button", { name: "Start focus", exact: true }).click();
       await synced(page);
@@ -44,12 +49,13 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
       await expect(drop).toHaveCount(0);
     });
 
-    test("Today counts down to the check-in day, and a landed check-in is announced", async ({ page, backend }) => {
+    test("Overview counts down to the check-in day, and Today announces a landed check-in", async ({ page, backend }) => {
       const meter = page.locator(".review-meter .check-in-meter");
       const shift = (days: number) => new Date(Date.parse(`${backend.data.today}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
       backend.weekly.week.nextUpdate = shift(3);
       backend.weekly.checkIn = { day: 3, plan: null };
       await page.goto("/");
+      await visit(page, "Overview");
       await expect(meter).toContainText("Weekly check-in · Wednesday");
       await expect(meter).toContainText("In 3 days");
       await expect(meter.locator(".check-in-week")).toHaveAttribute("aria-label", "4 of 7 days until your check-in.");
@@ -60,6 +66,7 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
         await page.screenshot({ path: `${SHOTS}/check-in-meter-${width}.png` });
       }
 
+      await visit(page, "Today");
       await expect(page.locator(".review-unlocked")).toHaveCount(0);
       backend.weekly.reviews = [{ weekStart: shift(-7), weekEnd: shift(-1), model: "gpt-4.1-mini", generatedAt: Math.floor(Date.now() / 1000), activity: { tasks: [], stops: [], totalStops: 0, omittedStops: 0 }, analysis: { summary: "A steady week.", mainReasons: [], improvements: ["Start earlier."] } }];
       backend.weekly.status = "up_to_date";
@@ -73,8 +80,10 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
       await expect(page.locator(".check-in")).toBeVisible();
       await page.getByRole("navigation").getByRole("button", { name: "Today", exact: true }).click();
       await expect(page.locator(".review-unlocked")).toHaveCount(0);
+      // On Overview, the meter leads down to the check-in itself.
+      await visit(page, "Overview");
       await meter.click();
-      await expect(page.locator("#app")).toHaveAttribute("data-view", "habits");
+      await expect(page.locator(".weekly-overview")).toBeInViewport();
     });
 
     test("a check-in shows smoothed trends and a plan that sets Today's target and estimate", async ({ page, backend }) => {
@@ -129,14 +138,17 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
       backend.data.todayTasks = ["Write the report", "Call the bank"].map((outcome, i) => ({ id: `message-task-${i}`, outcome, isPriority: false, plannedFor: today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow, resources: [] })) as never;
       await page.goto("/");
       const streak = page.getByRole("region", { name: "Streak" });
+      await visit(page, "Overview");
       await expect(streak).toContainText("1day streak");
       await expect(streak).toContainText("Finish one task today to keep it.");
+      await visit(page, "Today");
       await page.getByRole("button", { name: "Start focus", exact: true }).first().click();
       await synced(page);
       await page.getByRole("button", { name: "Complete task", exact: true }).click();
       await synced(page);
-      await expect(streak).toContainText("2day streak");
       await expect(page.locator(".insight-drop")).toHaveCount(0);
+      await visit(page, "Overview");
+      await expect(streak).toContainText("2day streak");
       await expect(streak.locator('[data-state="done"]').last()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       if (SHOTS) {

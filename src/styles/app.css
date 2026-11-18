@@ -2308,3 +2308,307 @@ body:has(.planner-tour-dialog) .starters {
     transform: none;
   }
 }
+
+/* Focus time: the one-screen picker, Today's line and the Profile row.
+   Phone first; the picker reuses the stop dialog's frame. */
+.focus-time-dialog .pause-heading h2 {
+  font-size: 1.3333rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.focus-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+#app .focus-preset {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-height: 72px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+@media (hover: hover) {
+  #app .focus-preset:hover:not(:disabled) {
+    background: var(--surface-hover);
+    border-color: var(--taupe);
+  }
+}
+#app .focus-preset[aria-pressed="true"],
+#app .focus-preset:active:not(:disabled) {
+  background: var(--pearl-pale);
+  border-color: var(--pearl);
+}
+#app .focus-preset.is-other {
+  border-style: dashed;
+}
+#app .focus-preset.is-other .focus-preset-time {
+  color: var(--muted);
+}
+.focus-preset-label {
+  color: var(--muted);
+  font-size: 0.7778rem;
+  font-weight: 600;
+}
+.focus-preset-time {
+  font-family: var(--mono);
+  font-size: 1.3333rem;
+  font-weight: 600;
+}
+.focus-other {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+#app .focus-other input {
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+}
+#app .focus-time-dialog .primary-button {
+  min-height: 48px;
+  margin: 0;
+  padding-inline: 24px;
+  border-radius: var(--radius-pill);
+  color: var(--on-accent);
+  background: var(--action);
+  border-color: var(--action);
+  font-weight: 600;
+}
+.focus-time-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
+}
+#app .focus-time-footer .text-button {
+  min-height: 44px;
+  margin: 0;
+}
+@media (min-width: 560px) {
+  .focus-presets {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.focus-time-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.focus-time-line p {
+  flex: 1 1 160px;
+  margin: 0;
+  font-size: 0.9444rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.focus-time-value {
+  font-family: var(--mono);
+}
+.focus-time-days {
+  color: var(--muted);
+  font-weight: 400;
+}
+.focus-time-line strong {
+  margin-right: 10px;
+  color: var(--pearl-deep);
+  font-family: var(--font);
+  font-size: 0.6667rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.focus-time-line.is-ask p {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 0.8333rem;
+  color: var(--muted);
+}
+.focus-time-line.is-ask strong {
+  display: block;
+  margin: 0 0 2px;
+  color: var(--text);
+  font-size: 0.9444rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+#app .focus-time-line button {
+  min-height: 40px;
+  margin: 0;
+}
+#app .focus-time-line .secondary-button {
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+.overview-content .focus-time-line {
+  margin-top: 16px;
+}
+
+.email-reminder.focus-time-setting {
+  align-items: center;
+  justify-content: space-between;
+}
+#app .focus-time-setting select {
+  flex: none;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+/* The focus time's second screen: what you get, each turned on explicitly. */
+.focus-ways {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.focus-ways li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.focus-way-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 160px;
+  font-size: 0.8333rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.focus-way-text strong {
+  color: var(--text);
+  font-size: 0.9444rem;
+}
+.focus-way-actions {
+  display: flex;
+  gap: 8px;
+}
+#app .focus-way-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8333rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  #app .focus-way-link:hover {
+    background: var(--surface-hover);
+    border-color: var(--taupe);
+  }
+}
+#app .focus-ways .primary-button {
+  min-height: 40px;
+  padding-inline: 18px;
+}
+.focus-way-done {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--positive);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Onboarding's first task: the same card as the focus-time steps. */
+#app .first-task-input {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+}
+#app .first-task-input:focus-visible {
+  border-color: var(--text);
+  outline: none;
+}
+.first-task-estimate {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.first-task-estimate legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.7778rem;
+  font-weight: 600;
+}
+.first-task-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+#app .first-task-chip {
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8333rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#app .first-task-chip[aria-pressed="true"] {
+  border-color: var(--pearl-deep);
+  background: var(--pearl-pale);
+  color: var(--pearl-deep);
+}
+#app .first-task-add {
+  width: 100%;
+}
+#app .first-task-add:disabled {
+  opacity: 0.35;
+}

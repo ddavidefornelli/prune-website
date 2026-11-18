@@ -25,15 +25,21 @@ export function shouldOfferOnboarding(
 export const tourKey = (accountKey: string) => `prune:tour:v1:${accountKey}`;
 
 /**
- * Every account gets the page tour once per device, right after sign-in,
- * whether or not it has tasks. Never over a running timer: views are locked.
+ * Only a new, empty planner gets the (one-step) tour, once per device. An
+ * account with any task or history already knows its way around.
  */
 export function shouldOfferTour(
   data: Dashboard,
   accountKey: string,
   storage: Pick<Storage, "getItem">,
 ): boolean {
-  if (data.activeTask) return false;
+  if (
+    data.activeTask ||
+    data.todayTasks.length ||
+    data.tomorrowTasks.length ||
+    data.completions.some((day) => day.count > 0)
+  )
+    return false;
   try {
     return !storage.getItem(tourKey(accountKey));
   } catch {
