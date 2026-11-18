@@ -52,45 +52,6 @@
     --demo-zoom: 0.72;
   }
 }
-/* The price: a quiet pill, not a sale sticker. The reason comes first, the
-   usual price is struck in the page's own ink, "Free" carries the weight. */
-.landing-price {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75em;
-  margin: clamp(16px, 3.2svh, 32px) 0 0;
-  padding: 0.5em 1.1em 0.5em 0.5em;
-  font-size: clamp(0.9rem, 1.3vw, 1rem);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
-}
-.landing-price-tag {
-  padding: 0.4em 0.75em;
-  color: var(--text);
-  font-size: 0.8em;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  background: var(--background);
-  border-radius: var(--radius-pill);
-}
-/* The page's red and green, darkened a touch so they read on white. */
-.landing-price-was {
-  color: color-mix(in srgb, var(--flame-low) 85%, var(--text));
-  font-weight: 500;
-  text-decoration: line-through;
-  text-decoration-color: currentColor;
-  text-decoration-thickness: 1.5px;
-}
-.landing-price-now {
-  color: color-mix(in srgb, var(--positive) 70%, var(--text));
-  font-weight: 700;
-}
 .landing-cta {
   display: grid;
   place-items: center;
@@ -122,9 +83,6 @@
 @media (min-width: 700px) and (max-height: 760px) {
   .landing .product-preview {
     --demo-zoom: 0.6;
-  }
-  .landing-price {
-    margin-top: 12px;
   }
   .landing-cta {
     margin-top: 10px;
@@ -200,10 +158,6 @@
   }
   .landing .device-screen {
     mask-image: linear-gradient(#000 calc(100% - 1.5rem), transparent);
-  }
-  .landing-price {
-    margin-top: clamp(8px, 1.6svh, 16px);
-    font-size: clamp(0.8333rem, 2.1svh, 0.9444rem);
   }
   .landing-cta {
     min-height: 48px;
