@@ -54,10 +54,15 @@ function ActivityLegend() {
   return (
     <div
       class="activity-legend"
-      aria-label="Daily completions: no tasks, one task, two tasks, three or more tasks"
+      aria-label={`Daily completions: no tasks, one task, two tasks, three tasks, four tasks, ${PLANNER_LIMITS.tasksPerDay} or more tasks`}
     >
       <span>Less</span>
-      <For each={[0, 1, 2, 3]}>
+      <For
+        each={Array.from(
+          { length: PLANNER_LIMITS.tasksPerDay + 1 },
+          (_, level) => level,
+        )}
+      >
         {(level) => <ActivitySwatch count={level} aria-hidden="true" />}
       </For>
       <span>More</span>

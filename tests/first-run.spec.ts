@@ -44,7 +44,7 @@ test.describe("returning visits", () => {
     const yesterday = new Date(Date.parse(`${backend.data.today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
     backend.data.completions = [{ day: yesterday, count: 2 }];
     await openPlanner(page);
-    await expect(page.locator(".plan-summary")).toHaveText("2 down yesterday. Today’s three?");
+    await expect(page.locator(".plan-summary")).toHaveText("2 down yesterday. Today’s five?");
     // No onboarding starters or tips. After 17:00 the evening "plan tomorrow"
     // card may also appear; it is not onboarding, so it is left out.
     await expect(page.locator(".starters, .hint-card:not(.evening-card)")).toHaveCount(0);

@@ -11,7 +11,7 @@ test("calendar preserves accessible labels and roving focus across Overview and 
   await expect(calendar.getByRole("heading")).toContainText("4 tasks completed");
   await expect(calendar.locator(".activity-weekday")).toHaveCount(7);
   const today = calendar.locator('[aria-current="date"]');
-  await expect(today).toHaveClass(/activity-level-3/);
+  await expect(today).toHaveClass(/activity-level-4/);
   await expect(today).toHaveAttribute("aria-label", /^4 tasks completed on /);
   const tabStop = calendar.locator('[tabindex="0"]');
   await expect(tabStop).toHaveCount(1);

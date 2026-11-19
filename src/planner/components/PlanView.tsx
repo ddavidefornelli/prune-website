@@ -292,7 +292,9 @@ export function PlanView(props: {
                   value={task.estimatedMinutes}
                   disabled={planner.busy()}
                   onChange={(minutes) =>
-                    void planner
+                    // The dial rolls back when this resolves to false, so the
+                    // save result must be passed through.
+                    planner
                       .mutate(() =>
                         props.client.changeEstimate(task.id, minutes),
                       )
@@ -301,6 +303,7 @@ export function PlanView(props: {
                           capture("task_estimate_changed", {
                             estimated_minutes: minutes,
                           });
+                        return changed;
                       })
                   }
                 />

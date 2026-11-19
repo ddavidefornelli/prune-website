@@ -23,6 +23,8 @@ test("stored task titles and AI output render as text, never executable HTML", a
   backend.weekly.reviews = [saved];
   await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
   await expect(page.locator(".weekly-improvements")).toContainText(payload);
+  // Stop evidence sits inside the collapsed breakdown under the check-in.
+  await page.getByText("Full breakdown", { exact: true }).click();
   await page.getByText("View 1 supporting stop entry", { exact: true }).click();
   await expect(page.locator(".review-evidence")).toContainText(payload);
   await expect(page.locator(".weekly-report img, .weekly-report [onerror]")).toHaveCount(0);
@@ -32,11 +34,14 @@ test("stored task titles and AI output render as text, never executable HTML", a
 test("normal planner, calendar and profile workflows do not violate CSP", async ({ page }) => {
   const violations: string[] = [];
   await page.exposeFunction("__reportCsp", (directive: string, blocked: string) => {
-    // The production CSP allows the live site's /sounds/ folder, not this
-    // preview origin (tests/security-policy.test.mjs covers that entry), so
-    // the streak party's sound is the one expected block here.
+    // The production CSP allows the live site's /sounds/ folder and
+    // /manifest.webmanifest, not this preview origin
+    // (tests/security-policy.test.mjs covers those entries), so the streak
+    // party's sound and WebKit's manifest fetch are the expected blocks here.
     const url = URL.canParse(blocked) ? new URL(blocked) : null;
-    if (directive === "connect-src" && url?.origin === new URL(page.url()).origin && url.pathname.startsWith("/sounds/")) return;
+    const local = url?.origin === new URL(page.url()).origin;
+    if (local && directive === "connect-src" && url!.pathname.startsWith("/sounds/")) return;
+    if (local && directive === "manifest-src" && url!.pathname === "/manifest.webmanifest") return;
     violations.push(directive);
   });
   await page.addInitScript(() => {
