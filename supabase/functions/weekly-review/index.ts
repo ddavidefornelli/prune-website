@@ -6,6 +6,7 @@
 // This replaces the copy deployed from ../pro. The database decides which tasks
 // a review covers (planner_review_input) and enforces one paid call per check-in.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createAiGenerationObserver } from "../ai-observability.ts";
 import { ApiError } from "../../../server/http.ts";
 import {
   createHandler,
@@ -22,10 +23,19 @@ declare const Deno: {
 };
 
 const env = (name: string) => Deno.env.get(name);
+const aiObserver = createAiGenerationObserver(
+  env("VITE_POSTHOG_KEY"),
+  env("VITE_POSTHOG_HOST"),
+  env("NODE_ENV") === "production",
+);
 const openAiKey = env("OPENAI_API_KEY");
-const db = createClient(env("SUPABASE_URL")!, env("SUPABASE_SERVICE_ROLE_KEY")!, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const db = createClient(
+  env("SUPABASE_URL")!,
+  env("SUPABASE_SERVICE_ROLE_KEY")!,
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+  },
+);
 const origins = new Set(
   [
     env("ALLOWED_ORIGINS") ||
@@ -58,37 +68,44 @@ Deno.serve(
       const { data, error } = await db.auth.getUser(token);
       // Never trust a user id from the request body, and never accept guests.
       if (error || !data.user || data.user.is_anonymous || !data.user.email)
-        throw new ApiError(401, "unauthorized", "Your session has expired. Please sign in again.");
+        throw new ApiError(
+          401,
+          "unauthorized",
+          "Your session has expired. Please sign in again.",
+        );
       return data.user.id;
     },
-    loadInput: (userId, timezone, preview = false) =>
-      rpc(preview ? "planner_preview_input" : "planner_review_input", {
-        p_user_id: userId,
-        p_timezone: timezone,
-      }),
-    reserve(userId, input, hash, preview = false) {
-      if (preview)
-        return rpc<Reservation>("reserve_review_preview", { p_user_id: userId });
-      return rpc<Reservation>("reserve_planner_review", {
+    loadInput: (userId, timezone) =>
+      rpc("planner_review_input", { p_user_id: userId, p_timezone: timezone }),
+    reserve: (userId, input, hash) =>
+      rpc<Reservation>("reserve_planner_review", {
         p_user_id: userId,
         p_week_start: input.weekStart,
         p_request_hash: hash,
         p_consent_version: input.consentVersion,
         p_activity: input.activity,
-      });
-    },
-    generate: (input) => generateReview(input, openAiKey!),
-    finish: (id, token, analysis, preview = false) =>
-      preview
-        ? rpc<boolean>("finish_review_preview", { p_id: id, p_lease_token: token })
-        : rpc<boolean>("finish_weekly_review", {
-            p_id: id,
-            p_lease_token: token,
-            p_analysis: analysis,
-            p_model: MODEL,
-          }),
-    async fail(id, token, preview = false) {
-      await rpc<boolean>(preview ? "fail_review_preview" : "fail_weekly_review", {
+      }),
+    generate: (input, userId) =>
+      generateReview(
+        input,
+        openAiKey!,
+        undefined,
+        aiObserver
+          ? {
+              observer: aiObserver,
+              distinctId: `${new URL(env("SUPABASE_URL")!).origin}:${userId}`,
+            }
+          : undefined,
+      ),
+    finish: (id, token, analysis) =>
+      rpc<boolean>("finish_weekly_review", {
+        p_id: id,
+        p_lease_token: token,
+        p_analysis: analysis,
+        p_model: MODEL,
+      }),
+    async fail(id, token) {
+      await rpc<boolean>("fail_weekly_review", {
         p_id: id,
         p_lease_token: token,
       });

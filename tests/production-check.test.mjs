@@ -44,7 +44,7 @@ test("checker accepts a correctly deployed artifact and makes only non-destructi
   assert.equal(report.counts.ERROR, 0);
   assert.equal(report.counts.FAIL, 0);
   assert.equal(f.requests.filter(({ url }) => url.pathname === "/assets/app.js").length, 1, "shared bundle is downloaded once");
-  assert.equal(f.requests.filter(({ url }) => url.pathname.startsWith("/rest/v1/") && !url.pathname.includes("/rpc/")).length, 10);
+  assert.equal(f.requests.filter(({ url }) => url.pathname.startsWith("/rest/v1/") && !url.pathname.includes("/rpc/")).length, 8);
   for (const { url, init } of f.requests) {
     assert.equal(init.redirect, "manual");
     assert.equal(init.credentials, "omit");

@@ -828,8 +828,7 @@
   font-size: clamp(0.5rem, 4cqh, 0.8333rem);
   background:
     radial-gradient(circle at 30% 20%, #b7b2f4, transparent 60%),
-    radial-gradient(circle at 80% 90%, #ff9fc0, transparent 55%),
-    #4b43b8;
+    radial-gradient(circle at 80% 90%, #ff9fc0, transparent 55%), #4b43b8;
   border: 1.2cqh solid #0b0b0b;
   border-radius: 7cqh;
   box-shadow: var(--shadow-float);

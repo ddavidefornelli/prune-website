@@ -8,6 +8,7 @@ import {
   untrack,
   For,
 } from "solid-js";
+import { capture } from "../../analytics.ts";
 import { Dialog } from "../../components/Dialog";
 import type { PlanningClient } from "../api";
 import { PLANNER_LIMITS } from "../constants";
@@ -78,25 +79,36 @@ export function FocusView(props: {
   async function toggleTimer(): Promise<void> {
     const active = task();
     if (!active) return;
-    if (paused()) await planner.mutate(() => props.client.resume(active.id));
-    else {
-      const success = await planner.mutate(() =>
+    if (paused()) {
+      const resumed = await planner.mutate(() =>
+        props.client.resume(active.id),
+      );
+      if (resumed) capture("timer_resumed");
+    } else {
+      const pausedTimer = await planner.mutate(() =>
         props.client.stopTimer(active.id),
       );
-      if (success) planner.setPauseReasonOpen(true);
+      if (pausedTimer) {
+        capture("timer_paused");
+        planner.setPauseReasonOpen(true);
+      }
     }
   }
 
-  function saveReason(text: string): void {
+  function saveReason(text: string, preset: boolean): void {
     const active = task();
     if (!active) return;
-    void planner.mutate(async () => {
-      await props.client.savePauseReason(active.id, text);
-      props.hints.dismiss("pause");
-      setReason("");
-      setArea(null);
-      planner.setPauseReasonOpen(false);
-    });
+    void planner
+      .mutate(async () => {
+        await props.client.savePauseReason(active.id, text);
+        props.hints.dismiss("pause");
+        setReason("");
+        setArea(null);
+        planner.setPauseReasonOpen(false);
+      })
+      .then((saved) => {
+        if (saved) capture("pause_reason_saved", { preset });
+      });
   }
 
   return (
@@ -145,7 +157,13 @@ export function FocusView(props: {
                         planner.visit("today");
                       })
                       .then((success) => {
-                        if (success && done) props.onCompleted?.(done);
+                        if (success && done) {
+                          capture("task_completed", {
+                            estimated_minutes: done.estimatedMinutes,
+                            actual_seconds: done.actualSeconds,
+                          });
+                          props.onCompleted?.(done);
+                        }
                       });
                   }}
                 >
@@ -237,7 +255,7 @@ export function FocusView(props: {
                       : "Pick a reason or write one for stopping.",
                   );
                   if (!event.currentTarget.reportValidity()) return;
-                  saveReason(reason());
+                  saveReason(reason(), false);
                 }}
               >
                 <div class="pause-heading">
@@ -285,6 +303,7 @@ export function FocusView(props: {
                               onClick={() =>
                                 saveReason(
                                   presetStopReason(picked().area, preset),
+                                  true,
                                 )
                               }
                             >
@@ -328,12 +347,16 @@ export function FocusView(props: {
                     type="button"
                     disabled={planner.busy()}
                     onClick={() => {
-                      void planner.mutate(async () => {
-                        await props.client.resume(active().id);
-                        setReason("");
-                        setArea(null);
-                        planner.setPauseReasonOpen(false);
-                      });
+                      void planner
+                        .mutate(async () => {
+                          await props.client.resume(active().id);
+                          setReason("");
+                          setArea(null);
+                          planner.setPauseReasonOpen(false);
+                        })
+                        .then((resumed) => {
+                          if (resumed) capture("timer_resumed");
+                        });
                     }}
                   >
                     Resume focusing

@@ -5,7 +5,7 @@ const key = "prune:cookies:v1";
 
 test("optional recorder waits for consent, remembers it and stops after withdrawal", async ({ page, request }) => {
   const recorderRequests: string[] = [];
-  await page.route("https://**.contentsquare.net/**", async (route) => {
+  await page.route(/^https:\/\/eu(?:-assets)?\.i\.posthog\.com\//, async (route) => {
     recorderRequests.push(route.request().url());
     await route.fulfill({ contentType: "application/javascript", body: "" });
   });
@@ -29,22 +29,31 @@ test("optional recorder waits for consent, remembers it and stops after withdraw
   expect(recorderRequests).toEqual([]);
   await page.getByRole("button", { name: "Cookie settings", exact: true }).click();
   await page.getByRole("button", { name: "Accept optional", exact: true }).click();
-  await expect.poll(() => recorderRequests.length).toBe(1);
+  await expect.poll(() => recorderRequests.length).toBeGreaterThan(0);
+  const afterAccept = recorderRequests.length;
   await page.reload();
-  await expect.poll(() => recorderRequests.length).toBe(2);
+  await expect.poll(() => recorderRequests.length).toBeGreaterThan(afterAccept);
   await page.getByRole("button", { name: "Cookie settings", exact: true }).click();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await expect(banner).toHaveCount(0);
+  await page.waitForLoadState("load");
+  const afterReject = recorderRequests.length;
   await page.reload();
-  expect(recorderRequests).toHaveLength(2);
+  await page.waitForTimeout(500);
+  expect(recorderRequests).toHaveLength(afterReject);
   expect(await page.evaluate((storageKey) => JSON.parse(localStorage.getItem(storageKey)!).choice, key)).toBe("rejected");
 });
 
 test("expired consent prompts again without loading the recorder", async ({ page }) => {
+  const recorderRequests: string[] = [];
+  await page.route(/posthog\.com\//, async (route) => {
+    recorderRequests.push(route.request().url());
+    await route.abort();
+  });
   await page.addInitScript((storageKey) => {
     localStorage.setItem(storageKey, JSON.stringify({ choice: "accepted", at: 1 }));
   }, key);
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Cookie preferences" })).toBeVisible();
-  expect(await page.locator('script[src*="contentsquare"]').count()).toBe(0);
+  expect(recorderRequests).toEqual([]);
 });

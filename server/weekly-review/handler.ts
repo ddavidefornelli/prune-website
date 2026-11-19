@@ -29,25 +29,15 @@ export type Reservation =
     };
 export type Dependencies = {
   authenticate: (token: string) => Promise<string>;
-  loadInput: (
-    userId: string,
-    timezone: string,
-    preview?: boolean,
-  ) => Promise<unknown>;
+  loadInput: (userId: string, timezone: string) => Promise<unknown>;
   reserve: (
     userId: string,
     input: ReviewInput,
     hash: string,
-    preview?: boolean,
   ) => Promise<Reservation>;
-  generate: (input: ReviewInput) => Promise<Analysis>;
-  finish: (
-    id: string,
-    token: string,
-    analysis: Analysis,
-    preview?: boolean,
-  ) => Promise<boolean>;
-  fail: (id: string, token: string, preview?: boolean) => Promise<void>;
+  generate: (input: ReviewInput, userId: string) => Promise<Analysis>;
+  finish: (id: string, token: string, analysis: Analysis) => Promise<boolean>;
+  fail: (id: string, token: string) => Promise<void>;
   now: () => Date;
   allowedOrigins: Set<string>;
 };
@@ -94,7 +84,6 @@ export function createHandler(
     const respond = (status: number, body: unknown) =>
       new Response(JSON.stringify(body), { status, headers });
     let reservation: Extract<Reservation, { outcome: "reserved" }> | undefined;
-    let preview = false;
     try {
       // CORS is only a browser policy. Authentication and DB quotas protect native requests too.
       if (origin && !deps.allowedOrigins.has(origin))
@@ -169,10 +158,7 @@ export function createHandler(
         !value ||
         typeof value !== "object" ||
         Array.isArray(value) ||
-        Object.keys(value).some(
-          (key) => key !== "timezone" && key !== "preview",
-        ) ||
-        ("preview" in value && typeof value.preview !== "boolean") ||
+        Object.keys(value).some((key) => key !== "timezone") ||
         !("timezone" in value) ||
         typeof value.timezone !== "string" ||
         !value.timezone ||
@@ -181,11 +167,10 @@ export function createHandler(
         throw new ApiError(
           400,
           "invalid_request",
-          "Send your device timezone and optional preview flag. Review activity is loaded from your account.",
+          "Send your device timezone. Review activity is loaded from your account.",
         );
       }
-      preview = "preview" in value && value.preview === true;
-      const source = await deps.loadInput(userId, value.timezone, preview);
+      const source = await deps.loadInput(userId, value.timezone);
       if (source && typeof source === "object" && "disabled" in source) {
         throw new ApiError(
           403,
@@ -201,13 +186,8 @@ export function createHandler(
         if (activity.tasks?.length === 0 && activity.stops?.length === 0)
           return respond(200, { noData: true });
       }
-      const input = validateInput(source, deps.now(), preview);
-      const claim = await deps.reserve(
-        userId,
-        input,
-        await fingerprint(input),
-        preview,
-      );
+      const input = validateInput(source, deps.now());
+      const claim = await deps.reserve(userId, input, await fingerprint(input));
       if (claim.outcome === "cached") {
         return respond(200, {
           analysis: validateAnalysis(claim.analysis, input.activity),
@@ -218,20 +198,14 @@ export function createHandler(
       }
       if (claim.outcome !== "reserved") {
         const [status, message] = RESERVATION_ERRORS[claim.outcome];
-        throw new ApiError(
-          status,
-          claim.outcome,
-          preview && claim.outcome === "rate_limited"
-            ? "Preview limit reached. Allow 10 minutes between requests; at most 3 attempts per UTC day. Failed attempts count."
-            : message,
-        );
+        throw new ApiError(status, claim.outcome, message);
       }
       reservation = claim;
       const analysis = validateAnalysis(
-        await deps.generate(input),
+        await deps.generate(input, userId),
         input.activity,
       );
-      if (!(await deps.finish(claim.id, claim.leaseToken, analysis, preview))) {
+      if (!(await deps.finish(claim.id, claim.leaseToken, analysis))) {
         throw new ApiError(
           503,
           "save_failed",
@@ -239,17 +213,6 @@ export function createHandler(
         );
       }
       reservation = undefined;
-      if (preview)
-        return respond(200, {
-          review: {
-            weekStart: input.weekStart,
-            weekEnd: input.weekEnd,
-            activity: input.activity,
-            analysis,
-            model: MODEL,
-            generatedAt: Math.floor(deps.now().getTime() / 1000),
-          },
-        });
       return respond(200, {
         analysis,
         model: MODEL,
@@ -259,7 +222,7 @@ export function createHandler(
     } catch (error) {
       if (reservation) {
         try {
-          await deps.fail(reservation.id, reservation.leaseToken, preview);
+          await deps.fail(reservation.id, reservation.leaseToken);
         } catch {
           /* The lease expires; keep the attempt charged. */
         }
@@ -272,8 +235,7 @@ export function createHandler(
               "unavailable",
               "Weekly AI is temporarily unavailable. Your planner is unaffected.",
             );
-      if (safe.status === 429)
-        headers.set("Retry-After", preview ? "600" : "3600");
+      if (safe.status === 429) headers.set("Retry-After", "3600");
       if (safe.code === "running") headers.set("Retry-After", "15");
       return respond(safe.status, {
         error: { code: safe.code, message: safe.message },

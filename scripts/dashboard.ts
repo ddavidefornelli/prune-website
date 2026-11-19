@@ -1,12 +1,16 @@
-// A local dashboard for the three numbers that decide whether to keep going or
-// pivot: activation, day-2 return and week-4 retention, per weekly signup cohort.
+// A local dashboard of the rates that decide whether to keep going or pivot,
+// all as percentages per week so the trend is what you read: activation,
+// next-day / first-week / month-4 return, weekly active, task completion,
+// focus time, push, reminder emails kept on and signup growth.
 //
 //   npm run dashboard
 //
 // Reads the live project with the service-role key (SUPABASE_SERVICE_ROLE_KEY in
 // .env.reminders.local, or asked for, hidden), then serves the page on
 // 127.0.0.1 only. The browser gets one anonymous row per account (signup time,
-// the days it was active, whether it set a focus time): no ids, no emails.
+// the days it was active, whether it set a focus time, turned on push or kept
+// reminder emails on, and the creation/completion day of each task): no ids,
+// no emails, no task text.
 // Your own account (REMINDER_TO) is flagged so the page can leave it out.
 //
 // "Active on a day" means the account left a trace that day: a task created,
@@ -88,6 +92,10 @@ async function allRows(
 }
 
 function dayOf(value: unknown): number | undefined {
+  // planner_tasks.created_at / started_at are epoch milliseconds (bigint).
+  if (typeof value === "number" && value > 0) return Math.floor(value / DAY);
+  if (typeof value === "string" && /^\d{11,}$/.test(value))
+    return Math.floor(Number(value) / DAY);
   if (typeof value !== "string" || !value) return undefined;
   // Plain dates (completed_on) are already a calendar day; read them as UTC.
   const time = Date.parse(value.length === 10 ? `${value}T00:00:00Z` : value);
@@ -99,6 +107,10 @@ export interface DashboardAccount {
   activeDays: number[];
   activated: boolean;
   focusSet: boolean;
+  push: boolean;
+  emailsOn: boolean;
+  /** [created day, completed day or -1], in days since the epoch (UTC). */
+  tasks: [number, number][];
   self: boolean;
 }
 
@@ -119,12 +131,16 @@ async function load() {
     users.push(...data.users);
     if (data.users.length < 1000) break;
   }
-  const [accounts, tasks, reminders, history] = await Promise.all([
+  const [accounts, tasks, reminders, history, pushRows] = await Promise.all([
     allRows("planner_accounts", 'user_id,"isDeleted"'),
     allRows("planner_tasks", "user_id,created_at,started_at,completed_on"),
-    allRows("planner_email_reminders", "user_id,focus_minute,last_seen_at"),
+    allRows(
+      "planner_email_reminders",
+      "user_id,focus_minute,last_seen_at,daily_enabled",
+    ),
     // Optional until 20261122000100_planner_history.sql is applied.
     allRows("planner_history", "user_id,at", true),
+    allRows("planner_push_subscriptions", "user_id", true),
   ]);
 
   const deleted = new Set(
@@ -142,7 +158,13 @@ async function load() {
     if (!map.has(user)) map.set(user, new Set());
     map.get(user)!.add(day);
   };
+  const taskDays = new Map<unknown, [number, number][]>();
   for (const t of tasks) {
+    const created = dayOf(t.created_at);
+    if (created !== undefined) {
+      if (!taskDays.has(t.user_id)) taskDays.set(t.user_id, []);
+      taskDays.get(t.user_id)!.push([created, dayOf(t.completed_on) ?? -1]);
+    }
     mark(days, t.user_id, t.created_at);
     mark(days, t.user_id, t.started_at);
     mark(days, t.user_id, t.completed_on);
@@ -151,8 +173,11 @@ async function load() {
   }
   for (const h of history) mark(days, h.user_id, h.at);
   const focus = new Set<unknown>();
+  const emailsOff = new Set<unknown>();
+  const push = new Set(pushRows.map((p) => p.user_id));
   for (const r of reminders) {
     mark(days, r.user_id, r.last_seen_at);
+    if (r.daily_enabled === false) emailsOff.add(r.user_id);
     if (r.focus_minute !== null && r.focus_minute !== undefined)
       focus.add(r.user_id);
   }
@@ -172,6 +197,9 @@ async function load() {
       activeDays: [...new Set(active)].sort((a, b) => a - b),
       activated: startedDays.get(u.id)?.has(signupDay) ?? false,
       focusSet: focus.has(u.id),
+      push: push.has(u.id),
+      emailsOn: !emailsOff.has(u.id),
+      tasks: taskDays.get(u.id) ?? [],
       self: !!selfEmail && u.email?.toLowerCase() === selfEmail,
     });
   }

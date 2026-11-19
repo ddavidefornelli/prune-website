@@ -4,9 +4,9 @@
 
 -- 1. Every expected table must exist with RLS enabled (all rows true/true).
 with expected(name) as (values
-  ('planner_accounts'), ('planner_tasks'), ('planner_resources'), ('planner_stops'),
+  ('planner_accounts'), ('planner_tasks'), ('planner_stops'),
   ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests'), ('ai_review_previews')
+  ('ai_review_requests')
 )
 select e.name, c.oid is not null as table_exists,
   coalesce(c.relrowsecurity, false) as rls_enabled
@@ -17,9 +17,9 @@ order by e.name;
 -- 2. No anon or authenticated direct INSERT/UPDATE/DELETE privileges.
 -- authenticated SELECT should be true only for the five owner-readable tables.
 with expected(name) as (values
-  ('planner_accounts'), ('planner_tasks'), ('planner_resources'), ('planner_stops'),
+  ('planner_accounts'), ('planner_tasks'), ('planner_stops'),
   ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests'), ('ai_review_previews')
+  ('ai_review_requests')
 ), roles(name) as (values ('anon'), ('authenticated'))
 select e.name as table_name, r.name as role_name,
   has_table_privilege(r.name, c.oid, 'SELECT') as can_select,
@@ -55,8 +55,7 @@ join pg_catalog.pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and (
   p.proname like 'planner\_%' escape '\' or
   p.proname in ('reserve_weekly_review', 'reserve_planner_review', 'finish_weekly_review',
-    'fail_weekly_review', 'purge_weekly_review_content', 'reserve_review_preview',
-    'finish_review_preview', 'fail_review_preview')
+    'fail_weekly_review', 'purge_weekly_review_content')
 )
 order by function_name;
 

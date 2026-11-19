@@ -33,6 +33,7 @@ import {
   shouldOfferTour,
   tourKey,
 } from "./onboarding";
+import { capture } from "../analytics.ts";
 import { createShortcuts } from "./shortcuts";
 import type { Account, Task } from "./types";
 
@@ -89,7 +90,9 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     const finishedHere = performance.now() - completingAt < PARTY_WINDOW_MS;
     if (lit && litToday?.day === data.today && !litToday.lit && finishedHere) {
       completingAt = -Infinity;
-      setParty(streakFor(data));
+      const streak = streakFor(data);
+      setParty(streak);
+      capture("streak_lit", { days: streak.days });
     }
     litToday = { day: data.today, lit };
   });

@@ -8,6 +8,7 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { capture } from "../../analytics.ts";
 import { Dialog } from "../../components/Dialog";
 import type { PlanningClient } from "../api";
 import { errorMessage } from "../errors";
@@ -66,6 +67,10 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
       );
       props.onSaved(state);
       setSaved(state);
+      capture("focus_time_changed", {
+        focus_minute: minute,
+        weekdays_only: state.weekdaysOnly,
+      });
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -83,6 +88,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
       if (subscription) {
         const state = await client.savePushSubscription(subscription);
         props.onSaved(state);
+        capture("push_notifications_changed", { enabled: true });
       }
       setPush(await pushState());
     } catch (cause) {

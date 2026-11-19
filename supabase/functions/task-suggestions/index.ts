@@ -2,6 +2,7 @@
 // optional EXTRA_ALLOWED_ORIGINS (added to, never replacing, the shared list);
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by the platform.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createAiGenerationObserver } from "../ai-observability.ts";
 import { ApiError } from "../../../server/http.ts";
 import { createHandler } from "../../../server/task-suggestions/handler.ts";
 import {
@@ -16,11 +17,23 @@ declare const Deno: {
 };
 
 const env = (name: string) => Deno.env.get(name);
-const db = createClient(env("SUPABASE_URL")!, env("SUPABASE_SERVICE_ROLE_KEY")!, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const aiObserver = createAiGenerationObserver(
+  env("VITE_POSTHOG_KEY"),
+  env("VITE_POSTHOG_HOST"),
+  env("NODE_ENV") === "production",
+);
+const db = createClient(
+  env("SUPABASE_URL")!,
+  env("SUPABASE_SERVICE_ROLE_KEY")!,
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+  },
+);
 const origins = new Set(
-  [env("ALLOWED_ORIGINS") || "https://www.prune.win", env("EXTRA_ALLOWED_ORIGINS")]
+  [
+    env("ALLOWED_ORIGINS") || "https://www.prune.win",
+    env("EXTRA_ALLOWED_ORIGINS"),
+  ]
     .join(",")
     .split(",")
     .map((value) => value.trim())
@@ -55,7 +68,9 @@ Deno.serve(
         return { disabled: true };
       const rows = await db
         .from("planner_tasks")
-        .select("outcome, status, estimated_minutes, actual_seconds, planned_for")
+        .select(
+          "outcome, status, estimated_minutes, actual_seconds, planned_for",
+        )
         .eq("user_id", userId)
         .in("planned_for", [sourceDay, day])
         .order("slot");
@@ -84,10 +99,20 @@ Deno.serve(
       if (error) throw new Error("Reservation failed");
       return data === true;
     },
-    async generate(input) {
+    async generate(input, userId) {
       const key = env("OPENAI_API_KEY");
       if (!key) throw new Error("AI is not configured");
-      return generateSuggestions(input, key);
+      return generateSuggestions(
+        input,
+        key,
+        undefined,
+        aiObserver
+          ? {
+              observer: aiObserver,
+              distinctId: `${new URL(env("SUPABASE_URL")!).origin}:${userId}`,
+            }
+          : undefined,
+      );
     },
   }),
 );

@@ -8,6 +8,7 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { capture } from "../../analytics.ts";
 import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
 import { plannedEstimate } from "../../reviews/check-in";
 import type { PlanningClient } from "../api";
@@ -95,8 +96,17 @@ export function PlanView(props: {
   });
   const showShortcutHint = () =>
     desktop && props.hints.visits() >= 3 && !props.hints.seen("shortcuts");
-  const create = (outcome: string, minutes: number) =>
-    planner.mutate(() => props.client.create(outcome, day(), minutes));
+  const create = async (outcome: string, minutes: number): Promise<boolean> => {
+    const created = await planner.mutate(() =>
+      props.client.create(outcome, day(), minutes),
+    );
+    if (created)
+      capture("task_created", {
+        day: tomorrow() ? "tomorrow" : "today",
+        estimated_minutes: minutes,
+      });
+    return created;
+  };
   // The plan from the last check-in: a soft daily target under the hard cap,
   // and the estimate new tasks start at.
   const plan = () => props.review?.data()?.checkIn?.plan ?? null;
@@ -282,9 +292,16 @@ export function PlanView(props: {
                   value={task.estimatedMinutes}
                   disabled={planner.busy()}
                   onChange={(minutes) =>
-                    planner.mutate(() =>
-                      props.client.changeEstimate(task.id, minutes),
-                    )
+                    void planner
+                      .mutate(() =>
+                        props.client.changeEstimate(task.id, minutes),
+                      )
+                      .then((changed) => {
+                        if (changed)
+                          capture("task_estimate_changed", {
+                            estimated_minutes: minutes,
+                          });
+                      })
                   }
                 />
               </Show>
@@ -294,10 +311,17 @@ export function PlanView(props: {
                   disabled={planner.busy() || !!planner.data()?.activeTask}
                   onClick={() => {
                     props.hints.dismiss("start");
-                    void planner.mutate(async () => {
-                      await props.client.start(task.id);
-                      planner.visit("focus");
-                    });
+                    void planner
+                      .mutate(async () => {
+                        await props.client.start(task.id);
+                        planner.visit("focus");
+                      })
+                      .then((started) => {
+                        if (started)
+                          capture("focus_started", {
+                            estimated_minutes: task.estimatedMinutes,
+                          });
+                      });
                   }}
                 >
                   Start focus

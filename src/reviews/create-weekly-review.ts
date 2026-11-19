@@ -1,4 +1,5 @@
 import { createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
+import { capture } from "../analytics.ts";
 import type { PlanningClient } from "../planner/api";
 import { onWake } from "../shared/on-wake.ts";
 import { POLLING } from "../planner/constants.ts";
@@ -82,14 +83,20 @@ export function createWeeklyReview(
       () => client.enableWeeklyAi(),
       "Could not save AI settings. Please try again.",
     );
+    if (saved) capture("weekly_ai_enabled");
     if (saved && !disposed && data()?.settings.enabled) await checkDue();
   }
 
   async function decide(plan: CheckInPlan): Promise<void> {
-    await save(
+    const saved = await save(
       () => client.setCheckInPlan(plan),
       "Could not save your plan. Please try again.",
     );
+    if (saved)
+      capture("check_in_plan_decided", {
+        daily_target: plan.dailyTarget,
+        estimate_factor: plan.estimateFactor,
+      });
   }
 
   createEffect(

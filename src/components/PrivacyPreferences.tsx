@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { injectContentsquareScript } from "@contentsquare/tag-sdk";
+import { startAnalytics, stopAnalytics } from "../analytics.ts";
 import { PRODUCTION_ORIGINS } from "../shared/site";
 import { PrivacyPolicyButton } from "./PrivacyPolicyButton";
 import "../styles/preferences.css";
@@ -37,8 +37,7 @@ export function PrivacyPreferences() {
       !PRODUCTION_ORIGINS.includes(location.origin)
     )
       return;
-    started = true;
-    injectContentsquareScript({ clientId: "10d7eccb828d8" });
+    started = startAnalytics();
   }
 
   function choose(next: Choice) {
@@ -58,8 +57,10 @@ export function PrivacyPreferences() {
     setError("");
     // A reload tears down the running recorder, including pending script loads.
     // Never clear planner or authentication storage when withdrawing consent.
-    if (next === "rejected" && started) location.reload();
-    else if (next === "accepted") startTracking();
+    if (next === "rejected" && started) {
+      stopAnalytics();
+      location.reload();
+    } else if (next === "accepted") startTracking();
   }
 
   onMount(() => {
@@ -69,8 +70,10 @@ export function PrivacyPreferences() {
     if (saved === "accepted") startTracking();
     const changed = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY || event.key === null) {
-        if (started && savedChoice() !== "accepted") location.reload();
-        else {
+        if (started && savedChoice() !== "accepted") {
+          stopAnalytics();
+          location.reload();
+        } else {
           const next = savedChoice();
           setChoice(next);
           setOpen(!next);
@@ -92,9 +95,9 @@ export function PrivacyPreferences() {
       <section class="cookie-banner" aria-label="Cookie preferences">
         <div class="cookie-copy">
           <p>
-            Optional cookies for heatmaps and session recordings (Hotjar /
-            Contentsquare) stay off unless you accept. Change this anytime in
-            Cookie settings.
+            Optional cookies for product analytics, heatmaps and masked session
+            recordings (PostHog, EU) stay off unless you accept. Change this
+            anytime in Cookie settings.
           </p>
           <PrivacyPolicyButton label="Read our privacy policy" />
           <Show when={error()}>

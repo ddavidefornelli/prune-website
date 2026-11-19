@@ -68,11 +68,7 @@ function date(value: unknown): string {
   return value;
 }
 /** Strict allowlist: resource paths/URLs, model choices and prompts are never accepted. */
-export function validateInput(
-  value: unknown,
-  now: Date,
-  preview = false,
-): ReviewInput {
+export function validateInput(value: unknown, now: Date): ReviewInput {
   const input = record(value, [
     "consentVersion",
     "weekStart",
@@ -88,23 +84,10 @@ export function validateInput(
   }
   const weekStart = date(input.weekStart);
   const weekEnd = date(input.weekEnd);
-  if (preview) {
-    const localDays = [-1, 0, 1].map((offset) =>
-      new Date(now.getTime() + offset * DAY_MS).toISOString().slice(0, 10),
-    );
-    const end = new Date(`${weekEnd}T00:00:00Z`);
-    const monday = new Date(
-      end.getTime() - ((end.getUTCDay() + 6) % 7) * DAY_MS,
-    )
-      .toISOString()
-      .slice(0, 10);
-    if (!localDays.includes(weekEnd) || weekStart !== monday) invalid();
-  } else {
-    // A review covers a batch of 10 completed tasks, from its first to its last
-    // date. The service-only SQL loader picks the batch; it can't end in the future.
-    const latest = new Date(now.getTime() + DAY_MS).toISOString().slice(0, 10);
-    if (weekStart > weekEnd || weekEnd > latest) invalid();
-  }
+  // A review covers a batch of 10 completed tasks, from its first to its last
+  // date. The service-only SQL loader picks the batch; it can't end in the future.
+  const latest = new Date(now.getTime() + DAY_MS).toISOString().slice(0, 10);
+  if (weekStart > weekEnd || weekEnd > latest) invalid();
   const activity = record(input.activity, [
     "tasks",
     "stops",

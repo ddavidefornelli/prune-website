@@ -20,7 +20,7 @@ export type Dependencies = {
   ) => Promise<SuggestionInput | { disabled: true }>;
   /** Charges one attempt against the account's daily allowance. */
   reserve: (userId: string, day: string) => Promise<boolean>;
-  generate: (input: SuggestionInput) => Promise<Suggestion[]>;
+  generate: (input: SuggestionInput, userId: string) => Promise<Suggestion[]>;
   allowedOrigins: Set<string>;
 };
 
@@ -132,7 +132,7 @@ export function createHandler(
         );
       return respond(200, {
         day: input.day,
-        suggestions: await deps.generate(input),
+        suggestions: await deps.generate(input, userId),
       });
     } catch (error) {
       const safe =

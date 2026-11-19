@@ -8,6 +8,7 @@ import {
   onMount,
 } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
+import { resetAccount } from "../analytics.ts";
 import { onWake } from "../shared/on-wake.ts";
 import type { PlanningClient } from "./api";
 import type { Dashboard } from "./types";
@@ -156,6 +157,7 @@ export function createPlanner(client: PlanningClient) {
     await mutate(async () => {
       if (action === "delete") await client.deleteAccount();
       else await client.signOut();
+      resetAccount();
       window.location.reload();
     });
     if (!disposed) setAccountAction(null);

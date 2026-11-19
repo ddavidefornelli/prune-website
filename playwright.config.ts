@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 const fixture = {
   VITE_SUPABASE_URL: "https://web-fixture.supabase.co",
   VITE_SUPABASE_ANON_KEY: "sb_publishable_fixture",
+  VITE_POSTHOG_KEY: "phc_fixture",
 };
 
 export default defineConfig({

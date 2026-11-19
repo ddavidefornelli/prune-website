@@ -1,3 +1,4 @@
+import { logPostHogError } from "../analytics.ts";
 import { ERROR_LOG_PATH } from "../shared/api-routes.ts";
 import { PRODUCTION_ORIGINS } from "../shared/site.ts";
 
@@ -20,6 +21,7 @@ export function logError(
   const key = `${event}:${context}:${detail}`;
   if (sent.has(key)) return;
   sent.add(key);
+  logPostHogError("sign-in network request failed", { event, context, detail });
   try {
     void fetch(ERROR_LOG_PATH, {
       method: "POST",

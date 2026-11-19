@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { loadEnv } from "vite";
 import { publicConfig } from "../src/planner/config.ts";
-import { ANALYTICS_SCRIPTS, CONTENTSQUARE_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
+import { ANALYTICS_SCRIPTS, POSTHOG_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 
-const TABLES = ["planner_accounts", "planner_tasks", "planner_resources", "planner_stops", "planner_reviews", "planner_receipts", "ai_controls", "ai_usage", "ai_review_requests", "ai_review_previews"];
+const TABLES = ["planner_accounts", "planner_tasks", "planner_stops", "planner_reviews", "planner_receipts", "ai_controls", "ai_usage", "ai_review_requests"];
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const HELP = `Usage: npm run check:production -- [options]
 
@@ -195,7 +195,7 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
     if (!csp) add("FAIL", `site${path}:csp`, `${path}: enforced HTTP CSP`, "Content-Security-Policy header is missing; meta-only or report-only CSP is not a substitute.", deploymentFix);
     else {
       policy = parsePolicy(csp);
-      const hashes = [...(policy.get("script-src") || [])].filter((source) => ![...ANALYTICS_SCRIPTS, ...CONTENTSQUARE_SCRIPTS].includes(source));
+      const hashes = [...(policy.get("script-src") || [])].filter((source) => ![...ANALYTICS_SCRIPTS, ...POSTHOG_SCRIPTS].includes(source));
       const pinned = hashes.length > 0 && hashes.every((hash) => /^'sha384-[A-Za-z0-9+/]{64}'$/.test(hash));
       const backend = config?.url || (() => {
         try { return new URL([...(policy.get("connect-src") || [])][0]).origin; } catch { return null; }
@@ -234,7 +234,7 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
       if (!await inspectAsset(url, attrs.integrity, "JavaScript")) valid = false;
     }
     check(valid, `site${path}:scripts`, `${path}: same-origin, external, integrity-pinned entry scripts`, valid ? "All entry script tags carry SHA-384 integrity." : "Missing scripts/SRI, inline code, or an unexpected script source was found.", deploymentFix);
-    if (policy && valid) check(policy.get("script-src")?.size === documentHashes.size + ANALYTICS_SCRIPTS.length + CONTENTSQUARE_SCRIPTS.length && [...documentHashes].every((hash) => policy.get("script-src").has(hash)), `site${path}:script-policy`, `${path}: CSP hashes match the actual entry scripts`, "The header must authorize the document hashes plus the reviewed Vercel Analytics and Contentsquare sources.", deploymentFix);
+    if (policy && valid) check(policy.get("script-src")?.size === documentHashes.size + ANALYTICS_SCRIPTS.length + POSTHOG_SCRIPTS.length && [...documentHashes].every((hash) => policy.get("script-src").has(hash)), `site${path}:script-policy`, `${path}: CSP hashes match the actual entry scripts`, "The header must authorize the document hashes plus the reviewed Vercel Analytics and PostHog sources.", deploymentFix);
 
     const styles = [...html.matchAll(/<link\b((?:"[^"]*"|'[^']*'|[^'">])*)>/gi)].map((match) => attributes(match[1])).filter((attrs) => attrs.rel?.toLowerCase().split(/\s+/).includes("stylesheet"));
     let validStyles = true;

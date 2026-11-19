@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ANALYTICS_SCRIPTS, ANALYTICS_CONNECTIONS, ERROR_LOG_CONNECTIONS, SOUND_CONNECTIONS, CONTENTSQUARE_SCRIPTS, CONTENTSQUARE_CONNECTIONS, CONTENTSQUARE_IMAGES, CONTENTSQUARE_RESOURCES, API_PATHS, hardenHtml, integrity, securityHeaders } from "../scripts/security-policy.ts";
+import { ANALYTICS_SCRIPTS, ANALYTICS_CONNECTIONS, ERROR_LOG_CONNECTIONS, SOUND_CONNECTIONS, POSTHOG_SCRIPTS, POSTHOG_CONNECTIONS, API_PATHS, hardenHtml, integrity, securityHeaders } from "../scripts/security-policy.ts";
 import { productionCsp } from "../scripts/csp-plugin.ts";
 import { buildVercel } from "../scripts/build-vercel.ts";
 
@@ -22,21 +22,19 @@ test("CSP and SRI use hashes of exact emitted bytes, with explicit managed analy
   const built = hardenHtml(entry, assets, origin);
   const expected = `sha384-${createHash("sha384").update(script).digest("base64")}`;
   const csp = directives(built.headers["Content-Security-Policy"]);
-  assert.equal(csp["script-src"], `'${expected}' ${[...ANALYTICS_SCRIPTS, ...CONTENTSQUARE_SCRIPTS].join(" ")}`);
+  assert.equal(csp["script-src"], `'${expected}' ${[...ANALYTICS_SCRIPTS, ...POSTHOG_SCRIPTS].join(" ")}`);
   assert.ok(built.html.includes(`<script integrity="${expected}"`));
   assert.ok(built.html.includes(`<link integrity="${integrity(css)}"`));
   assert.ok(built.html.indexOf("http-equiv=") < built.html.indexOf("<script"));
-  assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ERROR_LOG_CONNECTIONS, ...SOUND_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...CONTENTSQUARE_CONNECTIONS, ...CONTENTSQUARE_RESOURCES].join(" "));
-  // Replay may read static files from the site, never its same-origin API.
-  assert.ok(CONTENTSQUARE_RESOURCES.every((source) => /^https:\/\/(?:www\.)?prune\.win\/(?:assets\/|fonts\/|[\w-]+\.(?:png|webp))$/.test(source)));
+  assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ERROR_LOG_CONNECTIONS, ...SOUND_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" "));
+  // Optional analytics reaches PostHog's EU hosts only, by exact origin.
+  assert.ok([...POSTHOG_SCRIPTS, ...POSTHOG_CONNECTIONS].every((source) => /^https:\/\/eu(?:-assets)?\.i\.posthog\.com$/.test(source)));
   assert.ok(!csp["connect-src"].split(" ").includes("'self'"));
   // Focus sounds may only come from their own folder on the site.
   assert.deepEqual(SOUND_CONNECTIONS, ["https://www.prune.win/sounds/", "https://prune.win/sounds/"]);
-  assert.equal(csp["img-src"], `'self' ${CONTENTSQUARE_IMAGES.join(" ")}`);
+  assert.equal(csp["img-src"], "'self'");
   for (const sources of Object.values(csp)) {
-    for (const source of sources.split(" ")) {
-      if (source.includes("*")) assert.match(source, /^https:\/\/\*\.contentsquare\.(net|com)$/);
-    }
+    for (const source of sources.split(" ")) assert.ok(!source.includes("*"), `wildcard source: ${source}`);
   }
   assert.ok(!built.headers["Content-Security-Policy"].includes("unsafe-"));
   assert.equal(csp["style-src"], "'self'");

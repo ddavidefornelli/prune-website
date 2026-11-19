@@ -21,7 +21,9 @@ test("web source and public text assets contain no marketing tracking integratio
 test("package dependencies do not install advertising or behavioural analytics SDKs", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const dependencies = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
+  // posthog-js is the one reviewed exception: it only starts after cookie
+  // consent (src/analytics.ts), with autocapture off and replays masked.
   for (const name of Object.keys(dependencies)) {
-    assert.ok(!/^(?:@vercel\/speed-insights|@google-analytics\/|@segment\/|@hotjar\/|@microsoft\/clarity|posthog-js$|mixpanel-browser$|react-ga(?:4)?$|react-gtm-module$)/.test(name), `Tracking SDK found: ${name}`);
+    assert.ok(!/^(?:@vercel\/speed-insights|@google-analytics\/|@segment\/|@hotjar\/|@contentsquare\/|@microsoft\/clarity|mixpanel-browser$|react-ga(?:4)?$|react-gtm-module$)/.test(name), `Tracking SDK found: ${name}`);
   }
 });

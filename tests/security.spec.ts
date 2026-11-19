@@ -97,11 +97,8 @@ cspTest("production CSP blocks injected code, styles and unapproved backend conn
   const policy = response!.headers()["content-security-policy"]!;
   expect(policy).toMatch(/script-src 'sha384-[A-Za-z0-9+/]{64}'/);
   expect(policy).not.toContain("script-src 'self'");
-  // Optional, consent-gated analytics has narrowly reviewed domain wildcards;
-  // no unrestricted source or backend wildcard may enter the policy.
-  expect([...new Set(policy.split(/[;\s]+/).filter((source) => source.includes("*")))].sort()).toEqual([
-    "https://*.contentsquare.com", "https://*.contentsquare.net",
-  ]);
+  // Optional, consent-gated analytics uses exact hosts: no wildcard may enter the policy.
+  expect(policy.split(/[;\s]+/).filter((source) => source.includes("*"))).toEqual([]);
   expect(response!.headers()["cache-control"]).toContain("no-store");
   await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute("content", policy.replace("; frame-ancestors 'none'", ""));
   await page.evaluate(async () => {

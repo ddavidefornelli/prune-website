@@ -1,3 +1,4 @@
+import { capture } from "../analytics.ts";
 import { createAccountQueue } from "./account-queue.ts";
 import { BrowserCloud } from "./browser.ts";
 import type {
@@ -316,6 +317,8 @@ export class PlanningClient {
    */
   track(event: JourneyEvent, detail: JourneyDetail = {}): void {
     if (this.disposed || !this.accountKey) return;
+    // Mirrored to optional analytics only after cookie consent (else a no-op).
+    capture(event, detail);
     void this.cloud.execute("planner_track", { event, detail }).catch(() => {});
   }
 

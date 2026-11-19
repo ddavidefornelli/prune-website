@@ -1,4 +1,5 @@
 import { ApiError, readLimited } from "../http.ts";
+import type { AiGenerationObserver } from "../ai-observability.ts";
 import { ESTIMATE, PLANNER_LIMITS } from "../../src/planner/constants.ts";
 
 export const MODEL = "gpt-4.1-mini";
@@ -138,7 +139,38 @@ export async function generateSuggestions(
   input: SuggestionInput,
   key: string,
   fetcher: typeof fetch = fetch,
+  observability?: { observer: AiGenerationObserver; distinctId: string },
 ): Promise<Suggestion[]> {
+  const requestBody = providerBody(input);
+  const startedAt = performance.now();
+  const traceId = observability ? crypto.randomUUID() : undefined;
+  let httpStatus: number | undefined;
+  let captured = false;
+  // Only metadata reaches PostHog: never the prompt (task titles, stop
+  // reasons) or the generated text, which run without cookie consent.
+  const capture = (
+    body:
+      | { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } }
+      | undefined,
+    isError: boolean,
+  ) => {
+    if (!observability || !traceId || captured) return;
+    captured = true;
+    const number = (value: unknown) =>
+      typeof value === "number" && Number.isFinite(value) ? value : undefined;
+    observability.observer.capture({
+      distinctId: observability.distinctId,
+      traceId,
+      spanName: "task_suggestions",
+      model: requestBody.model,
+      maxTokens: requestBody.max_completion_tokens,
+      inputTokens: number(body?.usage?.prompt_tokens),
+      outputTokens: number(body?.usage?.completion_tokens),
+      latency: (performance.now() - startedAt) / 1_000,
+      httpStatus,
+      isError,
+    });
+  };
   try {
     const response = await fetcher(
       "https://api.openai.com/v1/chat/completions",
@@ -150,9 +182,10 @@ export async function generateSuggestions(
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(providerBody(input)),
+        body: JSON.stringify(requestBody),
       },
     );
+    httpStatus = response.status;
     if (!response.ok) {
       await response.body?.cancel();
       throw new Error("Provider request failed");
@@ -167,8 +200,10 @@ export async function generateSuggestions(
       typeof choice?.message?.content !== "string"
     )
       throw new Error("Incomplete provider response");
+    capture(body, false);
     return validateSuggestions(JSON.parse(choice.message.content), input);
   } catch {
+    capture(undefined, true);
     // Never leak provider bodies, request data, URLs, credentials, or raw exceptions.
     throw new ApiError(
       502,
