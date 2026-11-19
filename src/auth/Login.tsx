@@ -2,12 +2,16 @@ import { Logo } from "../components/Logo";
 import { batch, createSignal, For, Show, untrack } from "solid-js";
 import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import type { PlanningClient } from "../planner/api";
-import { errorMessage } from "../planner/errors";
-import { requirePrivacyAcknowledgement } from "../planner/privacy-state";
+import { CloudError } from "../planner/cloud-error";
+import { PLANNER_LIMITS } from "../planner/constants";
+import { MESSAGES } from "../planner/messages";
+import { PrivacyNotice } from "../planner/privacy-state";
 import { isAccount, type Account } from "../planner/types";
+import { APP_EVENTS } from "../shared/storage-keys";
 
-const EMAIL_MAX_LENGTH = 254;
+/** Must match the OTP length set for the project in Supabase Auth. */
 const CODE_LENGTH = 8;
+const NON_DIGITS = /\D/g;
 
 interface LoginProps {
   client: PlanningClient;
@@ -43,14 +47,14 @@ export function Login(props: LoginProps) {
   }
 
   function fail(cause: unknown): void {
-    setError(errorMessage(cause));
+    setError(CloudError.messageOf(cause));
   }
 
   async function continueWithGoogle(): Promise<void> {
     if (unavailable()) return;
     begin("google");
     try {
-      requirePrivacyAcknowledgement(localStorage);
+      new PrivacyNotice(localStorage).require();
       await props.client.signInWithGoogle();
       // The browser is on its way to Google; stay busy until it leaves.
     } catch (cause) {
@@ -66,7 +70,7 @@ export function Login(props: LoginProps) {
     if (unavailable()) return;
     begin("email");
     try {
-      requirePrivacyAcknowledgement(localStorage);
+      new PrivacyNotice(localStorage).require();
       const address = email().trim();
       await props.client.sendCode(address);
       setSentTo(address);
@@ -84,8 +88,7 @@ export function Login(props: LoginProps) {
     begin("email");
     try {
       const account = await props.client.verifyCode(sentTo(), code().trim());
-      if (!isAccount(account))
-        throw new Error("Sign-in did not return an account. Please try again.");
+      if (!isAccount(account)) throw new Error(MESSAGES.noAccountReturned);
       props.onAuthenticated(account);
     } catch (cause) {
       fail(cause);
@@ -137,7 +140,7 @@ export function Login(props: LoginProps) {
                     autocapitalize="none"
                     spellcheck={false}
                     required
-                    maxLength={EMAIL_MAX_LENGTH}
+                    maxLength={PLANNER_LIMITS.emailLength}
                     placeholder="you@example.com"
                     value={email()}
                     disabled={busy()}
@@ -193,7 +196,7 @@ export function Login(props: LoginProps) {
                 value={code()}
                 onInput={(event) => {
                   const value = event.currentTarget.value
-                    .replace(/\D/g, "")
+                    .replace(NON_DIGITS, "")
                     .slice(0, CODE_LENGTH);
                   event.currentTarget.value = value;
                   setCode(value);
@@ -240,7 +243,7 @@ export function Login(props: LoginProps) {
           type="button"
           class="privacy-policy-button"
           onClick={() =>
-            window.dispatchEvent(new Event("prune:preferences:open"))
+            window.dispatchEvent(new Event(APP_EVENTS.openPrivacyPreferences))
           }
         >
           Cookie settings

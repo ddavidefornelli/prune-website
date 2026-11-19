@@ -2,12 +2,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildSync } from "esbuild";
 import { loadEnv } from "vite";
-import { publicConfig } from "../src/planner/config.ts";
+import { PublicConfig } from "../src/planner/config.ts";
 
 /** Package the /api/error-log Edge Function into Vercel Build Output. */
 export function buildFunctions(destination = ".vercel/output", mode = "production"): void {
   const env = loadEnv(mode, process.cwd(), "VITE_SUPABASE_");
-  const config = publicConfig(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+  const config = PublicConfig.parse(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
   const directory = resolve(destination, "functions/api/error-log.func");
   mkdirSync(directory, { recursive: true });
   buildSync({

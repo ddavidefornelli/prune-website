@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateInput } from "../server/weekly-review/domain.ts";
+import { ReviewValidator } from "../server/weekly-review/domain.ts";
+
+const validateInput = ReviewValidator.input;
 import { owner, reviewFixture as fixture } from "./helpers/review-db.mjs";
 
 test("a review is due after every 10 completed tasks, counting from the switch", async () => {

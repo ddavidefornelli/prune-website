@@ -1,6 +1,6 @@
 import { createEffect, For, onCleanup, onMount, untrack } from "solid-js";
 import { NAVIGATION_VIEWS, VIEW_LABELS } from "../constants";
-import type { PlannerState } from "../create-planner";
+import type { PlannerState } from "../planner-state";
 
 const VIEW_SHORTCUTS = { today: "T", focus: "F", tomorrow: "M", habits: "O" };
 

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ApiError, readLimited } from "../server/http.ts";
+import { ApiError, LimitedBody } from "../server/http.ts";
+
+const readLimited = LimitedBody.read;
 
 const stream = (...chunks) =>
   new ReadableStream({

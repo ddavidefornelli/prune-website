@@ -8,7 +8,7 @@ import { buildVercel } from "../scripts/build-vercel.ts";
 import { checkDeployment } from "../scripts/check-deployment.mjs";
 import { hardenHtml } from "../scripts/security-policy.ts";
 
-const paths = ["/", "/download", "/download/", "/login", "/login/", "/index.html"];
+const paths = ["/", "/login", "/login/", "/index.html"];
 const origin = "https://deployment-fixture.supabase.co";
 const script = "console.log('trusted application');";
 const css = "body { color: white; }";
@@ -61,16 +61,16 @@ for (const header of ["Content-Security-Policy", "X-Content-Type-Options", "X-Fr
   });
 }
 
-test("no-store and the document rewrite are required on the trailing-slash download route too", async (t) => {
+test("no-store and the document rewrite are required on the trailing-slash login route too", async (t) => {
   const { destination } = fixture(t);
-  changeConfig(destination, (config) => { config.routes.find((route) => route.headers?.["Cache-Control"]).src = "^/(?:index\\.html|download)?$"; });
+  changeConfig(destination, (config) => { config.routes.find((route) => route.headers?.["Cache-Control"]).src = "^/(?:index\\.html|login)?$"; });
   let report = await checkDeployment(destination);
-  assert.equal(result(report, "site/download/:cache").status, "FAIL");
+  assert.equal(result(report, "site/login/:cache").status, "FAIL");
   assert.equal(result(report, "site/:cache").status, "PASS");
   changeConfig(destination, (config) => { config.routes = config.routes.filter((route) => !route.dest); });
   report = await checkDeployment(destination);
-  assert.equal(result(report, "site/download:http").status, "FAIL");
-  assert.equal(result(report, "site/download/:http").status, "FAIL");
+  assert.equal(result(report, "site/login:http").status, "FAIL");
+  assert.equal(result(report, "site/login/:http").status, "FAIL");
 });
 
 for (const extension of ["js", "css"]) {

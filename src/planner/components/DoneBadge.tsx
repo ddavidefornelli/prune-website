@@ -1,5 +1,5 @@
+import { Duration } from "../../shared/duration";
 import { ESTIMATE } from "../constants";
-import { formatDuration } from "../time";
 
 interface DoneBadgeProps {
   actualSeconds: number;
@@ -13,12 +13,12 @@ export function DoneBadge(props: DoneBadgeProps) {
     Math.min(
       ESTIMATE.max,
       props.actualSeconds > 0
-        ? Math.max(1, Math.round(props.actualSeconds / 60))
+        ? Math.max(1, Math.round(new Duration(props.actualSeconds).minutes))
         : props.estimatedMinutes,
     );
   const label = () =>
     props.actualSeconds > 0
-      ? `${formatDuration(props.actualSeconds)} · completed`
+      ? `${new Duration(props.actualSeconds).clock()} · completed`
       : "completed";
   return (
     <span class="task-done" title={label()}>

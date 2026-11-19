@@ -1,14 +1,10 @@
 import { createMemo, For, Show } from "solid-js";
-import { formatMinutes } from "../planner/quick-entry";
+import { Estimate } from "../planner/estimate";
 import type { CheckInPlan, WeeklyReview } from "../planner/types";
-import {
-  type CheckInSummary,
-  checkInSummary,
-  plannedEstimate,
-  ratioLabel,
-} from "./check-in";
-import type { WeeklyReviewState } from "./create-weekly-review";
-import { reviewRange, reviewText } from "./format";
+import { Duration } from "../shared/duration";
+import { CheckInSummary } from "./check-in";
+import { ReviewFormat } from "./format";
+import type { WeeklyReviewState } from "./weekly-review-state";
 import { ReviewReport } from "./ReviewReport";
 
 /**
@@ -93,7 +89,7 @@ function TrendCards(props: { summary: CheckInSummary }) {
       <section class="check-in-trend">
         <h4>Estimates</h4>
         <p class="check-in-value">
-          {ratio() === null ? "—" : ratioLabel(ratio()!)}
+          {ratio() === null ? "—" : CheckInSummary.ratioLabel(ratio()!)}
         </p>
         <Sparkline
           raw={props.summary.points.map((point) => point.estimateRatio)}
@@ -103,7 +99,7 @@ function TrendCards(props: { summary: CheckInSummary }) {
         <p class="check-in-note">
           {week()?.estimateRatio == null
             ? "No timed tasks this week."
-            : `This week: ${ratioLabel(week()!.estimateRatio!).toLowerCase()}`}
+            : `This week: ${CheckInSummary.ratioLabel(week()!.estimateRatio!).toLowerCase()}`}
         </p>
       </section>
       <section class="check-in-trend">
@@ -127,7 +123,7 @@ function TrendCards(props: { summary: CheckInSummary }) {
         <p class="check-in-value">
           {props.summary.capacityMinutes === null
             ? "—"
-            : formatMinutes(props.summary.capacityMinutes * 60)}
+            : Duration.ofMinutes(props.summary.capacityMinutes).rounded()}
         </p>
         <p class="check-in-note">
           Focus on finished tasks, on a day you worked.
@@ -153,8 +149,12 @@ function PlanCard(props: {
     return [
       {
         label: "New tasks start at",
-        from: formatMinutes(plannedEstimate(current.estimateFactor) * 60),
-        to: formatMinutes(plannedEstimate(suggested.estimateFactor) * 60),
+        from: Duration.ofMinutes(
+          Estimate.forFactor(current.estimateFactor),
+        ).rounded(),
+        to: Duration.ofMinutes(
+          Estimate.forFactor(suggested.estimateFactor),
+        ).rounded(),
       },
       {
         label: "Tasks a day",
@@ -246,11 +246,14 @@ export function CheckIn(props: {
   plan: CheckInPlan | null;
   state: WeeklyReviewState;
 }) {
-  const summary = createMemo(() => checkInSummary(props.history, props.plan));
+  const summary = createMemo(
+    () => new CheckInSummary(props.history, props.plan),
+  );
   return (
     <article class="check-in">
       <p class="check-in-eyebrow">
-        Check-in · {reviewRange(props.review.weekStart, props.review.weekEnd)}
+        Check-in ·{" "}
+        {ReviewFormat.range(props.review.weekStart, props.review.weekEnd)}
       </p>
       <TrendCards summary={summary()} />
       <PlanCard
@@ -261,10 +264,10 @@ export function CheckIn(props: {
       />
       <section class="check-in-coach">
         <h4>Coach&rsquo;s note</h4>
-        <p>{reviewText(props.review.analysis.summary)}</p>
+        <p>{ReviewFormat.text(props.review.analysis.summary)}</p>
         <ol class="weekly-improvements">
           <For each={props.review.analysis.improvements}>
-            {(improvement) => <li>{reviewText(improvement)}</li>}
+            {(improvement) => <li>{ReviewFormat.text(improvement)}</li>}
           </For>
         </ol>
       </section>

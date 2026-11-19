@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  alignDashboardDate,
-  dashboardTasks,
-} from "../src/planner/dashboard.ts";
-import { applyCommand, project } from "../src/planner/task-projection.ts";
-import { nextDay } from "../src/planner/time.ts";
+import { PlannerSnapshot } from "../src/planner/planner-snapshot.ts";
+import { CalendarDay } from "../src/shared/calendar-day.ts";
 import { dashboard } from "./helpers/queue.mjs";
+
+const applyCommand = (data, command, result) =>
+  PlannerSnapshot.own(data).apply(command, result);
 
 function command(data, action, args = {}) {
   return {
@@ -32,7 +31,7 @@ function create(data, overrides = {}) {
 
 test("projection clones its input, and dashboard tasks include the active task only once", () => {
   const base = dashboard();
-  const next = project(
+  const next = PlannerSnapshot.project(
     base,
     command(base, "create_task", {
       outcome: "  A task  ",
@@ -43,7 +42,7 @@ test("projection clones its input, and dashboard tasks include the active task o
   assert.equal(base.todayTasks.length, 0);
   assert.equal(next.todayTasks[0].outcome, "A task");
   next.activeTask = structuredClone(next.todayTasks[0]);
-  assert.equal(dashboardTasks(next).length, 1);
+  assert.equal(PlannerSnapshot.own(next).tasks().length, 1);
 });
 
 test("date alignment preserves an older active task and promotes tomorrow's plan", () => {
@@ -60,7 +59,10 @@ test("date alignment preserves an older active task and promotes tomorrow's plan
     requestId: nextId,
   });
   const tomorrow = data.tomorrow;
-  alignDashboardDate(data, Date.parse(`${tomorrow}T12:00:00Z`) / 1000, "UTC");
+  PlannerSnapshot.own(data).alignTo(
+    Date.parse(`${tomorrow}T12:00:00Z`) / 1000,
+    "UTC",
+  );
   assert.equal(data.today, tomorrow);
   assert.deepEqual(
     data.todayTasks.map(({ id }) => id),
@@ -68,43 +70,23 @@ test("date alignment preserves an older active task and promotes tomorrow's plan
   );
   assert.equal(data.activeTask.id, active.id);
   assert.deepEqual(
-    dashboardTasks(data).map(({ id }) => id),
+    PlannerSnapshot.own(data).tasks().map(({ id }) => id),
     [nextId, active.id],
   );
 });
 
-test("legacy priority, resource and pause commands still replay without losing Mac metadata", () => {
+test("retired commands in an old outbox replay without changing the plan, and the acknowledgement settles them", () => {
   const data = dashboard();
   const task = create(data);
-  task.resources.push({
-    id: "file",
-    kind: "file",
-    label: "Mac file",
-    target: "/Users/example/private.txt",
-  });
-  const apply = (action, args = {}) =>
-    applyCommand(data, command(data, action, { id: task.id, ...args }));
-  apply("prioritize_task");
-  const link = command(data, "add_task_link", {
-    id: task.id,
-    label: "Reference",
-    target: "https://example.com",
-  });
-  link.requestId = "link";
-  applyCommand(data, link);
-  apply("remove_task_resource", { resourceId: "link" });
-  apply("start_task");
-  applyCommand(data, {
-    ...command(data, "pause_task", { id: task.id }),
-    at: data.serverNow + 60,
-  });
+  const before = structuredClone(task);
+  for (const action of ["prioritize_task", "add_task_link", "remove_task_resource", "pause_task"])
+    applyCommand(data, command(data, action, { id: task.id }));
+  assert.deepEqual(task, before);
+  applyCommand(data, command(data, "start_task", { id: task.id }));
+  const acknowledged = { ...task, startedAt: null, actualSeconds: 60 };
+  applyCommand(data, command(data, "pause_task", { id: task.id }), acknowledged);
   assert.equal(task.actualSeconds, 60);
   assert.equal(task.startedAt, null);
-  assert.equal(task.isPriority, true);
-  assert.deepEqual(
-    task.resources.map(({ id }) => id),
-    ["file"],
-  );
 });
 
 test("completing an older active task returns its final timing even outside the day lists", () => {
@@ -142,5 +124,5 @@ for (const [day, expected] of [
   ["2026-12-31", "2027-01-01"],
 ])
   test(`date keys advance across calendar boundaries: ${day}`, () => {
-    assert.equal(nextDay(day), expected);
+    assert.equal(CalendarDay.parse(day).next().key, expected);
   });

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apiFetch } from "../src/planner/api-fetch.ts";
+import { boundedFetch } from "../src/planner/api-fetch.ts";
+
+const apiFetch = (input, init, timeoutMs) =>
+  boundedFetch.request(input, init, timeoutMs);
 import { HTTP_LIMITS } from "../src/shared/api-routes.ts";
 
 const bytes = (value) => new TextEncoder().encode(value);

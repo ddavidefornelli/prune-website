@@ -1,26 +1,28 @@
-export interface TaskResource {
-  id: string;
-  label: string;
-  target: string;
-  kind: "link" | "file";
-}
+/**
+ * Records exchanged with the server and saved in browser storage. They stay
+ * plain JSON objects: Solid stores track plain objects, and snapshots are
+ * cloned and serialized. Behaviour lives in the classes that read them.
+ */
+
+export type TaskStatus = "planned" | "active" | "completed";
 
 export interface Task {
   /** Mutation-response metadata; omitted from dashboard task rows. */
   serverRevision?: number;
   id: string;
   outcome: string;
-  /** Shared-backend compatibility; all tasks are equal in the web UI. */
-  isPriority: boolean;
   plannedFor: string;
   estimatedMinutes: number;
   actualSeconds: number;
-  status: "planned" | "active" | "completed";
+  status: TaskStatus;
   startedAt: number | null;
   completedOn: string | null;
   createdAt: number;
-  /** Mac-only metadata is preserved, never rendered as browser links. */
-  resources: TaskResource[];
+}
+
+export interface Completion {
+  day: string;
+  count: number;
 }
 
 export interface Dashboard {
@@ -30,24 +32,36 @@ export interface Dashboard {
   todayTasks: Task[];
   tomorrowTasks: Task[];
   activeTask: Task | null;
-  canPlanTomorrow: boolean;
-  completions: { day: string; count: number }[];
+  completions: Completion[];
   serverNow: number;
 }
 
-/** AI proposal for today, derived server-side from yesterday's tasks. */
+export type SuggestionTarget = "today" | "tomorrow";
+
+/** AI proposal for a day, derived server-side from the day before. */
 export interface TaskSuggestion {
   outcome: string;
   estimatedMinutes: number;
   basis: "carry_over" | "follow_up";
 }
 
-export interface ReviewStop {
+interface ReviewStop {
   id: number;
   taskId: string;
   reason: string;
   stoppedOn: string;
 }
+
+type ReviewTask = Pick<
+  Task,
+  | "id"
+  | "outcome"
+  | "plannedFor"
+  | "completedOn"
+  | "status"
+  | "estimatedMinutes"
+  | "actualSeconds"
+>;
 
 export interface WeeklyReview {
   weekStart: string;
@@ -55,16 +69,7 @@ export interface WeeklyReview {
   generatedAt: number;
   model: string;
   activity: {
-    tasks: Pick<
-      Task,
-      | "id"
-      | "outcome"
-      | "plannedFor"
-      | "completedOn"
-      | "status"
-      | "estimatedMinutes"
-      | "actualSeconds"
-    >[];
+    tasks: ReviewTask[];
     stops: ReviewStop[];
     totalStops: number;
     omittedStops: number;
@@ -76,8 +81,6 @@ export interface WeeklyReview {
   };
 }
 
-/** A month of the owner's own tasks, counted on the server. */
-/** Which reminder emails the account receives. */
 /** The owner's daily focus time, when prune reminds them to work. */
 export interface ScheduleState {
   /** Minutes after local midnight; null when not chosen (reminders at 09:00, only for planned tasks). */
@@ -87,6 +90,7 @@ export interface ScheduleState {
   pushDevices: number;
 }
 
+/** Which reminder emails the account receives. */
 export interface EmailPreferences {
   /** One email on days when planned tasks are still unfinished. */
   daily: boolean;
@@ -94,6 +98,7 @@ export interface EmailPreferences {
   comeback: boolean;
 }
 
+/** A month of the owner's own tasks, counted on the server. */
 export interface MonthStats {
   month: string;
   /** Tasks planned for days so far, plus any of today's already finished. */
@@ -112,8 +117,9 @@ export interface CheckInPlan {
   decidedFor: string;
 }
 
+export type PlanSettings = Omit<CheckInPlan, "decidedFor">;
+
 export interface WeeklyOverview {
-  developmentUnlimited?: boolean;
   settings: { enabled: boolean };
   model: string;
   available: boolean;

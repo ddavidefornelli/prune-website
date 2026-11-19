@@ -1,11 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isDayComplete, trackedSeconds } from "../src/planner/task-model.ts";
-import { onboardingKey, shouldOfferOnboarding, shouldOfferTour, tourKey } from "../src/planner/onboarding.ts";
-import { profileStats, todayFocusSeconds } from "../src/profile/profile-stats.ts";
-import { reviewCountdown } from "../src/reviews/review-countdown.ts";
-import { averageTaskTiming, completedTaskTimings } from "../src/shared/task-timing.ts";
+import { DayPlan, TaskTimer } from "../src/planner/day-plan.ts";
+import { FirstRun } from "../src/planner/onboarding.ts";
+import { ProfileStats } from "../src/profile/profile-stats.ts";
+import { ReviewCountdown } from "../src/reviews/review-countdown.ts";
+import { STORAGE_KEYS } from "../src/shared/storage-keys.ts";
+import { TaskTimingReport } from "../src/shared/task-timing.ts";
 import { dashboard, persistence } from "./helpers/queue.mjs";
+
+const isDayComplete = (tasks) => new DayPlan(tasks).isComplete;
+const trackedSeconds = (task, now) => new TaskTimer(task).trackedSeconds(now);
+const profileStats = (data) => ({ ...new ProfileStats(data) });
+const todayFocusSeconds = (data, now = data.serverNow) =>
+  new DayPlan(data.todayTasks).focusedSeconds(now);
+const shouldOfferOnboarding = (data, account, storage) =>
+  new FirstRun(storage, account).offersOnboarding(data);
+const shouldOfferTour = (data, account, storage) =>
+  new FirstRun(storage, account).offersTour(data);
+const reviewCountdown = (week, now) => ReviewCountdown.of(week, now);
+const completedTaskTimings = (tasks, start, end) =>
+  new TaskTimingReport(tasks, start, end).completed;
+const averageTaskTiming = (tasks, start, end) =>
+  new TaskTimingReport(tasks, start, end).average();
 
 test("day completion requires a nonempty plan with every task complete", () => {
   assert.equal(isDayComplete([]), false);
@@ -73,7 +89,7 @@ test("onboarding is scoped to an account and never offered over existing history
   const { storage } = persistence();
   const data = dashboard();
   assert.equal(shouldOfferOnboarding(data, "alice", storage), true);
-  storage.setItem(onboardingKey("alice"), "done");
+  storage.setItem(STORAGE_KEYS.onboarding("alice"), "done");
   assert.equal(shouldOfferOnboarding(data, "alice", storage), false);
   assert.equal(shouldOfferOnboarding(data, "bob", storage), true);
   data.completions = [{ day: data.today, count: 1 }];
@@ -87,7 +103,7 @@ test("the tour is offered once per account, only to an empty planner, never over
   assert.equal(shouldOfferTour(data, "alice", storage), true);
   assert.equal(shouldOfferTour({ ...data, completions: [{ day: data.today, count: 4 }] }, "alice", storage), false, "history: no tour");
   assert.equal(shouldOfferTour({ ...data, tomorrowTasks: [{ id: "t" }] }, "alice", storage), false, "tasks: no tour");
-  storage.setItem(tourKey("alice"), "done");
+  storage.setItem(STORAGE_KEYS.tour("alice"), "done");
   assert.equal(shouldOfferTour(data, "alice", storage), false);
   assert.equal(shouldOfferTour(data, "bob", storage), true);
   assert.equal(shouldOfferTour({ ...dashboard(), activeTask: { id: "t" } }, "bob", storage), false);

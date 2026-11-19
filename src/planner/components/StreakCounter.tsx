@@ -1,5 +1,5 @@
 import { For, Show, untrack } from "solid-js";
-import { type Streak, streakNote } from "../streak";
+import type { Streak } from "../streak";
 
 const STATES = {
   done: "done",
@@ -65,7 +65,7 @@ export function StreakCounter(props: { streak: Streak }) {
         <strong>{days()}</strong>
         <span class="streak-words">
           <span class="streak-unit">day streak</span>
-          <span class="streak-note">{streakNote(props.streak)}</span>
+          <span class="streak-note">{props.streak.note()}</span>
         </span>
       </p>
       <ol class="streak-week" aria-label="This week">

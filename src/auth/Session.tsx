@@ -1,26 +1,27 @@
 import { createEffect, Match, Switch } from "solid-js";
-import { identifyAccount } from "../analytics.ts";
+import { HOME_PATH } from "./routes";
+import { analytics } from "../analytics.ts";
 import { LoadingIndicator } from "../components/LoadingIndicator";
 import { PlanningClient } from "../planner/api";
 import { Planner } from "../planner/Planner";
-import { createSession } from "./create-session";
+import { SessionState } from "./session-state";
 import { SignIn } from "./SignIn";
 
 export function Session() {
   const client = new PlanningClient();
-  const session = createSession(client);
+  const session = new SessionState(client);
 
   // Identify after either session restoration or a completed sign-in. The
   // analytics singleton defers this until optional-analytics consent, if needed.
   createEffect(() => {
     const account = session.account();
-    if (account) identifyAccount(account.accountKey, account.email);
+    if (account) analytics.identify(account.accountKey, account.email);
   });
 
   // The planner lives at the root; don't leave a signed-in visitor on /login.
   createEffect(() => {
-    if (session.account() && location.pathname !== "/")
-      history.replaceState(null, "", "/");
+    if (session.account() && location.pathname !== HOME_PATH)
+      history.replaceState(null, "", HOME_PATH);
   });
 
   return (

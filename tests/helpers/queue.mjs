@@ -16,6 +16,6 @@ export function persistence() {
 }
 export function dashboard(at = Math.floor(Date.now() / 1000)) {
   const today = new Date(at * 1000).toISOString().slice(0, 10);
-  return { revision: 0, today, tomorrow: new Date(at * 1000 + 86400000).toISOString().slice(0, 10), todayTasks: [], tomorrowTasks: [], activeTask: null, canPlanTomorrow: false, completions: [], serverNow: at };
+  return { revision: 0, today, tomorrow: new Date(at * 1000 + 86400000).toISOString().slice(0, 10), todayTasks: [], tomorrowTasks: [], activeTask: null, completions: [], serverNow: at };
 }
 export const offline = async () => { throw { code: "network", message: "Offline fixture" }; };

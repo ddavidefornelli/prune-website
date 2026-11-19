@@ -1,7 +1,8 @@
+import { HTTP_STATUS } from "../../src/shared/api-routes.ts";
+import { CORS, REMINDERS } from "../constants.ts";
 import {
-  buildReminderEmail,
-  buildReminderPush,
-  unsubscribeKind,
+  ReminderMessages,
+  UNSUBSCRIBE_KINDS,
   type Reminder,
   type ReminderEmail,
   type ReminderKind,
@@ -23,7 +24,7 @@ export interface OutgoingEmail extends ReminderEmail {
   oneClickUrl: string;
 }
 
-export type ReminderDependencies = {
+export interface ReminderDependencies {
   /** Shared secret the scheduler sends as a bearer token. */
   secret: string;
   siteUrl: string;
@@ -46,7 +47,15 @@ export type ReminderDependencies = {
     record: (endpoint: string, result: PushResult) => Promise<void>;
   };
   concurrency?: number;
-};
+}
+
+type Counts = Record<
+  "sent" | "retry" | "rejected" | "released" | "pushed",
+  number
+>;
+
+const BEARER = /^Bearer ([^\s]+)$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -58,97 +67,68 @@ const json = (status: number, body: unknown) =>
     },
   });
 
-/** Length-independent comparison so the secret cannot be guessed byte by byte. */
-export function sameSecret(given: string, expected: string): boolean {
-  const a = new TextEncoder().encode(given);
-  const b = new TextEncoder().encode(expected);
-  let difference = a.length ^ b.length;
-  for (let index = 0; index < b.length; index += 1)
-    difference |= (a[index] ?? 0) ^ b[index]!;
-  return difference === 0;
-}
-
-export function oneClickUrl(endpoint: string, reminder: Reminder): string {
-  const url = new URL(endpoint);
-  url.searchParams.set("token", reminder.unsubscribeToken);
-  url.searchParams.set("kind", unsubscribeKind(reminder.kind));
-  return url.toString();
-}
-
 /**
- * Hourly job: claim everyone who is due, then send. A claim is released only
- * when the provider might accept a retry, so a permanently rejected address is
- * not retried every hour and nobody is emailed twice. An account-level refusal
- * stops the run and releases everything unsent, so a misconfigured provider
- * never uses up anyone's reminder without delivering it.
+ * The scheduled job: claim everyone who is due, then send. A claim is
+ * released only when the provider might accept a retry, so a permanently
+ * rejected address is not retried every run and nobody is emailed twice. An
+ * account-level refusal stops the run and releases everything unsent, so a
+ * misconfigured provider never uses up anyone's reminder without delivering it.
  */
-export function createReminderHandler(
-  deps: ReminderDependencies,
-): (request: Request) => Promise<Response> {
-  return async (request) => {
+export class ReminderJob {
+  private readonly deps: ReminderDependencies;
+  private readonly messages: ReminderMessages;
+
+  constructor(deps: ReminderDependencies) {
+    this.deps = deps;
+    this.messages = new ReminderMessages(deps.siteUrl);
+  }
+
+  /** Length-independent comparison so the secret cannot be guessed byte by byte. */
+  static sameSecret(given: string, expected: string): boolean {
+    const a = new TextEncoder().encode(given);
+    const b = new TextEncoder().encode(expected);
+    let difference = a.length ^ b.length;
+    for (let index = 0; index < b.length; index += 1)
+      difference |= (a[index] ?? 0) ^ b[index]!;
+    return difference === 0;
+  }
+
+  /** For `Deno.serve`, and safe to pass around. */
+  readonly handle = async (request: Request): Promise<Response> => {
     if (request.method !== "POST")
-      return json(405, { error: "method_not_allowed" });
-    const bearer = /^Bearer ([^\s]+)$/i.exec(
-      request.headers.get("Authorization") ?? "",
-    );
-    if (!deps.secret || !bearer || !sameSecret(bearer[1]!, deps.secret))
-      return json(401, { error: "unauthorized" });
+      return json(HTTP_STATUS.methodNotAllowed, {
+        error: "method_not_allowed",
+      });
+    const bearer = BEARER.exec(request.headers.get("Authorization") ?? "");
+    if (
+      !this.deps.secret ||
+      !bearer ||
+      !ReminderJob.sameSecret(bearer[1]!, this.deps.secret)
+    )
+      return json(HTTP_STATUS.unauthorized, { error: "unauthorized" });
     let reminders: Reminder[];
     try {
-      reminders = await deps.claim();
+      reminders = await this.deps.claim();
     } catch {
-      return json(500, { error: "claim_failed" });
+      return json(HTTP_STATUS.serverError, { error: "claim_failed" });
     }
-    const counts = { sent: 0, retry: 0, rejected: 0, released: 0, pushed: 0 };
-    // Push endpoints for this run, by account. Without them, email still goes out.
-    const devices = new Map<string, PushTarget[]>();
-    if (deps.push && reminders.length) {
-      try {
-        for (const target of await deps.push.targets(
-          reminders.map((reminder) => reminder.userId),
-        )) {
-          const list = devices.get(target.userId) ?? [];
-          list.push(target);
-          devices.set(target.userId, list);
-        }
-      } catch {
-        /* Email only this run. */
-      }
-    }
-    const notify = async (reminder: Reminder) => {
-      const push = deps.push;
-      const targets = devices.get(reminder.userId);
-      if (!push || !targets) return;
-      const payload = buildReminderPush(reminder, deps.siteUrl);
-      await Promise.all(
-        targets.map(async (target) => {
-          const result = await push
-            .send(target, payload)
-            .catch((): PushResult => "failed");
-          if (result === "sent") counts.pushed += 1;
-          await push.record(target.endpoint, result).catch(() => {});
-        }),
-      );
+    const counts: Counts = {
+      sent: 0,
+      retry: 0,
+      rejected: 0,
+      released: 0,
+      pushed: 0,
     };
+    const devices = await this.pushTargets(reminders);
     const queue = [...reminders];
     let halted = false;
     const release = async (reminder: Reminder) => {
       counts.released += 1;
-      await deps.release(reminder.userId, reminder.kind).catch(() => {});
+      await this.deps.release(reminder.userId, reminder.kind).catch(() => {});
     };
     const worker = async () => {
       for (let next = queue.shift(); next; next = queue.shift()) {
-        let result: SendResult;
-        try {
-          result = await deps.send({
-            ...buildReminderEmail(next, deps.siteUrl),
-            to: next.email,
-            kind: next.kind,
-            oneClickUrl: oneClickUrl(deps.unsubscribeEndpoint, next),
-          });
-        } catch {
-          result = "retry";
-        }
+        const result = await this.sendEmail(next);
         if (result === "halt") {
           halted = true;
           // Emptying the queue also stops the other workers after their current send.
@@ -157,25 +137,84 @@ export function createReminderHandler(
         }
         counts[result] += 1;
         if (result === "retry") await release(next);
-        else await notify(next);
+        else counts.pushed += await this.notify(next, devices);
       }
     };
     await Promise.all(
-      Array.from({ length: Math.max(1, deps.concurrency ?? 4) }, worker),
+      Array.from(
+        { length: Math.max(1, this.deps.concurrency ?? REMINDERS.concurrency) },
+        worker,
+      ),
     );
     // Counts only: never addresses or task text in a response or log.
     return halted
-      ? json(502, { error: "provider_refused", ...counts })
-      : json(200, counts);
+      ? json(HTTP_STATUS.badGateway, { error: "provider_refused", ...counts })
+      : json(HTTP_STATUS.ok, counts);
   };
+
+  private async sendEmail(reminder: Reminder): Promise<SendResult> {
+    try {
+      return await this.deps.send({
+        ...this.messages.email(reminder),
+        to: reminder.email,
+        kind: reminder.kind,
+        oneClickUrl: ReminderMessages.oneClickUrl(
+          this.deps.unsubscribeEndpoint,
+          reminder,
+        ),
+      });
+    } catch {
+      return "retry";
+    }
+  }
+
+  /** Push endpoints for this run, by account. Without them, email still goes out. */
+  private async pushTargets(
+    reminders: Reminder[],
+  ): Promise<Map<string, PushTarget[]>> {
+    const devices = new Map<string, PushTarget[]>();
+    if (!this.deps.push || !reminders.length) return devices;
+    try {
+      const targets = await this.deps.push.targets(
+        reminders.map((reminder) => reminder.userId),
+      );
+      for (const target of targets) {
+        const list = devices.get(target.userId) ?? [];
+        list.push(target);
+        devices.set(target.userId, list);
+      }
+    } catch {
+      /* Email only this run. */
+    }
+    return devices;
+  }
+
+  /** Sends the reminder to the account's browsers; returns how many took it. */
+  private async notify(
+    reminder: Reminder,
+    devices: Map<string, PushTarget[]>,
+  ): Promise<number> {
+    const push = this.deps.push;
+    const targets = devices.get(reminder.userId);
+    if (!push || !targets) return 0;
+    const payload = this.messages.push(reminder);
+    const results = await Promise.all(
+      targets.map(async (target) => {
+        const result = await push
+          .send(target, payload)
+          .catch((): PushResult => "failed");
+        await push.record(target.endpoint, result).catch(() => {});
+        return result;
+      }),
+    );
+    return results.filter((result) => result === "sent").length;
+  }
 }
 
-export type UnsubscribeDependencies = {
+export interface UnsubscribeDependencies {
   unsubscribe: (token: string, kind: UnsubscribeKind) => Promise<void>;
   allowedOrigins: Set<string>;
-};
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+}
 
 /**
  * Turns one kind of email off. POST only, so a mail scanner that merely opens
@@ -183,40 +222,43 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * (one-click); the website's confirmation page calls it from an allowed origin.
  * The response never reveals whether a token exists.
  */
-export function createUnsubscribeHandler(
-  deps: UnsubscribeDependencies,
-): (request: Request) => Promise<Response> {
-  return async (request) => {
+export class UnsubscribeEndpoint {
+  private readonly deps: UnsubscribeDependencies;
+
+  constructor(deps: UnsubscribeDependencies) {
+    this.deps = deps;
+  }
+
+  /** For `Deno.serve`, and safe to pass around. */
+  readonly handle = async (request: Request): Promise<Response> => {
     const origin = request.headers.get("Origin");
     const headers = new Headers({
       "Cache-Control": "no-store",
       Vary: "Origin",
     });
-    if (origin && deps.allowedOrigins.has(origin))
+    if (origin && this.deps.allowedOrigins.has(origin))
       headers.set("Access-Control-Allow-Origin", origin);
     const empty = (status: number) => new Response(null, { status, headers });
-    if (origin && !deps.allowedOrigins.has(origin)) return empty(403);
+    if (origin && !this.deps.allowedOrigins.has(origin))
+      return empty(HTTP_STATUS.forbidden);
     if (request.method === "OPTIONS") {
-      headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      return empty(204);
+      headers.set("Access-Control-Allow-Methods", CORS.methods);
+      return empty(HTTP_STATUS.noContent);
     }
     if (request.method !== "POST") {
-      headers.set("Allow", "POST, OPTIONS");
-      return empty(405);
+      headers.set("Allow", CORS.methods);
+      return empty(HTTP_STATUS.methodNotAllowed);
     }
     const params = new URL(request.url).searchParams;
     const token = params.get("token") ?? "";
     const kind = params.get("kind");
-    if (
-      !UUID.test(token) ||
-      (kind !== "daily" && kind !== "comeback" && kind !== "session")
-    )
-      return empty(400);
+    if (!UUID.test(token) || !kind || !UNSUBSCRIBE_KINDS.includes(kind))
+      return empty(HTTP_STATUS.badRequest);
     try {
-      await deps.unsubscribe(token, kind);
+      await this.deps.unsubscribe(token, kind as UnsubscribeKind);
     } catch {
-      return empty(500);
+      return empty(HTTP_STATUS.serverError);
     }
-    return empty(204);
+    return empty(HTTP_STATUS.noContent);
   };
 }

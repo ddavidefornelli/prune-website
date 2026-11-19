@@ -1,7 +1,5 @@
 import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
-import { createAmbientSound, type AmbientSoundKind } from "../ambient-sound";
-
-const VOLUME_KEY = "prune:focus-sound-volume:v1";
+import { AmbientSoundPlayer, type AmbientSoundKind } from "../ambient-sound";
 
 type Choice = AmbientSoundKind | "off";
 
@@ -26,24 +24,14 @@ const CHOICES: { value: Choice; label: string; icon: string }[] = [
   },
 ];
 
-function storedVolume(): number {
-  try {
-    const stored = localStorage.getItem(VOLUME_KEY);
-    const value = Number(stored);
-    return stored !== null && value >= 0 && value <= 1 ? value : 0.6;
-  } catch {
-    return 0.6;
-  }
-}
-
 /** Off, rain or white noise to focus to. It stops when the focus screen closes. */
 export function FocusSounds() {
-  const sound = createAmbientSound();
+  const sound = new AmbientSoundPlayer();
   onCleanup(() => sound.dispose());
   const [choice, setChoice] = createSignal<Choice>("off");
   const [loading, setLoading] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
-  const initialVolume = storedVolume();
+  const initialVolume = AmbientSoundPlayer.savedVolume();
   const [volume, setVolume] = createSignal(initialVolume);
   sound.setVolume(initialVolume);
   const name = createUniqueId();
@@ -118,11 +106,7 @@ export function FocusSounds() {
               const next = Number(event.currentTarget.value);
               setVolume(next);
               sound.setVolume(next);
-              try {
-                localStorage.setItem(VOLUME_KEY, String(next));
-              } catch {
-                // Remembering the volume is a convenience; it can be lost.
-              }
+              AmbientSoundPlayer.saveVolume(next);
             }}
           />
         </div>

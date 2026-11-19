@@ -43,49 +43,85 @@ const CHEERS = [
   "That's the stuff",
   "Keep it rolling",
   "Sweet as a prune",
-];
+] as const;
 
-/** Words for the days worth a bigger cheer. */
-export function milestoneHeadline(days: number): string | null {
-  if (days === 1) return "Day one. Let's go!";
-  if (days === 3) return "Three in a row!";
-  if (days === 7) return "A whole week!";
-  if (days === 14) return "Two weeks strong!";
-  if (days === 30) return "A month of focus!";
-  if (days === 50) return "Fifty. Fifty!";
-  if (days === 100) return "Triple digits!";
-  if (days === 365) return "A year of prune!";
-  if (days > 0 && days % 100 === 0) return `${days} days. Legend.`;
-  return null;
-}
+/** Streak lengths that always get their own words. */
+const MILESTONES: ReadonlyMap<number, string> = new Map([
+  [1, "Day one. Let's go!"],
+  [3, "Three in a row!"],
+  [7, "A whole week!"],
+  [14, "Two weeks strong!"],
+  [30, "A month of focus!"],
+  [50, "Fifty. Fifty!"],
+  [100, "Triple digits!"],
+  [365, "A year of prune!"],
+]);
+/** Past the named milestones, every hundredth day is one too. */
+const CENTURY = 100;
 
-/** A milestone throws more confetti. */
-export const isMilestone = (days: number): boolean =>
-  milestoneHeadline(days) !== null && days > 1;
+/** Ranges for each piece of confetti, drawn uniformly. */
+const CONFETTI = {
+  pieces: 36,
+  milestonePieces: 56,
+  up: { min: 0.25, spread: 0.35 },
+  turnDegrees: 900,
+  maxDelay: 0.5,
+  duration: { min: 2.2, spread: 1.4 },
+  scale: { min: 0.7, spread: 0.7 },
+  hues: 360,
+} as const;
 
-const pick = <T>(list: readonly T[], random: () => number): T =>
-  list[Math.min(list.length - 1, Math.floor(random() * list.length))];
+/** Chooses each party's dance, headline and confetti. */
+export class PartyPlanner {
+  private readonly random: () => number;
 
-export function pickParty(
-  days: number,
-  random: () => number = Math.random,
-  /** A set dance instead of a random one (the dev preview uses it). */
-  dance?: Dance,
-): Party {
-  const count = isMilestone(days) ? 56 : 36;
-  const confetti: ConfettiPiece[] = Array.from({ length: count }, () => ({
-    bit: pick(BITS, random),
-    x: random() - 0.5,
-    up: 0.25 + random() * 0.35,
-    turn: (random() - 0.5) * 900,
-    delay: random() * 0.5,
-    duration: 2.2 + random() * 1.4,
-    scale: 0.7 + random() * 0.7,
-    hue: Math.floor(random() * 360),
-  }));
-  return {
-    dance: dance ?? pick(DANCES, random),
-    headline: milestoneHeadline(days) ?? pick(CHEERS, random),
-    confetti,
-  };
+  constructor(random: () => number = Math.random) {
+    this.random = random;
+  }
+
+  /** Words for the days worth a bigger cheer. */
+  static milestoneHeadline(days: number): string | null {
+    const named = MILESTONES.get(days);
+    if (named) return named;
+    if (days > 0 && days % CENTURY === 0) return `${days} days. Legend.`;
+    return null;
+  }
+
+  /** A milestone throws more confetti. */
+  static isMilestone(days: number): boolean {
+    return PartyPlanner.milestoneHeadline(days) !== null && days > 1;
+  }
+
+  /** `dance` sets the dance instead of drawing one (the dev preview uses it). */
+  plan(days: number, dance?: Dance): Party {
+    const count = PartyPlanner.isMilestone(days)
+      ? CONFETTI.milestonePieces
+      : CONFETTI.pieces;
+    const confetti = Array.from({ length: count }, () => this.piece());
+    return {
+      dance: dance ?? this.pick(DANCES),
+      headline: PartyPlanner.milestoneHeadline(days) ?? this.pick(CHEERS),
+      confetti,
+    };
+  }
+
+  private piece(): ConfettiPiece {
+    const random = this.random;
+    return {
+      bit: this.pick(BITS),
+      x: random() - 0.5,
+      up: CONFETTI.up.min + random() * CONFETTI.up.spread,
+      turn: (random() - 0.5) * CONFETTI.turnDegrees,
+      delay: random() * CONFETTI.maxDelay,
+      duration: CONFETTI.duration.min + random() * CONFETTI.duration.spread,
+      scale: CONFETTI.scale.min + random() * CONFETTI.scale.spread,
+      hue: Math.floor(random() * CONFETTI.hues),
+    };
+  }
+
+  private pick<T>(list: readonly T[]): T {
+    return list[
+      Math.min(list.length - 1, Math.floor(this.random() * list.length))
+    ];
+  }
 }

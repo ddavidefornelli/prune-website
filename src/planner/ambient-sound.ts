@@ -15,129 +15,159 @@
  * side, so the loop points stay seamless even if a browser trims the
  * encoder's lead-in differently.
  */
+import { STORAGE_KEYS } from "../shared/storage-keys.ts";
+
 export type AmbientSoundKind = "rain" | "white-noise";
 
-export const AMBIENT_SOUND_PATH = "/sounds/";
+const SOUND_PATH = "/sounds/";
+const SOUNDS: Readonly<
+  Record<AmbientSoundKind, { file: string; loopSeconds: number }>
+> = {
+  rain: { file: "rain.m4a", loopSeconds: 60 },
+  "white-noise": { file: "white-noise.m4a", loopSeconds: 30 },
+};
+const AUDIO = {
+  marginSeconds: 1,
+  fadeSeconds: 0.8,
+  defaultVolume: 0.6,
+  /** Time constant of a volume change, in seconds. */
+  volumeSmoothing: 0.05,
+} as const;
 
-const SOUNDS: Record<AmbientSoundKind, { file: string; loopSeconds: number }> =
-  {
-    rain: { file: "rain.m4a", loopSeconds: 60 },
-    "white-noise": { file: "white-noise.m4a", loopSeconds: 30 },
-  };
-const MARGIN_SECONDS = 1;
-const FADE_SECONDS = 0.8;
+interface Playing {
+  output: GainNode;
+  source: AudioBufferSourceNode;
+}
 
-export type AmbientSound = {
+/** Plays one ambient loop at a time through the Web Audio API. */
+export class AmbientSoundPlayer {
+  private context: AudioContext | undefined;
+  private master: GainNode | undefined;
+  private playing: Playing | undefined;
+  private request = 0;
+  private volume: number = AUDIO.defaultVolume;
+  private readonly buffers = new Map<AmbientSoundKind, Promise<AudioBuffer>>();
+
+  /** The volume this device used last, from 0 to 1. */
+  static savedVolume(): number {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.focusSoundVolume);
+      const value = Number(stored);
+      return stored !== null && value >= 0 && value <= 1
+        ? value
+        : AUDIO.defaultVolume;
+    } catch {
+      return AUDIO.defaultVolume;
+    }
+  }
+
+  /** Remembering the volume is a convenience; it can be lost. */
+  static saveVolume(volume: number): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.focusSoundVolume, String(volume));
+    } catch {
+      /* Not remembered on this device. */
+    }
+  }
+
+  /** A slider feels even when its position maps to loudness, not amplitude. */
+  private static loudness(volume: number): number {
+    return volume * volume;
+  }
+
   /**
    * Fades the sound in, replacing whatever was playing. Call it from a click
    * so the browser allows audio. Resolves once it is audible; rejects if the
    * file could not be loaded. A later play or stop cancels it quietly.
    */
-  play(kind: AmbientSoundKind): Promise<void>;
-  /** Fades out whatever is playing. */
-  stop(): void;
-  /** 0 to 1. */
-  setVolume(volume: number): void;
-  /** Stops at once and releases the audio device. */
-  dispose(): void;
-};
-
-type Playing = { output: GainNode; source: AudioBufferSourceNode };
-
-export function createAmbientSound(): AmbientSound {
-  let context: AudioContext | undefined;
-  let master: GainNode | undefined;
-  let playing: Playing | undefined;
-  let request = 0;
-  let volume = 0.6;
-  const buffers = new Map<AmbientSoundKind, Promise<AudioBuffer>>();
-
-  function audio(): { context: AudioContext; master: GainNode } {
-    if (!context || !master) {
-      context = new AudioContext();
-      master = context.createGain();
-      master.gain.value = loudness(volume);
-      master.connect(context.destination);
-    }
-    // A browser may start the context suspended until a click resumes it.
-    if (context.state === "suspended") void context.resume();
-    return { context, master };
+  async play(kind: AmbientSoundKind): Promise<void> {
+    const current = ++this.request;
+    const { context, master } = this.audio();
+    this.fadeOut();
+    const buffer = await this.load(context, kind);
+    if (current !== this.request || context.state === "closed") return;
+    const { loopSeconds } = SOUNDS[kind];
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.loopStart = AUDIO.marginSeconds;
+    source.loopEnd = AUDIO.marginSeconds + loopSeconds;
+    const output = context.createGain();
+    const now = context.currentTime;
+    output.gain.setValueAtTime(0, now);
+    output.gain.linearRampToValueAtTime(1, now + AUDIO.fadeSeconds);
+    source.connect(output).connect(master);
+    // Start somewhere new each time, so it never sounds like a replay.
+    source.start(now, AUDIO.marginSeconds + Math.random() * loopSeconds);
+    this.playing = { output, source };
   }
 
-  function load(context: AudioContext, kind: AmbientSoundKind) {
-    let buffer = buffers.get(kind);
+  /** Fades out whatever is playing. */
+  stop(): void {
+    this.request++;
+    this.fadeOut();
+  }
+
+  /** 0 to 1. */
+  setVolume(next: number): void {
+    this.volume = Math.min(1, Math.max(0, next));
+    if (this.context && this.master)
+      this.master.gain.setTargetAtTime(
+        AmbientSoundPlayer.loudness(this.volume),
+        this.context.currentTime,
+        AUDIO.volumeSmoothing,
+      );
+  }
+
+  /** Stops at once and releases the audio device. */
+  dispose(): void {
+    this.request++;
+    this.playing = undefined;
+    void this.context?.close();
+    this.context = undefined;
+    this.master = undefined;
+    this.buffers.clear();
+  }
+
+  private audio(): { context: AudioContext; master: GainNode } {
+    if (!this.context || !this.master) {
+      this.context = new AudioContext();
+      this.master = this.context.createGain();
+      this.master.gain.value = AmbientSoundPlayer.loudness(this.volume);
+      this.master.connect(this.context.destination);
+    }
+    // A browser may start the context suspended until a click resumes it.
+    if (this.context.state === "suspended") void this.context.resume();
+    return { context: this.context, master: this.master };
+  }
+
+  private load(
+    context: AudioContext,
+    kind: AmbientSoundKind,
+  ): Promise<AudioBuffer> {
+    let buffer = this.buffers.get(kind);
     if (!buffer) {
-      buffer = fetch(`${AMBIENT_SOUND_PATH}${SOUNDS[kind].file}`)
+      buffer = fetch(`${SOUND_PATH}${SOUNDS[kind].file}`)
         .then((response) => {
           if (!response.ok) throw new Error(`Sound ${response.status}`);
           return response.arrayBuffer();
         })
         .then((data) => context.decodeAudioData(data));
       // A failed download can be tried again on the next pick.
-      buffer.catch(() => buffers.delete(kind));
-      buffers.set(kind, buffer);
+      buffer.catch(() => this.buffers.delete(kind));
+      this.buffers.set(kind, buffer);
     }
     return buffer;
   }
 
-  function fadeOut(): void {
-    if (!context || !playing) return;
-    const now = context.currentTime;
-    const { output, source } = playing;
+  private fadeOut(): void {
+    if (!this.context || !this.playing) return;
+    const now = this.context.currentTime;
+    const { output, source } = this.playing;
     output.gain.cancelScheduledValues(now);
     output.gain.setValueAtTime(output.gain.value, now);
-    output.gain.linearRampToValueAtTime(0, now + FADE_SECONDS);
-    source.stop(now + FADE_SECONDS);
-    playing = undefined;
+    output.gain.linearRampToValueAtTime(0, now + AUDIO.fadeSeconds);
+    source.stop(now + AUDIO.fadeSeconds);
+    this.playing = undefined;
   }
-
-  return {
-    async play(kind) {
-      const current = ++request;
-      const { context, master } = audio();
-      fadeOut();
-      const buffer = await load(context, kind);
-      if (current !== request || context.state === "closed") return;
-      const { loopSeconds } = SOUNDS[kind];
-      const source = context.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      source.loopStart = MARGIN_SECONDS;
-      source.loopEnd = MARGIN_SECONDS + loopSeconds;
-      const output = context.createGain();
-      const now = context.currentTime;
-      output.gain.setValueAtTime(0, now);
-      output.gain.linearRampToValueAtTime(1, now + FADE_SECONDS);
-      source.connect(output).connect(master);
-      // Start somewhere new each time, so it never sounds like a replay.
-      source.start(now, MARGIN_SECONDS + Math.random() * loopSeconds);
-      playing = { output, source };
-    },
-    stop() {
-      request++;
-      fadeOut();
-    },
-    setVolume(next) {
-      volume = Math.min(1, Math.max(0, next));
-      if (context && master)
-        master.gain.setTargetAtTime(
-          loudness(volume),
-          context.currentTime,
-          0.05,
-        );
-    },
-    dispose() {
-      request++;
-      playing = undefined;
-      void context?.close();
-      context = undefined;
-      master = undefined;
-      buffers.clear();
-    },
-  };
-}
-
-/** A slider feels even when its position maps to loudness, not amplitude. */
-function loudness(volume: number): number {
-  return volume * volume;
 }

@@ -1,14 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  base64url,
-  encryptPayload,
-  fromBase64url,
-  sendPush,
-  vapidAuthorization,
+  Base64Url,
+  WebPushCrypto,
+  WebPushSender,
 } from "../server/reminders/web-push.ts";
-import { buildReminderEmail, buildReminderPush } from "../server/reminders/email.ts";
-import { createReminderHandler, createUnsubscribeHandler } from "../server/reminders/handler.ts";
+import { ReminderMessages } from "../server/reminders/email.ts";
+import { ReminderJob, UnsubscribeEndpoint } from "../server/reminders/handler.ts";
+
+const base64url = Base64Url.encode;
+const fromBase64url = Base64Url.decode;
+const encryptPayload = WebPushCrypto.encrypt;
+const vapidAuthorization = WebPushCrypto.vapidAuthorization;
+const sendPush = (target, payload, keys, fetcher) =>
+  new WebPushSender(keys, fetcher).send(target, payload);
+const buildReminderEmail = (reminder, site) => new ReminderMessages(site).email(reminder);
+const buildReminderPush = (reminder, site) => new ReminderMessages(site).push(reminder);
+const createReminderHandler = (deps) => new ReminderJob(deps).handle;
+const createUnsubscribeHandler = (deps) => new UnsubscribeEndpoint(deps).handle;
 
 const SITE = "https://www.prune.win/";
 const subtle = crypto.subtle;

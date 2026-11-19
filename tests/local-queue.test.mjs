@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { LocalQueue } from "../src/planner/local-queue.ts";
-import { project } from "../src/planner/task-projection.ts";
+import { PlannerSnapshot } from "../src/planner/planner-snapshot.ts";
+
+const project = PlannerSnapshot.project;
 import { deferred, persistence } from "./helpers/queue.mjs";
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
 const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 const dashboard = () => ({ today: day, tomorrow, todayTasks: [], tomorrowTasks: [], activeTask: null,
-  canPlanTomorrow: false, completions: [], serverNow: Math.floor(Date.now() / 1000) });
+  completions: [], serverNow: Math.floor(Date.now() / 1000) });
 const args = { outcome: "Local work", day, estimatedMinutes: 15 };
 function fixture() {
   const { storage, lock } = persistence();
@@ -24,7 +26,7 @@ function fixture() {
     receipts.set(command.requestId, structuredClone(task));
     return structuredClone(task);
   };
-  const make = (send = execute, key = "alice", fetch = async () => structuredClone(server)) => new LocalQueue(key, storage, lock, send, fetch);
+  const make = (send = execute, key = "alice", fetch = async () => structuredClone(server)) => new LocalQueue({ key, storage, lock, send, fetchDashboard: fetch });
   return { storage, make, execute, attempts, server: () => server };
 }
 const network = () => Promise.reject({ code: "network", message: "Offline" });
@@ -176,6 +178,5 @@ test("projection: offline timers use event times, exclude pauses, and update com
   data = project(data, command("complete_task", 230));
   assert.equal(data.todayTasks[0].actualSeconds, 90);
   assert.equal(data.activeTask, null);
-  assert.equal(data.canPlanTomorrow, true);
   assert.deepEqual(data.completions, [{ day, count: 1 }]);
 });

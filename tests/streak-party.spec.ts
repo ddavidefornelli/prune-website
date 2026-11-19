@@ -6,7 +6,6 @@ function seedYesterdayStreak(backend: Backend): void {
   backend.data.todayTasks = [{
     id: "party-task",
     outcome: "Write the intro",
-    isPriority: false,
     plannedFor: backend.data.today,
     estimatedMinutes: 25,
     actualSeconds: 0,
@@ -14,7 +13,6 @@ function seedYesterdayStreak(backend: Backend): void {
     startedAt: null,
     completedOn: null,
     createdAt: backend.data.serverNow,
-    resources: [],
   }];
 }
 

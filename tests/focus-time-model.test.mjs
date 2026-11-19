@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.TZ = "Europe/Rome";
-const { formatMinute, parseMinute, googleCalendarUrl, calendarFile } = await import("../src/planner/focus-time.ts");
+const { FocusTime } = await import("../src/planner/focus-time.ts");
+const formatMinute = (minute) => new FocusTime(minute).label();
+const parseMinute = (value) => FocusTime.parse(value)?.minute ?? null;
+const googleCalendarUrl = (minute, weekdaysOnly, site, now, zone) =>
+  new FocusTime(minute).googleCalendarUrl(weekdaysOnly, site, now, zone);
+const calendarFile = (minute, weekdaysOnly, site, now) =>
+  new FocusTime(minute).calendarFile(weekdaysOnly, site, now);
 
 test("focus times format and parse as HH:MM", () => {
   assert.equal(formatMinute(540), "09:00");

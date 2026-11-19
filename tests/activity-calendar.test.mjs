@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calendarMonth } from "../src/planner/activity-calendar-model.ts";
+import { CalendarMonth } from "../src/planner/activity-calendar-model.ts";
+
+const calendarMonth = (today, completions, offset) =>
+  new CalendarMonth(today, completions, offset);
 
 test("month is laid out Monday-first with the right number of weeks", () => {
   // November 2026 starts on a Sunday, so it begins in the last column.

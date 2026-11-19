@@ -11,7 +11,24 @@ import {
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import { PruneMark } from "../../components/Logo";
+import { Duration } from "../../shared/duration";
+import { CALENDAR, TIME } from "../../shared/time-constants";
+import { MEDIA_QUERIES } from "../constants";
+import { FocusTime } from "../focus-time";
 import { FLAME } from "./StreakCounter";
+
+/** The pitch's choreography, in milliseconds from when a scene appears. */
+const TOUR_TIMING = {
+  prunePhases: [900, 2000],
+  focus: { delay: 500, duration: 2600 },
+  checkInPhases: [250, 1500],
+  checkInCountUp: { delay: 300, duration: 1100, onTargetDelay: 500 },
+  nudgePhases: [700, 1100, 2300, 2700],
+  streak: { firstEmber: 450, betweenEmbers: 260 },
+} as const;
+
+/** A horizontal swipe shorter than this is a tap or a scroll. */
+const SWIPE_MIN_PX = 50;
 
 interface Scene {
   eyebrow: string;
@@ -62,7 +79,7 @@ export const ONBOARDING = {
 } as const;
 
 const reducedMotion = () =>
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  window.matchMedia?.(MEDIA_QUERIES.reducedMotion).matches ?? false;
 
 /** A scene's animation as numbered phases, each starting after its delay. */
 function usePhases(delays: readonly number[]) {
@@ -76,7 +93,7 @@ function usePhases(delays: readonly number[]) {
 }
 
 /** Onboarding's progress, one segment per step, across every screen. */
-export function OnboardingProgress(props: { step: number }) {
+function OnboardingProgress(props: { step: number }) {
   return (
     <ol
       class="tour-progress"
@@ -198,7 +215,8 @@ export function PlannerTour(props: PlannerTourProps) {
           const dx = event.clientX - startX;
           const dy = event.clientY - startY;
           startX = null;
-          if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+          if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy))
+            return;
           // Never finish by swiping: the last step is a choice.
           if (dx < 0 && !last()) go(index() + 1);
           if (dx > 0) go(index() - 1);
@@ -291,7 +309,7 @@ const LIST = [
 ] as const;
 
 function PruneScene() {
-  const phase = usePhases([900, 2000]);
+  const phase = usePhases(TOUR_TIMING.prunePhases);
   let cut = 0;
   return (
     <div class="prune-scene" data-phase={phase()}>
@@ -323,7 +341,7 @@ function PruneScene() {
 
 /* ---------- 2 · Lock in: a focus timer running down to done ---------- */
 
-const FOCUS_SECONDS = 45 * 60;
+const FOCUS_SECONDS = 45 * TIME.secondsPerMinute;
 const RING = 2 * Math.PI * 46;
 
 function FocusScene() {
@@ -333,8 +351,7 @@ function FocusScene() {
   onMount(() => {
     if (reduced) return;
     let frame = 0;
-    const delay = 500;
-    const duration = 2600;
+    const { delay, duration } = TOUR_TIMING.focus;
     const started = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, Math.max(0, (now - started - delay) / duration));
@@ -346,10 +363,7 @@ function FocusScene() {
     frame = requestAnimationFrame(tick);
     onCleanup(() => cancelAnimationFrame(frame));
   });
-  const digits = () => {
-    const s = left();
-    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  };
+  const digits = () => new Duration(left()).minuteClock();
   return (
     <div class="focus-scene" classList={{ "is-done": done() }}>
       <p class="focus-scene-title">Finish the pitch deck</p>
@@ -410,9 +424,10 @@ const DAYS = [
 ] as const;
 
 function CheckInScene() {
-  const phase = usePhases([250, 1500]);
-  const done = useCountUp(18, 300, 1100);
-  const onTarget = useCountUp(87, 500, 1100);
+  const { delay, duration, onTargetDelay } = TOUR_TIMING.checkInCountUp;
+  const phase = usePhases(TOUR_TIMING.checkInPhases);
+  const done = useCountUp(18, delay, duration);
+  const onTarget = useCountUp(87, onTargetDelay, duration);
   return (
     <div class="checkin-scene" data-phase={phase()}>
       <div class="checkin-card">
@@ -453,28 +468,22 @@ function CheckInScene() {
 
 /* ---------- The focus-time nudge, on a phone's lock screen ---------- */
 
-const clock = (minute: number) =>
-  `${Math.floor(minute / 60)}:${String(minute % 60).padStart(2, "0")}`;
-
 /** The reminder arriving at the chosen time; with a task, a tap starts it. */
 export function NudgeScene(props: {
   minute: number;
   task?: { outcome: string; minutes: number };
 }) {
-  const phase = usePhases([700, 1100, 2300, 2700]);
-  const day = () => {
-    const now = new Date();
-    return now.getHours() * 60 + now.getMinutes() < props.minute
-      ? "Today"
-      : "Tomorrow";
-  };
+  const phase = usePhases(TOUR_TIMING.nudgePhases);
+  const time = () => new FocusTime(props.minute);
+  const day = () =>
+    FocusTime.of(new Date()).minute < props.minute ? "Today" : "Tomorrow";
   const started = () => phase() >= 4 && props.task;
   return (
     <div class="nudge-scene" data-phase={phase()}>
       <div class="nudge-phone">
         <span class="nudge-date">{day()}</span>
         <span class="nudge-clock">
-          {clock(phase() >= 1 ? props.minute : (props.minute + 1439) % 1440)}
+          {(phase() >= 1 ? time() : time().minuteBefore()).clockFace()}
         </span>
         <div class="nudge-note" classList={{ "is-started": !!started() }}>
           <PruneMark size={30} />
@@ -500,10 +509,11 @@ export function NudgeScene(props: {
 
 /* ---------- 4 · Light it up: a week of embers and a growing flame ---------- */
 
-const WEEK = ["M", "T", "W", "T", "F", "S", "S"];
+const WEEK = CALENDAR.weekdayInitials;
 
 function StreakScene() {
-  const phase = usePhases(WEEK.map((_, i) => 450 + i * 260));
+  const { firstEmber, betweenEmbers } = TOUR_TIMING.streak;
+  const phase = usePhases(WEEK.map((_, i) => firstEmber + i * betweenEmbers));
   const blazing = () => phase() === WEEK.length;
   return (
     <div

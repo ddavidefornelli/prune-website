@@ -65,7 +65,6 @@ test("equal tasks can start in any order without choosing a main task", async ({
   await synced(page);
   await expect(page.locator("#focus-timer")).toBeVisible();
   expect(backend.data.activeTask?.outcome).toBe("Second equal task");
-  expect(backend.requests.some((request) => request.body.p_action === "prioritize_task")).toBe(false);
   await page.getByRole("button", { name: "Complete task", exact: true }).click();
   await synced(page);
   await expect(page.getByRole("button", { name: "Start focus", exact: true })).toHaveCount(2);
@@ -125,24 +124,6 @@ test("Tomorrow is available immediately; titles and estimates persist through re
   await page.getByRole("navigation").getByRole("button", { name: "Tomorrow", exact: true }).click();
   await expect(page.getByRole("button", { name: "Edit task title: Prepare a calmer tomorrow" })).toBeVisible();
   await expect(page.locator(".task").getByRole("slider")).toHaveAttribute("aria-valuenow", "35");
-});
-
-test("Mac resource metadata remains inert and is preserved when editing a task on the web", async ({ page, backend }) => {
-  const resources = [
-    { id: "local-file", kind: "file" as const, label: "Notes.pdf", target: "/Users/me/Notes.pdf" },
-    { id: "hostile-link", kind: "link" as const, label: "Untrusted link", target: "javascript:alert(document.cookie)" },
-  ];
-  backend.data.todayTasks.push({ id: "local-task", outcome: "Read a trusted document", plannedFor: backend.data.today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow, isPriority: true, resources: structuredClone(resources) });
-  await openPlanner(page);
-  await expect(page.locator('a[href^="file:"], a[href^="javascript:"]')).toHaveCount(0);
-  await expect(page.getByText("/Users/me/Notes.pdf", { exact: false })).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "Add a link; press Enter to save" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Attach file", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Edit task title: Read a trusted document" }).click();
-  await page.getByRole("textbox", { name: "Task title", exact: true }).fill("Read it in the Mac app");
-  await page.getByRole("textbox", { name: "Task title", exact: true }).press("Enter");
-  await synced(page);
-  expect(backend.data.todayTasks[0]!.resources).toEqual(resources);
 });
 
 test("offline actions survive reload and sync in order without storing tokens in the outbox", async ({ page, backend }) => {

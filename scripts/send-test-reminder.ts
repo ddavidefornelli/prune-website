@@ -16,10 +16,11 @@
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createClient } from "@supabase/supabase-js";
-import { localDay } from "../src/planner/time.ts";
-import { sendWithBrevo } from "../server/reminders/brevo.ts";
-import { buildReminderEmail, type ReminderKind } from "../server/reminders/email.ts";
-import { oneClickUrl } from "../server/reminders/handler.ts";
+import { CalendarDay } from "../src/shared/calendar-day.ts";
+import { SITE } from "../src/shared/site.ts";
+import { BrevoMailer } from "../server/reminders/brevo.ts";
+import { ReminderMessages, type ReminderKind } from "../server/reminders/email.ts";
+import type { SendResult } from "../server/reminders/handler.ts";
 
 const SAMPLE_TOKEN = "00000000-0000-4000-8000-000000000000";
 
@@ -76,7 +77,7 @@ async function realTasks(email: string): Promise<string[]> {
   }
   if (!userId) throw new Error(`No prune account uses ${email}.`);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const today = localDay(Math.floor(Date.now() / 1000), timezone);
+  const today = CalendarDay.local(Math.floor(Date.now() / 1000), timezone).key;
   const { data, error } = await db
     .from("planner_tasks")
     .select("outcome")
@@ -129,24 +130,22 @@ const fetcher: typeof fetch = async (input, init) => {
     failure = `HTTP ${response.status}: ${(await response.clone().text()).slice(0, 500)}`;
   return response;
 };
-const site = process.env.SITE_URL || "https://www.prune.win/";
-const email = buildReminderEmail(reminder, site);
-const result = await sendWithBrevo(
-  {
-    ...email,
-    subject: `[TEST] ${email.subject}`,
-    to,
-    kind,
-    oneClickUrl: oneClickUrl("https://example.invalid/email-unsubscribe", reminder),
-  },
-  { apiKey, fromEmail: from, fetcher },
-);
-const meaning = {
+const site = process.env.SITE_URL || SITE.url;
+const email = new ReminderMessages(site).email(reminder);
+const result = await new BrevoMailer({ apiKey, fromEmail: from, fetcher }).send({
+  ...email,
+  subject: `[TEST] ${email.subject}`,
+  to,
+  kind,
+  oneClickUrl: ReminderMessages.oneClickUrl("https://example.invalid/email-unsubscribe", reminder),
+});
+const meanings: Record<SendResult, string> = {
   sent: "Brevo accepted it. Check the inbox (and spam) of the address you gave.",
   halt: "Brevo refused the account (401/402/403): check the API key, that Authorised IPs is off, and your credits.",
   rejected: "Brevo rejected this email (4xx): check that the sender is verified in Brevo and the address is valid.",
   retry: "Brevo was unreachable or rate-limited (network, 429 or 5xx). Try again in a minute.",
-}[result];
+};
+const meaning = meanings[result];
 console.log(`${result}: ${meaning}`);
 if (failure) console.log(`Brevo said: ${failure}`);
 process.exit(result === "sent" ? 0 : 1);

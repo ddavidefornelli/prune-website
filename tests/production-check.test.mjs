@@ -19,7 +19,7 @@ function fixture({ signupDisabled = true, override } = {}) {
     const replacement = await override?.(url, init);
     if (replacement) return replacement;
     if (url.origin === site) {
-      if (["/", "/download", "/download/", "/login", "/login/", "/index.html"].includes(url.pathname)) return new Response(built.html, { headers: documentHeaders });
+      if (["/", "/login", "/login/", "/index.html"].includes(url.pathname)) return new Response(built.html, { headers: documentHeaders });
       if (url.pathname === "/assets/app.js") return new Response(script, { headers: { "Content-Type": "text/javascript; charset=utf-8" } });
     }
     if (url.origin === api) {
@@ -106,12 +106,12 @@ test("deployed JavaScript with changed bytes or tracker calls fails integrity/co
   assert.equal(report.exitCode, 1);
 });
 
-test("all public document aliases are checked, not only the root and slashless download", async () => {
+test("all public document aliases are checked, not only the root and slashless login", async () => {
   const headers = { ...documentHeaders, "Cache-Control": "public, max-age=86400" };
-  const report = await fixture({ override: (url) => url.origin === site && url.pathname === "/download/" ? new Response(built.html, { headers }) : null }).run();
+  const report = await fixture({ override: (url) => url.origin === site && url.pathname === "/login/" ? new Response(built.html, { headers }) : null }).run();
   assert.equal(result(report, "site/:cache").status, "PASS");
-  assert.equal(result(report, "site/download:cache").status, "PASS");
-  assert.equal(result(report, "site/download/:cache").status, "FAIL");
+  assert.equal(result(report, "site/login:cache").status, "PASS");
+  assert.equal(result(report, "site/login/:cache").status, "FAIL");
   assert.equal(result(report, "site/index.html:http").status, "PASS");
 });
 

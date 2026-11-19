@@ -126,7 +126,7 @@ test("code splitting fails closed instead of weakening hash-only CSP", () => {
   }
 });
 
-test("Vercel packages the exact built headers with static files and both download routes", () => {
+test("Vercel packages the exact built headers with static files and both login routes", () => {
   const temp = mkdtempSync(join(tmpdir(), "prune-csp-"));
   try {
     const source = join(temp, "dist");
@@ -141,13 +141,14 @@ test("Vercel packages the exact built headers with static files and both downloa
     assert.equal(config.version, 3);
     assert.deepEqual(config.routes[0], { src: "/(.*)", headers: built.headers, continue: true });
     const rewrite = config.routes.find((route) => route.dest === "/index.html");
-    assert.ok(new RegExp(rewrite.src).test("/download"));
-    assert.ok(new RegExp(rewrite.src).test("/download/"));
-    assert.ok(!new RegExp(rewrite.src).test("/download/unexpected"));
+    assert.ok(new RegExp(rewrite.src).test("/login"));
+    assert.ok(new RegExp(rewrite.src).test("/login/"));
+    assert.ok(!new RegExp(rewrite.src).test("/login/unexpected"));
+    assert.ok(!new RegExp(rewrite.src).test("/download"));
     assert.equal(readFileSync(join(output, "static/index.html"), "utf8"), built.html);
     assert.equal(existsSync(join(output, "static/security-headers.json")), false);
     const cacheRule = config.routes.find((route) => route.headers?.["Cache-Control"]);
-    for (const path of ["/", "/index.html", "/download", "/download/", "/login", "/login/"]) assert.ok(new RegExp(cacheRule.src).test(path));
+    for (const path of ["/", "/index.html", "/login", "/login/"]) assert.ok(new RegExp(cacheRule.src).test(path));
 
     writeFileSync(join(source, "assets/app.js"), `${script}\n// changed after hashing`);
     assert.throws(() => buildVercel(source, output), /integrity/);

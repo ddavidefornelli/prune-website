@@ -1,67 +1,61 @@
-import type { Dashboard } from "./types";
-import { DAY_MS } from "./time.ts";
+import { CalendarDay } from "../shared/calendar-day.ts";
+import { CALENDAR } from "../shared/time-constants.ts";
+import type { Completion } from "./types.ts";
 
-export type Completion = Dashboard["completions"][number];
-export const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-export const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"] as const;
 /** How far back the calendar pages, counting the current month. */
 export const CALENDAR_MONTHS = 12;
 
-/** Months are counted from the current one: 0 is this month, -1 the last. */
-export function monthStart(today: string, offset = 0): Date {
-  return new Date(
-    Date.UTC(
-      Number(today.slice(0, 4)),
-      Number(today.slice(5, 7)) - 1 + offset,
-      1,
-    ),
-  );
+export interface CalendarCell {
+  day: string;
+  column: number;
+  week: number;
+  count: number;
+  future: boolean;
 }
 
-/** One month laid out Monday-first, like the landing page preview. */
-export function calendarMonth(
-  today: string,
-  completions: readonly Completion[],
-  offset = 0,
-) {
-  const start = monthStart(today, offset);
-  const year = start.getUTCFullYear();
-  const month = start.getUTCMonth();
-  const dayCount = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const lead = (start.getUTCDay() + 6) % 7;
-  const counts = new Map(completions.map(({ day, count }) => [day, count]));
-  const days = Array.from({ length: dayCount }, (_, index) => {
-    const date = new Date(start.getTime() + index * DAY_MS);
-    const day = date.toISOString().slice(0, 10);
-    return {
-      day,
-      column: (lead + index) % 7,
-      week: Math.floor((lead + index) / 7),
-      count: day <= today ? (counts.get(day) ?? 0) : 0,
-      future: day > today,
-    };
-  });
-  return {
-    year,
-    month,
-    weeks: Math.ceil((lead + dayCount) / 7),
-    days,
-    total: days.reduce((sum, day) => sum + day.count, 0),
-  };
-}
+/** One month of finished tasks, laid out Monday-first like the landing page preview. */
+export class CalendarMonth {
+  readonly year: number;
+  /** 0 is January. */
+  readonly month: number;
+  readonly weeks: number;
+  readonly days: CalendarCell[];
+  readonly total: number;
 
-export type CalendarMonth = ReturnType<typeof calendarMonth>;
-export type CalendarDay = CalendarMonth["days"][number];
+  /** `offset` counts months from the current one: 0 is this month, -1 the last. */
+  constructor(today: string, completions: readonly Completion[], offset = 0) {
+    const start = new Date(
+      Date.UTC(
+        Number(today.slice(0, 4)),
+        Number(today.slice(5, 7)) - 1 + offset,
+        1,
+      ),
+    );
+    this.year = start.getUTCFullYear();
+    this.month = start.getUTCMonth();
+    const first = CalendarDay.parse(start.toISOString().slice(0, 10));
+    const dayCount = new Date(
+      Date.UTC(this.year, this.month + 1, 0),
+    ).getUTCDate();
+    const lead =
+      (first.weekday + CALENDAR.daysPerWeek - 1) % CALENDAR.daysPerWeek;
+    const counts = new Map(completions.map(({ day, count }) => [day, count]));
+    this.days = Array.from({ length: dayCount }, (_, index) => {
+      const day = first.plus(index).key;
+      return {
+        day,
+        column: (lead + index) % CALENDAR.daysPerWeek,
+        week: Math.floor((lead + index) / CALENDAR.daysPerWeek),
+        count: day <= today ? (counts.get(day) ?? 0) : 0,
+        future: day > today,
+      };
+    });
+    this.weeks = Math.ceil((lead + dayCount) / CALENDAR.daysPerWeek);
+    this.total = this.days.reduce((sum, day) => sum + day.count, 0);
+  }
+
+  /** "November 2026". */
+  get title(): string {
+    return `${CALENDAR.monthNames[this.month]} ${this.year}`;
+  }
+}

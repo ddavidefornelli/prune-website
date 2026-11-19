@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createSession } from "../../src/auth/create-session.ts";
-import { acknowledgePrivacy } from "../../src/planner/privacy-state.ts";
+import { SessionState } from "../../src/auth/session-state.ts";
+import { PrivacyNotice } from "../../src/planner/privacy-state.ts";
+
+const acknowledgePrivacy = (storage) => new PrivacyNotice(storage).acknowledge();
 import { deferred } from "../helpers/queue.mjs";
 import { environment, settle } from "../helpers/reactivity.mjs";
 
@@ -28,7 +30,7 @@ function client(overrides = {}) {
 test("startup never constructs an authenticated session before privacy acknowledgement", async (t) => {
   const env = environment(t);
   const cloud = client();
-  const { state } = env.mount(() => createSession(cloud, () => {}));
+  const { state } = env.mount(() => new SessionState(cloud, () => {}));
   await settle();
   assert.equal(state.phase(), "ready");
   assert.equal(state.account(), undefined);
@@ -39,7 +41,7 @@ test("an acknowledged browser restores its saved account", async (t) => {
   const env = environment(t);
   acknowledgePrivacy(env.storage);
   const cloud = client();
-  const { state } = env.mount(() => createSession(cloud, () => {}));
+  const { state } = env.mount(() => new SessionState(cloud, () => {}));
   assert.equal(state.phase(), "restoring");
   await settle();
   assert.equal(state.phase(), "ready");
@@ -52,7 +54,7 @@ test("configuration errors reach sign-in without sending account requests", asyn
   acknowledgePrivacy(env.storage);
   const cloud = client();
   const { state } = env.mount(() =>
-    createSession(cloud, () => {
+    new SessionState(cloud, () => {
       throw new Error("Missing configuration");
     }),
   );
@@ -70,7 +72,7 @@ test("a failed restore is reported and still shows sign-in", async (t) => {
       throw new Error("Sign-in was cancelled or could not be completed.");
     },
   });
-  const { state } = env.mount(() => createSession(cloud, () => {}));
+  const { state } = env.mount(() => new SessionState(cloud, () => {}));
   await settle();
   assert.equal(state.phase(), "ready");
   assert.equal(state.account(), undefined);
@@ -82,7 +84,7 @@ test("late authentication cannot update a disposed session", async (t) => {
   acknowledgePrivacy(env.storage);
   const pending = deferred();
   const cloud = client({ authStatus: () => pending.promise });
-  const { state, dispose } = env.mount(() => createSession(cloud, () => {}));
+  const { state, dispose } = env.mount(() => new SessionState(cloud, () => {}));
   dispose();
   pending.resolve(account);
   await settle();

@@ -1,16 +1,16 @@
 import { createMemo, createUniqueId, For, Show, untrack } from "solid-js";
 import type { WeeklyOverview } from "../planner/types";
-import { WEEKDAYS } from "./check-in";
+import { CALENDAR } from "../shared/time-constants";
 import { CheckIn } from "./CheckIn";
-import type { WeeklyReviewState } from "./create-weekly-review";
-import { reviewRange, reviewText } from "./format";
-import { reviewCountdown } from "./review-countdown";
+import { ReviewFormat } from "./format";
+import { ReviewCountdown } from "./review-countdown";
+import type { WeeklyReviewState } from "./weekly-review-state";
 
 const COUNTDOWN_LABELS = ["Days", "Hours", "Minutes", "Seconds"] as const;
 
 function NextCheckIn(props: { data: WeeklyOverview; now: number }) {
   const countdown = createMemo(() =>
-    reviewCountdown(props.data.week, props.now),
+    ReviewCountdown.of(props.data.week, props.now),
   );
   const preparing = () =>
     props.data.status === "pending" || props.data.status === "running";
@@ -23,7 +23,7 @@ function NextCheckIn(props: { data: WeeklyOverview; now: number }) {
       <h3 class="review-countdown-title">
         {preparing()
           ? "Writing your check-in…"
-          : `Next check-in · ${WEEKDAYS[day()]}`}
+          : `Next check-in · ${CALENDAR.weekdayNames[day()]}`}
       </h3>
       <Show when={!preparing() && countdown()}>
         <div
@@ -50,7 +50,7 @@ function NextCheckIn(props: { data: WeeklyOverview; now: number }) {
       <p class="review-countdown-date">
         <Show when={props.data.checkIn}>
           Your first check-in is three days after you started, then every{" "}
-          {WEEKDAYS[day()]}.{" "}
+          {CALENDAR.weekdayNames[day()]}.{" "}
         </Show>
         Each check-in looks at the seven days before it: your trends, a plan for
         next week, and a short note.
@@ -65,10 +65,10 @@ function statusMessage(data: WeeklyOverview): string {
       "AI check-ins are off for this account. Turning them on sends a week of planner activity to OpenAI once a week for your check-in note, and for daily task suggestions. Once on, they can’t be turned off.",
     unavailable:
       "Hosted AI check-ins are temporarily unavailable. Your planner is unaffected.",
-    pending: `Your check-in for ${reviewRange(data.week.start, data.week.end)} is queued.`,
-    running: `Writing your check-in for ${reviewRange(data.week.start, data.week.end)}… You can keep using prune.`,
+    pending: `Your check-in for ${ReviewFormat.range(data.week.start, data.week.end)} is queued.`,
+    running: `Writing your check-in for ${ReviewFormat.range(data.week.start, data.week.end)}… You can keep using prune.`,
     failed: `${data.error ?? "Your check-in could not be written."} We’ll retry automatically. Your previous check-ins are unchanged.`,
-    no_data: `Nothing was planned for ${reviewRange(data.week.start, data.week.end)}, so there was nothing to check in on. No AI request was made.`,
+    no_data: `Nothing was planned for ${ReviewFormat.range(data.week.start, data.week.end)}, so there was nothing to check in on. No AI request was made.`,
     up_to_date: "Your latest check-in is ready.",
   };
   return messages[data.status];
@@ -146,12 +146,12 @@ export function WeeklyReview(props: {
                 {(report) => (
                   <details class="weekly-history">
                     <summary>
-                      {reviewRange(report.weekStart, report.weekEnd)}
+                      {ReviewFormat.range(report.weekStart, report.weekEnd)}
                     </summary>
-                    <p>{reviewText(report.analysis.summary)}</p>
+                    <p>{ReviewFormat.text(report.analysis.summary)}</p>
                     <ol class="weekly-improvements">
                       <For each={report.analysis.improvements}>
-                        {(tip) => <li>{reviewText(tip)}</li>}
+                        {(tip) => <li>{ReviewFormat.text(tip)}</li>}
                       </For>
                     </ol>
                   </details>

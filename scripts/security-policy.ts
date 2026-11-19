@@ -3,6 +3,16 @@ import { hasMarketingTracker } from "./tracking-policy.ts";
 import { PRODUCTION_ORIGINS } from "../src/shared/site.ts";
 import { ERROR_LOG_PATH, SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
 
+/** Every path that answers with the app's one HTML document. */
+export const DOCUMENT_ROUTES = {
+  /** Vercel route source for documents that must never be cached: "/", /index.html and /login. */
+  noStore: "^/(?:index\\.html|login/?)?$",
+  /** Vercel route source rewritten to /index.html. */
+  rewrite: "^/login/?$",
+  /** The aliases hosted checks fetch besides "/". */
+  aliases: ["/login", "/login/", "/index.html"],
+} as const;
+
 // Deliberately no origin-wide allowlist: do not permit Storage, arbitrary RPCs,
 // other Edge Functions, Realtime or another Supabase tenant.
 export const API_PATHS = Object.values(SUPABASE_ROUTES);

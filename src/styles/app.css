@@ -203,14 +203,6 @@ textarea,
   line-height: 1.05;
   letter-spacing: -0.045em;
 }
-.auth-description {
-  margin: 20px 0 28px;
-  text-align: left;
-  color: var(--muted);
-  font-size: 0.8889rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
 .auth-panel form {
   width: 100%;
   margin: 0;
@@ -1991,18 +1983,6 @@ textarea,
     grid-column: 2;
   }
 }
-#root .download-page {
-  display: grid;
-  place-content: center;
-  width: 100%;
-  min-height: 100dvh;
-  padding: 24px;
-  text-align: center;
-}
-.download-page h1 {
-  margin: 0;
-  font-size: clamp(1.3333rem, 5vw, 2.6667rem);
-}
 #root .unsubscribe-page {
   display: grid;
   place-content: center;
@@ -2066,13 +2046,6 @@ textarea,
 }
 #app .task-form > label:has(.quick-entry-chip) > input {
   padding-right: 96px;
-}
-
-/* Onboarding cards' step counter ("4 / 6"). */
-.tour-step {
-  color: var(--muted);
-  font-size: 0.6111rem;
-  letter-spacing: 0.12em;
 }
 
 /* Color roles: a black pill marks the one thing to do next on a screen (Start

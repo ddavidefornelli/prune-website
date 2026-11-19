@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { completionInsight, insightKey, insights } from "../src/planner/insights.ts";
+import { InsightDrops, InsightEngine } from "../src/planner/insights.ts";
+import { STORAGE_KEYS } from "../src/shared/storage-keys.ts";
+
+const insights = (log, data) => new InsightEngine(log, data).all();
+const completionInsight = (storage, accountKey, task, data, at, random) =>
+  new InsightDrops(storage, accountKey, random).afterCompletion(task, data, at);
 
 const TODAY = "2026-11-13"; // a Friday
 const dashboard = (completions = []) => ({
@@ -9,7 +14,6 @@ const dashboard = (completions = []) => ({
   todayTasks: [],
   tomorrowTasks: [],
   activeTask: null,
-  canPlanTomorrow: true,
   completions,
   serverNow: 0,
 });
@@ -77,15 +81,15 @@ test("a finished task is logged without task text and only sometimes drops an in
   assert.equal(completionInsight(storage, "account", task, data, at, () => 0).id, "streak");
   // The same insight never drops twice in a row.
   assert.equal(completionInsight(storage, "account", task, data, at, () => 0), null);
-  const saved = storage.getItem(insightKey("account"));
+  const saved = storage.getItem(STORAGE_KEYS.insights("account"));
   assert.deepEqual(JSON.parse(saved), { log: [[9, 30, 1500], [9, 30, 1500], [9, 30, 1500]], last: "streak" });
   assert.equal(saved.includes("Secret"), false);
 });
 
 test("the log is capped and a damaged one is ignored", () => {
-  const storage = memory({ [insightKey("a")]: "{not json", [insightKey("b")]: JSON.stringify({ log: Array(250).fill([9, 30, 60]).concat([["x", 1, 2], [1, 2]]), last: 7 }) });
+  const storage = memory({ [STORAGE_KEYS.insights("a")]: "{not json", [STORAGE_KEYS.insights("b")]: JSON.stringify({ log: Array(250).fill([9, 30, 60]).concat([["x", 1, 2], [1, 2]]), last: 7 }) });
   completionInsight(storage, "a", { estimatedMinutes: 25, actualSeconds: 0 }, dashboard(), new Date(2026, 10, 13, 22), () => 1);
-  assert.deepEqual(JSON.parse(storage.getItem(insightKey("a"))), { log: [[22, 25, 0]], last: null });
+  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_KEYS.insights("a"))), { log: [[22, 25, 0]], last: null });
   completionInsight(storage, "b", { estimatedMinutes: 25, actualSeconds: 0 }, dashboard(), new Date(2026, 10, 13, 22), () => 1);
-  assert.equal(JSON.parse(storage.getItem(insightKey("b"))).log.length, 200);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEYS.insights("b"))).log.length, 200);
 });

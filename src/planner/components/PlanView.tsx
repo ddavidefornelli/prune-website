@@ -8,23 +8,28 @@ import {
   Switch,
   untrack,
 } from "solid-js";
-import { capture } from "../../analytics.ts";
-import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
-import { plannedEstimate } from "../../reviews/check-in";
+import { analytics } from "../../analytics.ts";
+import type { WeeklyReviewState } from "../../reviews/weekly-review-state";
+import { CalendarDay } from "../../shared/calendar-day";
+import { Duration } from "../../shared/duration";
+import { TIME } from "../../shared/time-constants";
 import type { PlanningClient } from "../api";
-import { PLANNER_LIMITS } from "../constants";
-import type { PlannerState } from "../create-planner";
-import { formatClock, formatMinutes, summarizeDay } from "../quick-entry";
-import type { Hints } from "../hints";
+import {
+  COUNT_WORDS,
+  HINT_RULES,
+  MEDIA_QUERIES,
+  PLANNER_LIMITS,
+} from "../constants";
+import { DayPlan } from "../day-plan";
+import { Estimate } from "../estimate";
+import type { HintBook } from "../hints";
 import type { Insight } from "../insights";
-import { formatDuration, previousDay } from "../time";
+import type { PlannerState } from "../planner-state";
 import { DoneBadge } from "./DoneBadge";
 import { EstimateDial } from "./EstimateDial";
 import { InsightDrop } from "./InsightDrop";
 import { TaskForm } from "./TaskForm";
 import { TaskTitle } from "./TaskTitle";
-
-const DESKTOP_QUERY = "(hover: hover) and (min-width: 760px)";
 
 /** Joins summary phrases so a narrow screen breaks the line only between them. */
 const phrases = (...parts: string[]) =>
@@ -33,7 +38,7 @@ const phrases = (...parts: string[]) =>
 export function PlanView(props: {
   planner: PlannerState;
   client: PlanningClient;
-  hints: Hints;
+  hints: HintBook;
   firstRun: boolean;
   onShortcuts: () => void;
   /** The weekly check-in: Today's meter, and the plan both days follow. */
@@ -52,8 +57,8 @@ export function PlanView(props: {
     [];
   const day = () =>
     (tomorrow() ? planner.data()?.tomorrow : planner.data()?.today) ?? "";
-  const summary = createMemo(() => summarizeDay(tasks(), planner.now()));
-  const desktop = window.matchMedia(DESKTOP_QUERY).matches;
+  const summary = createMemo(() => new DayPlan(tasks()).summary(planner.now()));
+  const desktop = window.matchMedia(MEDIA_QUERIES.desktop).matches;
   const completedTotal = () =>
     planner.data()?.completions.reduce((sum, entry) => sum + entry.count, 0) ??
     0;
@@ -61,7 +66,7 @@ export function PlanView(props: {
   const yesterdayCount = () => {
     const data = planner.data();
     if (!data) return 0;
-    const yesterday = previousDay(data.today);
+    const yesterday = CalendarDay.parse(data.today).previous().key;
     return (
       data.completions.find((entry) => entry.day === yesterday)?.count ?? 0
     );
@@ -77,7 +82,7 @@ export function PlanView(props: {
     if (tomorrow() || !data) return null;
     if (
       completedTotal() > 0 &&
-      completedTotal() <= 3 &&
+      completedTotal() <= HINT_RULES.progressMaxCompleted &&
       data.todayTasks.some((task) => task.status === "completed") &&
       !props.hints.seen("progress")
     )
@@ -85,9 +90,9 @@ export function PlanView(props: {
     if (nextTaskId() && !everCompleted() && !props.hints.seen("start"))
       return "start";
     if (
-      new Date(planner.now() * 1000).getHours() >= 17 &&
+      new Date(planner.now() * TIME.msPerSecond).getHours() >=
+        HINT_RULES.eveningHour &&
       !planner.todayComplete() &&
-      data.canPlanTomorrow &&
       !data.tomorrowTasks.length &&
       !props.hints.seen(eveningId())
     )
@@ -95,13 +100,15 @@ export function PlanView(props: {
     return null;
   });
   const showShortcutHint = () =>
-    desktop && props.hints.visits() >= 3 && !props.hints.seen("shortcuts");
+    desktop &&
+    props.hints.visits >= HINT_RULES.shortcutsAfterVisits &&
+    !props.hints.seen("shortcuts");
   const create = async (outcome: string, minutes: number): Promise<boolean> => {
     const created = await planner.mutate(() =>
       props.client.create(outcome, day(), minutes),
     );
     if (created)
-      capture("task_created", {
+      analytics.capture("task_created", {
         day: tomorrow() ? "tomorrow" : "today",
         estimated_minutes: minutes,
       });
@@ -111,8 +118,7 @@ export function PlanView(props: {
   // and the estimate new tasks start at.
   const plan = () => props.review?.data()?.checkIn?.plan ?? null;
   const target = () => plan()?.dailyTarget ?? PLANNER_LIMITS.tasksPerDay;
-  const targetWord = () =>
-    ["one", "two", "three", "four", "five"][target() - 1] ?? "five";
+  const targetWord = () => COUNT_WORDS[target() - 1] ?? COUNT_WORDS.at(-1);
   const openSlots = () =>
     Math.max(0, PLANNER_LIMITS.tasksPerDay - tasks().length);
   // Tomorrow's proposals come from today's plan, so refresh them when it changes.
@@ -177,14 +183,17 @@ export function PlanView(props: {
     if (tomorrow())
       return phrases(
         `${tasks().length} of ${target()} planned`,
-        `${formatMinutes(remainingSeconds)} of focus`,
+        `${new Duration(remainingSeconds).rounded()} of focus`,
       );
     if (finishAt === null)
-      return phrases("All done", `${formatMinutes(focusedSeconds)} focused`);
+      return phrases(
+        "All done",
+        `${new Duration(focusedSeconds).rounded()} focused`,
+      );
     return phrases(
       `${completed} of ${tasks().length} done`,
-      `${formatMinutes(remainingSeconds)} left`,
-      `finish around ${formatClock(finishAt)}`,
+      `${new Duration(remainingSeconds).rounded()} left`,
+      `finish around ${Duration.timeOfDay(finishAt)}`,
     );
   };
 
@@ -275,7 +284,7 @@ export function PlanView(props: {
                 >
                   <p class="muted">
                     {task.status === "completed"
-                      ? `${formatDuration(task.actualSeconds)} · completed`
+                      ? `${new Duration(task.actualSeconds).clock()} · completed`
                       : `${task.estimatedMinutes} min estimated · ${task.status}`}
                   </p>
                 </Show>
@@ -300,7 +309,7 @@ export function PlanView(props: {
                       )
                       .then((changed) => {
                         if (changed)
-                          capture("task_estimate_changed", {
+                          analytics.capture("task_estimate_changed", {
                             estimated_minutes: minutes,
                           });
                         return changed;
@@ -321,7 +330,7 @@ export function PlanView(props: {
                       })
                       .then((started) => {
                         if (started)
-                          capture("focus_started", {
+                          analytics.capture("focus_started", {
                             estimated_minutes: task.estimatedMinutes,
                           });
                       });
@@ -381,7 +390,7 @@ export function PlanView(props: {
         <TaskForm
           busy={planner.busy()}
           autofocus={firstPlan() && desktop}
-          defaultMinutes={plannedEstimate(plan()?.estimateFactor)}
+          defaultMinutes={Estimate.forFactor(plan()?.estimateFactor)}
           onCreate={create}
         />
       </Show>

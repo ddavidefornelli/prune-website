@@ -8,9 +8,10 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { analytics } from "../analytics.ts";
 import { LoadingIndicator } from "../components/LoadingIndicator";
 import { Profile } from "../profile/Profile";
-import { createWeeklyReview } from "../reviews/create-weekly-review";
+import { WeeklyReviewState } from "../reviews/weekly-review-state";
 import type { PlanningClient } from "./api";
 import { FocusView } from "./components/FocusView";
 import { Overview } from "./components/Overview";
@@ -20,33 +21,29 @@ import { ONBOARDING, PlannerTour } from "./components/PlannerTour";
 import { FirstTaskDialog } from "./components/FirstTaskDialog";
 import { FocusTimeDialog } from "./components/FocusTimeDialog";
 import { StreakParty } from "./components/StreakParty";
-import { type Streak, streakFor } from "./streak";
-import { takeStartLink } from "./deep-link";
+import { Streak } from "./streak";
+import { StartLink } from "./deep-link";
 import { ShortcutSheet } from "./components/ShortcutSheet";
-import { VIEW_LABELS } from "./constants";
-import { createPlanner } from "./create-planner";
-import { createHints } from "./hints";
-import { completionInsight, type Insight } from "./insights";
-import {
-  onboardingKey,
-  shouldOfferOnboarding,
-  shouldOfferTour,
-  tourKey,
-} from "./onboarding";
-import { capture } from "../analytics.ts";
-import { createShortcuts } from "./shortcuts";
+import { PLANNER_TIMING, VIEW_LABELS } from "./constants";
+import { DayPlan } from "./day-plan";
+import { HintBook } from "./hints";
+import { InsightDrops, type Insight } from "./insights";
+import { FirstRun } from "./onboarding";
+import { PlannerState } from "./planner-state";
+import { KeyboardShortcuts } from "./shortcuts";
 import type { Account, Task } from "./types";
-
-/** How long after pressing Complete task the streak may light the party. */
-const PARTY_WINDOW_MS = 15_000;
-/** Away at least this long and back: counted as another visit in the history. */
-const RETURN_AFTER_MS = 30 * 60_000;
 
 export function Planner(props: { client: PlanningClient; account: Account }) {
   const client = untrack(() => props.client);
-  const planner = createPlanner(client);
-  const review = createWeeklyReview(client, () => planner.view() === "habits");
-  const hints = createHints(untrack(() => props.account.accountKey));
+  const accountKey = untrack(() => props.account.accountKey);
+  const planner = new PlannerState(client);
+  const review = new WeeklyReviewState(
+    client,
+    () => planner.view() === "habits",
+  );
+  const hints = new HintBook(accountKey);
+  const firstRunFlags = new FirstRun(localStorage, accountKey);
+  const insightDrops = new InsightDrops(localStorage, accountKey);
   const [firstRun, setFirstRun] = createSignal(false);
   const [shortcuts, setShortcuts] = createSignal(false);
   const [tour, setTour] = createSignal(false);
@@ -63,9 +60,9 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     client.schedule().catch(() => null),
   );
   // A link from a reminder (/?start=next) opens the timer on the next task.
-  const startLink = takeStartLink();
+  const startLink = StartLink.take();
   const plannedToday = () =>
-    planner.data()?.todayTasks.find((t) => t.status === "planned") ?? null;
+    new DayPlan(planner.data()?.todayTasks ?? []).nextPlanned();
   // A check-in that lands while the planner is open is announced on Today.
   let newestReview: number | null = null;
   createEffect(() => {
@@ -86,29 +83,25 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   createEffect(() => {
     const data = planner.data();
     if (!data) return;
-    const lit = !streakFor(data).open;
-    const finishedHere = performance.now() - completingAt < PARTY_WINDOW_MS;
+    const streak = Streak.of(data);
+    const lit = streak.lit;
+    const finishedHere =
+      performance.now() - completingAt < PLANNER_TIMING.partyWindowMs;
     if (lit && litToday?.day === data.today && !litToday.lit && finishedHere) {
       completingAt = -Infinity;
-      const streak = streakFor(data);
       setParty(streak);
-      capture("streak_lit", { days: streak.days });
+      analytics.capture("streak_lit", { days: streak.days });
     }
     litToday = { day: data.today, lit };
   });
   let firstRunChecked = false;
   let previousView = planner.view();
-  createShortcuts(planner, () => setShortcuts(true));
+  new KeyboardShortcuts(planner, () => setShortcuts(true));
   /** A finished task may drop a fact about the owner's own habits. */
   function taskCompleted(task: Task): void {
     const data = planner.data();
     if (!data) return;
-    const dropped = completionInsight(
-      localStorage,
-      props.account.accountKey,
-      task,
-      data,
-    );
+    const dropped = insightDrops.afterCompletion(task, data);
     if (dropped) setInsight(dropped);
   }
   // An insight belongs to the moment after finishing, not to the next task.
@@ -119,11 +112,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   function finishFirstRun(): void {
     if (!firstRun()) return;
     setFirstRun(false);
-    try {
-      localStorage.setItem(onboardingKey(props.account.accountKey), "done");
-    } catch {
-      /* The first plan does not depend on persistence. */
-    }
+    firstRunFlags.finishOnboarding();
   }
 
   async function addFirstTask(
@@ -152,15 +141,11 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
 
   function finishTour(): void {
     setTour(false);
-    try {
-      localStorage.setItem(tourKey(props.account.accountKey), "done");
-    } catch {
-      /* It is simply offered again on the next load. */
-    }
+    firstRunFlags.finishTour();
   }
 
   async function startFirstTask(): Promise<void> {
-    const task = planner.data()?.todayTasks.find((t) => t.status === "planned");
+    const task = plannedToday();
     if (!task) return;
     hints.dismiss("start");
     const success = await planner.mutate(async () => {
@@ -174,8 +159,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     const data = planner.data();
     if (!data || firstRunChecked) return;
     firstRunChecked = true;
-    const account = props.account.accountKey;
-    const isNew = shouldOfferOnboarding(data, account, localStorage);
+    const isNew = firstRunFlags.offersOnboarding(data);
     setFirstRun(isNew);
     client.track("planner_opened", {
       new_account: isNew,
@@ -191,7 +175,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
       }
     }
     // Right after sign-in, once per account and device.
-    const showTour = shouldOfferTour(data, account, localStorage);
+    const showTour = firstRunFlags.offersTour(data);
     setTour(showTour);
     if (showTour) client.track("tour_shown");
   });
@@ -203,7 +187,10 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
       hiddenSince = Date.now();
       return;
     }
-    if (hiddenSince && Date.now() - hiddenSince >= RETURN_AFTER_MS) {
+    if (
+      hiddenSince &&
+      Date.now() - hiddenSince >= PLANNER_TIMING.returnAfterMs
+    ) {
       const data = untrack(planner.data);
       client.track("planner_opened", {
         new_account: false,
@@ -308,7 +295,6 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
                 <FocusView
                   planner={planner}
                   client={props.client}
-                  hints={hints}
                   onCompleting={() => (completingAt = performance.now())}
                   onCompleted={taskCompleted}
                 />

@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { test as base, expect, type Page } from "@playwright/test";
-import { project } from "../../src/planner/task-projection";
+import { PlannerSnapshot } from "../../src/planner/planner-snapshot";
 import type { QueuedAction } from "../../src/planner/commands";
 import type { Dashboard, MonthStats, TaskSuggestion, WeeklyOverview, WeeklyReview } from "../../src/planner/types";
 import { PRIVACY_ACKNOWLEDGEMENT_KEY, PRIVACY_POLICY_VERSION } from "../../src/planner/privacy-state";
@@ -17,7 +17,7 @@ export function session(expiresIn = 3600) {
 }
 const day = () => new Date().toISOString().slice(0, 10);
 export function dashboard(): Dashboard {
-  return { revision: 0, today: day(), tomorrow: new Date(Date.now() + 86400000).toISOString().slice(0, 10), todayTasks: [], tomorrowTasks: [], activeTask: null, canPlanTomorrow: true, completions: [], serverNow: Math.floor(Date.now() / 1000) };
+  return { revision: 0, today: day(), tomorrow: new Date(Date.now() + 86400000).toISOString().slice(0, 10), todayTasks: [], tomorrowTasks: [], activeTask: null, completions: [], serverNow: Math.floor(Date.now() / 1000) };
 }
 function overview(): WeeklyOverview {
   return { settings: { enabled: true }, model: "gpt-4.1-mini", available: true, week: { start: day(), end: day(), nextUpdate: day(), nextUpdateAt: new Date(Date.now() + 5 * 86400000).toISOString() }, checkIn: { day: 0, plan: null }, status: "no_data", error: null, reviews: [] };
@@ -156,7 +156,7 @@ export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: 
       }
       const command: QueuedAction = { requestId: args._requestId, action, args, timezone: body.p_timezone, at: args._at, revision: args._revision };
       const previousTask = state.data.activeTask;
-      state.data = project(state.data, command);
+      state.data = PlannerSnapshot.project(state.data, command);
       const task = [...state.data.todayTasks, ...state.data.tomorrowTasks, ...(state.data.activeTask ? [state.data.activeTask] : [])].find((item) => item.id === (action === "create_task" ? args._requestId : args.id)) ?? previousTask;
       if (action === "save_pause_reason") state.stops.push(args.reason);
       const result = { ...task, serverRevision: state.data.revision };

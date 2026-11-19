@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
-import { hardenHtml, POSTHOG_API_HOST } from "./security-policy.ts";
+import {
+  DOCUMENT_ROUTES,
+  hardenHtml,
+  POSTHOG_API_HOST,
+} from "./security-policy.ts";
+
+const DOCUMENT = new RegExp(DOCUMENT_ROUTES.noStore);
 
 export function productionCsp(
   apiOrigin: string | null,
@@ -82,7 +88,7 @@ export function productionCsp(
         const path = request.url?.split("?")[0] ?? "/";
         if (
           ["GET", "HEAD"].includes(request.method ?? "") &&
-          /^\/(?:index\.html|download\/?|login\/?)?$/.test(path)
+          DOCUMENT.test(path)
         ) {
           // Serve the exact document ourselves: Vite's HTML middleware would
           // overwrite Cache-Control with no-cache rather than no-store.

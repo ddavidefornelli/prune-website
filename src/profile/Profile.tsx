@@ -2,16 +2,14 @@ import { createMemo, For, Show, untrack } from "solid-js";
 import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import type { PlanningClient } from "../planner/api";
 import { ActivityCalendar } from "../planner/components/ActivityCalendar";
-import type { PlannerState } from "../planner/create-planner";
+import { DayPlan } from "../planner/day-plan";
+import type { PlannerState } from "../planner/planner-state";
+import { Duration } from "../shared/duration";
+import { APP_EVENTS } from "../shared/storage-keys";
 import { Reminders } from "./Reminders";
-import { profileStats, todayFocusSeconds } from "./profile-stats";
+import { ProfileStats } from "./profile-stats";
 
-function focusMinutes(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  return minutes >= 60
-    ? `${Math.floor(minutes / 60)}h ${minutes % 60}m`
-    : `${minutes}m`;
-}
+const days = (count: number) => `${count} ${count === 1 ? "day" : "days"}`;
 
 function StatGrid(props: { metrics: readonly (readonly [string, string])[] }) {
   return (
@@ -36,8 +34,10 @@ export function Profile(props: {
   const planner = untrack(() => props.planner);
   const stats = createMemo(() => {
     const data = planner.data();
-    return data ? profileStats(data) : null;
+    return data ? new ProfileStats(data) : null;
   });
+  // Live focus reads only today's plan, so the clock never rescans history.
+  const today = createMemo(() => new DayPlan(planner.data()?.todayTasks ?? []));
   return (
     <section class="profile-page" aria-labelledby="profile-heading">
       <header class="profile-heading">
@@ -52,14 +52,8 @@ export function Profile(props: {
               metrics={[
                 ["Tasks completed", value().totalCompleted.toLocaleString()],
                 ["Active days", value().activeDays.toLocaleString()],
-                [
-                  "Current streak",
-                  `${value().currentStreak} ${value().currentStreak === 1 ? "day" : "days"}`,
-                ],
-                [
-                  "Best streak",
-                  `${value().bestStreak} ${value().bestStreak === 1 ? "day" : "days"}`,
-                ],
+                ["Current streak", days(value().currentStreak)],
+                ["Best streak", days(value().bestStreak)],
               ]}
             />
             <h2 class="profile-section-heading">Recent activity</h2>
@@ -73,22 +67,15 @@ export function Profile(props: {
                 ],
                 [
                   "Today’s task focus",
-                  focusMinutes(
-                    todayFocusSeconds(planner.data()!, planner.now()),
-                  ),
+                  new Duration(today().focusedSeconds(planner.now())).short(),
                 ],
               ]}
             />
             <p class="muted">
-              Today’s plan:{" "}
-              {
-                planner
-                  .data()!
-                  .todayTasks.filter((task) => task.status === "completed")
-                  .length
-              }
-              /{planner.data()!.todayTasks.length} complete ·{" "}
-              {focusMinutes(value().todayEstimatedMinutes * 60)} estimated
+              Today’s plan: {today().completedCount}/{today().tasks.length}{" "}
+              complete ·{" "}
+              {Duration.ofMinutes(value().todayEstimatedMinutes).short()}{" "}
+              estimated
             </p>
             <ActivityCalendar
               today={planner.data()!.today}
@@ -104,7 +91,7 @@ export function Profile(props: {
           type="button"
           class="privacy-policy-button"
           onClick={() =>
-            window.dispatchEvent(new Event("prune:preferences:open"))
+            window.dispatchEvent(new Event(APP_EVENTS.openPrivacyPreferences))
           }
         >
           Cookie settings

@@ -1,37 +1,68 @@
-import { HTTP_LIMITS, SUPABASE_ROUTES } from "../shared/api-routes.ts";
-import { CloudError } from "./http-error.ts";
+import {
+  FUNCTIONS_PREFIX,
+  HTTP_LIMITS,
+  SUPABASE_ROUTES,
+} from "../shared/api-routes.ts";
+import { CloudError } from "./cloud-error.ts";
+import { MESSAGES } from "./messages.ts";
 
-/** Bounded requests and response bodies. Never send cookies or a referrer. */
-export async function apiFetch(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-  timeoutMs?: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  const url = input instanceof Request ? input.url : String(input);
-  const timeout = setTimeout(
-    abort,
-    timeoutMs ??
-      (url.includes("/functions/")
-        ? HTTP_LIMITS.reviewMs
-        : url.includes(SUPABASE_ROUTES.signOut)
-          ? HTTP_LIMITS.signOutMs
-          : HTTP_LIMITS.requestMs),
-  );
-  const signal =
-    init?.signal ?? (input instanceof Request ? input.signal : undefined);
-  if (signal?.aborted) abort();
-  signal?.addEventListener("abort", abort, { once: true });
-  try {
-    const response = await fetch(input, {
-      ...init,
-      signal: controller.signal,
-      credentials: "omit",
-      cache: "no-store",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-    });
+type Limits = { [Key in keyof typeof HTTP_LIMITS]: number };
+
+/**
+ * `fetch` with a deadline that covers the streamed body and a cap on its
+ * size. Never sends cookies or a referrer, and never follows a redirect.
+ */
+export class BoundedFetch {
+  private readonly limits: Limits;
+
+  constructor(limits: Limits = HTTP_LIMITS) {
+    this.limits = limits;
+  }
+
+  /** The `fetch`-compatible form the Supabase SDK takes. */
+  readonly fetch = (input: RequestInfo | URL, init?: RequestInit) =>
+    this.request(input, init);
+
+  async request(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+    timeoutMs?: number,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    const url = input instanceof Request ? input.url : String(input);
+    const timeout = setTimeout(abort, timeoutMs ?? this.timeoutFor(url));
+    const signal =
+      init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    if (signal?.aborted) abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: controller.signal,
+        credentials: "omit",
+        cache: "no-store",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+      });
+      return await this.buffer(response, controller.signal);
+    } finally {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abort);
+    }
+  }
+
+  private timeoutFor(url: string): number {
+    if (url.includes(FUNCTIONS_PREFIX)) return this.limits.reviewMs;
+    if (url.includes(SUPABASE_ROUTES.signOut)) return this.limits.signOutMs;
+    return this.limits.requestMs;
+  }
+
+  /** Reads the whole body under the deadline and size cap, then rebuilds it. */
+  private async buffer(
+    response: Response,
+    signal: AbortSignal,
+  ): Promise<Response> {
     const reader = response.body?.getReader();
     if (!reader) return response;
     const chunks: Uint8Array[] = [];
@@ -41,11 +72,11 @@ export async function apiFetch(
       rejectRead = reject;
     });
     const interrupt = () => {
-      rejectRead(controller.signal.reason);
+      rejectRead(signal.reason);
       void reader.cancel().catch(() => {});
     };
-    controller.signal.addEventListener("abort", interrupt, { once: true });
-    if (controller.signal.aborted) interrupt();
+    signal.addEventListener("abort", interrupt, { once: true });
+    if (signal.aborted) interrupt();
     try {
       while (true) {
         const { value, done } = await Promise.race([
@@ -54,18 +85,15 @@ export async function apiFetch(
         ]);
         if (done) break;
         length += value.byteLength;
-        if (length > HTTP_LIMITS.responseBytes) {
+        if (length > this.limits.responseBytes) {
           // Cancellation is best-effort; a broken stream must not delay failure.
           void reader.cancel().catch(() => {});
-          throw new CloudError(
-            "size",
-            "The server response is too large. Please contact support.",
-          );
+          throw new CloudError("size", MESSAGES.responseTooLarge);
         }
         chunks.push(value);
       }
     } finally {
-      controller.signal.removeEventListener("abort", interrupt);
+      signal.removeEventListener("abort", interrupt);
       reader.releaseLock();
     }
     const bytes = new Uint8Array(length);
@@ -82,8 +110,7 @@ export async function apiFetch(
       statusText: response.statusText,
       headers,
     });
-  } finally {
-    clearTimeout(timeout);
-    signal?.removeEventListener("abort", abort);
   }
 }
+
+export const boundedFetch = new BoundedFetch();

@@ -165,16 +165,6 @@ test("an outdated notice gates saved sessions and the full policy is available b
   expect(backend.requests).toHaveLength(0);
 });
 
-test("the existing direct download page works without account services", async ({ page, backend }) => {
-  const downloadPromise = page.waitForEvent("download");
-  await page.goto("/download");
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("prune.dmg");
-  expect(await download.failure()).toBeNull();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("THANK YOU FOR INSTALLING");
-  expect(backend.requests).toHaveLength(0);
-});
-
 test("signup fits narrow phones and scrolls naturally in short landscape windows", async ({ page }) => {
   await page.goto("/");
   for (const viewport of [

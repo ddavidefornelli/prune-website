@@ -16,7 +16,7 @@
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createClient } from "@supabase/supabase-js";
-import { localDay } from "../src/planner/time.ts";
+import { CalendarDay } from "../src/shared/calendar-day.ts";
 
 function askHidden(question: string): Promise<string> {
   return new Promise((resolve) => {
@@ -79,7 +79,7 @@ if (!row.data.daily_enabled)
 
 const now = Math.floor(Date.now() / 1000);
 const homeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const today = localDay(now, homeZone);
+const today = CalendarDay.local(now, homeZone).key;
 const pending = await db
   .from("planner_tasks")
   .select("outcome")
@@ -96,7 +96,7 @@ console.log(`Found ${pending.data.length} unfinished task(s) for ${today}.`);
 const hourIn = (zone: string) =>
   Number(new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", hourCycle: "h23" }).format(now * 1000));
 const dueZone = Intl.supportedValuesOf("timeZone").find(
-  (zone) => hourIn(zone) === 10 && localDay(now, zone) === today,
+  (zone) => hourIn(zone) === 10 && CalendarDay.local(now, zone).key === today,
 );
 if (!dueZone) stop("Could not find a time zone where it is 10:00 on your date. Try again in a few minutes.");
 

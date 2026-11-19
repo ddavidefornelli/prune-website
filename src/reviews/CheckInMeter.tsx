@@ -1,12 +1,9 @@
 import { Index, Show } from "solid-js";
-import { DAY_MS } from "../planner/time";
-import { WEEKDAYS } from "./check-in";
-import type { WeeklyReviewState } from "./create-weekly-review";
+import { CalendarDay } from "../shared/calendar-day";
+import { CALENDAR } from "../shared/time-constants";
+import type { WeeklyReviewState } from "./weekly-review-state";
 
-const daysBetween = (from: string, to: string) =>
-  Math.round(
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS,
-  );
+const WEEK = CALENDAR.daysPerWeek;
 
 /**
  * Today's reminder of the weekly check-in: which day it is, how far off, and
@@ -22,7 +19,15 @@ export function CheckInMeter(props: {
     data()?.status === "pending" || data()?.status === "running";
   const left = () => {
     const next = data()?.week.nextUpdate;
-    return next ? Math.min(7, Math.max(0, daysBetween(props.today, next))) : 7;
+    return next
+      ? Math.min(
+          WEEK,
+          Math.max(
+            0,
+            CalendarDay.parse(next).daysSince(CalendarDay.parse(props.today)),
+          ),
+        )
+      : WEEK;
   };
   const hint = () => {
     if (writing()) return "Writing…";
@@ -30,7 +35,7 @@ export function CheckInMeter(props: {
     if (left() === 0) return "Today";
     return left() === 1 ? "Tomorrow" : `In ${left()} days`;
   };
-  const day = () => WEEKDAYS[data()?.checkIn?.day ?? 0];
+  const day = () => CALENDAR.weekdayNames[data()?.checkIn?.day ?? 0];
   return (
     <Show when={!data() || data()!.settings.enabled}>
       <section class="review-meter" aria-label="Weekly check-in">
@@ -55,13 +60,13 @@ export function CheckInMeter(props: {
             aria-label={
               writing()
                 ? "Your check-in is being written."
-                : `${7 - left()} of 7 days until your check-in.`
+                : `${WEEK - left()} of ${WEEK} days until your check-in.`
             }
           >
-            <Index each={Array.from({ length: 7 })}>
+            <Index each={Array.from({ length: WEEK })}>
               {(_, index) => (
                 <span
-                  classList={{ "is-past": writing() || index < 7 - left() }}
+                  classList={{ "is-past": writing() || index < WEEK - left() }}
                 />
               )}
             </Index>

@@ -1,9 +1,8 @@
 import { createSignal, createUniqueId, For } from "solid-js";
 import { Dialog } from "../../components/Dialog";
-import { ESTIMATE, MOBILE_QUERY, PLANNER_LIMITS } from "../constants";
+import { ESTIMATE, MEDIA_QUERIES, PLANNER_LIMITS } from "../constants";
 import { OnboardingScreen } from "./PlannerTour";
 
-const ESTIMATES = [15, 30, 45, 60] as const;
 const label = (minutes: number) =>
   minutes === 60 ? "1 hour" : `${minutes} min`;
 
@@ -40,7 +39,7 @@ export function FirstTaskDialog(props: {
       onDismiss={() => {}}
       initialFocus={(dialog) => {
         // On a phone, the keyboard would cover the estimate and the button.
-        if (!window.matchMedia(MOBILE_QUERY).matches)
+        if (!window.matchMedia(MEDIA_QUERIES.mobile).matches)
           dialog.querySelector<HTMLInputElement>("input")?.focus();
         else dialog.querySelector<HTMLElement>("h2")?.focus();
       }}
@@ -105,7 +104,7 @@ export function FirstTaskDialog(props: {
             <fieldset class="win-estimate">
               <legend>How long will it take?</legend>
               <div class="win-chips">
-                <For each={ESTIMATES}>
+                <For each={ESTIMATE.quickPicks}>
                   {(value) => (
                     <button
                       type="button"

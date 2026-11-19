@@ -9,12 +9,8 @@ import {
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import type { Streak } from "../streak";
-import {
-  type ConfettiPiece,
-  type Dance,
-  isMilestone,
-  pickParty,
-} from "../streak-party";
+import { MEDIA_QUERIES } from "../constants";
+import { type ConfettiPiece, type Dance, PartyPlanner } from "../streak-party";
 import { FLAME } from "./StreakCounter";
 
 const STAY_MS = 7000;
@@ -37,16 +33,13 @@ export function StreakParty(props: {
 }) {
   // Drawn once per party: the dance and the confetti never reshuffle.
   const days = untrack(() => props.streak.days);
-  const party = pickParty(
+  const party = new PartyPlanner().plan(
     days,
-    Math.random,
     untrack(() => props.dance),
   );
   const [count, setCount] = createSignal(Math.max(0, days - 1));
   const [brass, setBrass] = createSignal(false);
-  const reduced = window.matchMedia?.(
-    "(prefers-reduced-motion: reduce)",
-  ).matches;
+  const reduced = window.matchMedia?.(MEDIA_QUERIES.reducedMotion).matches;
 
   onMount(() => {
     const opened = performance.now();
@@ -77,7 +70,10 @@ export function StreakParty(props: {
   return (
     <Dialog
       class="streak-party"
-      classList={{ "is-milestone": isMilestone(days), "is-brass": brass() }}
+      classList={{
+        "is-milestone": PartyPlanner.isMilestone(days),
+        "is-brass": brass(),
+      }}
       data-dance={party.dance}
       aria-labelledby="streak-party-title"
       onDismiss={() => props.onClose()}
@@ -479,7 +475,7 @@ function Trumpet() {
 }
 
 /** The prize sound: "Con Carne (7 sec edit)" from Pixabay (see CREDITS.txt). */
-export const PARTY_SOUND = "/sounds/streak-party.m4a";
+const PARTY_SOUND = "/sounds/streak-party.m4a";
 
 /**
  * Plays the prize sound once. Fetched when the party opens, which follows a

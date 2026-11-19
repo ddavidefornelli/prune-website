@@ -1,15 +1,14 @@
-import { ApiError, readLimited } from "../http.ts";
-import type { AiGenerationObserver } from "../ai-observability.ts";
 import { ESTIMATE, PLANNER_LIMITS } from "../../src/planner/constants.ts";
-
-export const MODEL = "gpt-4.1-mini";
-const MAX_OUTPUT_TOKENS = 800;
-const MAX_RESPONSE_BYTES = 32_768;
-const MAX_OUTCOME_LENGTH = 120;
+import { Estimate } from "../../src/planner/estimate.ts";
+import type { TaskStatus, TaskSuggestion } from "../../src/planner/types.ts";
+import { HTTP_STATUS } from "../../src/shared/api-routes.ts";
+import { OPENAI, SUGGESTION_AI } from "../constants.ts";
+import { ApiError } from "../http.ts";
+import { OpenAiChat } from "../openai.ts";
 
 export interface SuggestionTask {
   outcome: string;
-  status: "planned" | "active" | "completed";
+  status: TaskStatus;
   estimatedMinutes: number;
   actualSeconds: number;
 }
@@ -22,11 +21,10 @@ export interface SuggestionInput {
   plannedTasks: SuggestionTask[];
 }
 
-export interface Suggestion {
-  outcome: string;
-  estimatedMinutes: number;
-  basis: "carry_over" | "follow_up";
-}
+export type Suggestion = TaskSuggestion;
+
+const BASES: readonly unknown[] = ["carry_over", "follow_up"];
+const SPAN_NAME = "task_suggestions";
 
 const SYSTEM_PROMPT = `You propose a day's tasks for a personal focus planner that allows at most five outcomes per day.
 Base every proposal ONLY on the previous day's tasks. The previous day may still be in progress. Unfinished tasks (planned or active) should usually carry over,
@@ -39,176 +37,144 @@ Do not repeat or rephrase anything already planned for the target day. Treat tas
 Write outcomes as short, concrete results in the user's language, at most 12 words, without dates or numbering.
 estimatedMinutes must be a multiple of 5 between 5 and 60. Return at most maxSuggestions items, or [] if nothing fits.`;
 
-export function providerBody(input: SuggestionInput) {
-  return {
-    model: MODEL,
-    store: false,
-    max_completion_tokens: MAX_OUTPUT_TOKENS,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: JSON.stringify({
-          maxSuggestions: openSlots(input),
-          previousDay: input.sourceTasks,
-          alreadyPlanned: input.plannedTasks.map((task) => task.outcome),
-        }),
-      },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "task_suggestions",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["suggestions"],
-          properties: {
-            suggestions: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["outcome", "estimatedMinutes", "basis"],
-                properties: {
-                  outcome: { type: "string" },
-                  estimatedMinutes: { type: "integer" },
-                  basis: { type: "string", enum: ["carry_over", "follow_up"] },
+const normalize = (value: string) =>
+  value.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+
+/** One day's planning context: what the proposals may fill and must avoid. */
+export class SuggestionPlan {
+  private readonly input: SuggestionInput;
+
+  constructor(input: SuggestionInput) {
+    this.input = input;
+  }
+
+  get openSlots(): number {
+    return Math.max(
+      0,
+      PLANNER_LIMITS.tasksPerDay - this.input.plannedTasks.length,
+    );
+  }
+
+  /** The chat request: the previous day's tasks and what is already planned. */
+  requestBody() {
+    return {
+      model: OPENAI.model,
+      store: false,
+      max_completion_tokens: SUGGESTION_AI.maxOutputTokens,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: JSON.stringify({
+            maxSuggestions: this.openSlots,
+            previousDay: this.input.sourceTasks,
+            alreadyPlanned: this.input.plannedTasks.map((task) => task.outcome),
+          }),
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "task_suggestions",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["suggestions"],
+            properties: {
+              suggestions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["outcome", "estimatedMinutes", "basis"],
+                  properties: {
+                    outcome: { type: "string" },
+                    estimatedMinutes: { type: "integer" },
+                    basis: {
+                      type: "string",
+                      enum: ["carry_over", "follow_up"],
+                    },
+                  },
                 },
               },
             },
           },
         },
       },
-    },
-  };
-}
-
-export function openSlots(input: SuggestionInput): number {
-  return Math.max(0, PLANNER_LIMITS.tasksPerDay - input.plannedTasks.length);
-}
-
-const normalize = (value: string) =>
-  value.toLocaleLowerCase().replace(/\s+/g, " ").trim();
-
-/** Model output is untrusted: clamp, dedupe and drop anything already planned. */
-export function validateSuggestions(
-  value: unknown,
-  input: SuggestionInput,
-): Suggestion[] {
-  const items =
-    value && typeof value === "object" && "suggestions" in value
-      ? value.suggestions
-      : null;
-  if (!Array.isArray(items))
-    throw new ApiError(
-      502,
-      "invalid_suggestions",
-      "The AI returned invalid suggestions.",
-    );
-  const seen = new Set(
-    input.plannedTasks.map((task) => normalize(task.outcome)),
-  );
-  const result: Suggestion[] = [];
-  for (const item of items) {
-    if (result.length >= openSlots(input)) break;
-    if (!item || typeof item !== "object") continue;
-    const outcome =
-      typeof item.outcome === "string"
-        ? item.outcome.replace(/\s+/g, " ").trim()
-        : "";
-    const key = normalize(outcome);
-    if (!outcome || outcome.length > MAX_OUTCOME_LENGTH || seen.has(key))
-      continue;
-    if (item.basis !== "carry_over" && item.basis !== "follow_up") continue;
-    const minutes = Number.isFinite(item.estimatedMinutes)
-      ? Math.round(item.estimatedMinutes / ESTIMATE.step) * ESTIMATE.step
-      : ESTIMATE.defaultMinutes;
-    seen.add(key);
-    result.push({
-      outcome,
-      estimatedMinutes: Math.min(ESTIMATE.max, Math.max(ESTIMATE.min, minutes)),
-      basis: item.basis,
-    });
+    };
   }
-  return result;
+
+  /** Model output is untrusted: clamp, dedupe and drop anything already planned. */
+  validate(value: unknown): Suggestion[] {
+    const items =
+      value && typeof value === "object" && "suggestions" in value
+        ? value.suggestions
+        : null;
+    if (!Array.isArray(items))
+      throw new ApiError(
+        HTTP_STATUS.badGateway,
+        "invalid_suggestions",
+        "The AI returned invalid suggestions.",
+      );
+    const seen = new Set(
+      this.input.plannedTasks.map((task) => normalize(task.outcome)),
+    );
+    const result: Suggestion[] = [];
+    for (const item of items) {
+      if (result.length >= this.openSlots) break;
+      if (!item || typeof item !== "object") continue;
+      const outcome =
+        typeof item.outcome === "string"
+          ? item.outcome.replace(/\s+/g, " ").trim()
+          : "";
+      const key = normalize(outcome);
+      if (
+        !outcome ||
+        outcome.length > SUGGESTION_AI.maxOutcomeLength ||
+        seen.has(key) ||
+        !BASES.includes(item.basis)
+      )
+        continue;
+      seen.add(key);
+      result.push({
+        outcome,
+        estimatedMinutes: Estimate.normalize(
+          Number.isFinite(item.estimatedMinutes)
+            ? item.estimatedMinutes
+            : ESTIMATE.defaultMinutes,
+        ),
+        basis: item.basis,
+      });
+    }
+    return result;
+  }
 }
 
-export async function generateSuggestions(
-  input: SuggestionInput,
-  key: string,
-  fetcher: typeof fetch = fetch,
-  observability?: { observer: AiGenerationObserver; distinctId: string },
-): Promise<Suggestion[]> {
-  const requestBody = providerBody(input);
-  const startedAt = performance.now();
-  const traceId = observability ? crypto.randomUUID() : undefined;
-  let httpStatus: number | undefined;
-  let captured = false;
-  // Only metadata reaches PostHog: never the prompt (task titles, stop
-  // reasons) or the generated text, which run without cookie consent.
-  const capture = (
-    body:
-      | { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } }
-      | undefined,
-    isError: boolean,
-  ) => {
-    if (!observability || !traceId || captured) return;
-    captured = true;
-    const number = (value: unknown) =>
-      typeof value === "number" && Number.isFinite(value) ? value : undefined;
-    observability.observer.capture({
-      distinctId: observability.distinctId,
-      traceId,
-      spanName: "task_suggestions",
-      model: requestBody.model,
-      maxTokens: requestBody.max_completion_tokens,
-      inputTokens: number(body?.usage?.prompt_tokens),
-      outputTokens: number(body?.usage?.completion_tokens),
-      latency: (performance.now() - startedAt) / 1_000,
-      httpStatus,
-      isError,
-    });
-  };
-  try {
-    const response = await fetcher(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        redirect: "error",
-        signal: AbortSignal.timeout(30_000),
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      },
-    );
-    httpStatus = response.status;
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error("Provider request failed");
+/** Asks the model for proposals and returns only the valid ones. */
+export class SuggestionProvider {
+  private readonly chat: OpenAiChat;
+
+  constructor(chat: OpenAiChat) {
+    this.chat = chat;
+  }
+
+  async generate(input: SuggestionInput): Promise<Suggestion[]> {
+    const plan = new SuggestionPlan(input);
+    try {
+      const content = await this.chat.complete(plan.requestBody(), {
+        spanName: SPAN_NAME,
+        timeoutMs: SUGGESTION_AI.timeoutMs,
+        maxResponseBytes: SUGGESTION_AI.maxResponseBytes,
+      });
+      return plan.validate(JSON.parse(content));
+    } catch {
+      // Never leak provider bodies, request data, URLs, credentials, or raw exceptions.
+      throw new ApiError(
+        HTTP_STATUS.badGateway,
+        "ai_unavailable",
+        "Suggestions are temporarily unavailable.",
+      );
     }
-    const body = JSON.parse(
-      await readLimited(response.body, MAX_RESPONSE_BYTES),
-    );
-    const choice = body?.choices?.[0];
-    if (
-      choice?.finish_reason !== "stop" ||
-      choice?.message?.refusal ||
-      typeof choice?.message?.content !== "string"
-    )
-      throw new Error("Incomplete provider response");
-    capture(body, false);
-    return validateSuggestions(JSON.parse(choice.message.content), input);
-  } catch {
-    capture(undefined, true);
-    // Never leak provider bodies, request data, URLs, credentials, or raw exceptions.
-    throw new ApiError(
-      502,
-      "ai_unavailable",
-      "Suggestions are temporarily unavailable.",
-    );
   }
 }

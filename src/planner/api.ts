@@ -1,6 +1,7 @@
-import { capture } from "../analytics.ts";
-import { createAccountQueue } from "./account-queue.ts";
+import { analytics, type EventProperties } from "../analytics.ts";
+import { AccountQueue } from "./account-queue.ts";
 import { BrowserCloud } from "./browser.ts";
+import { CloudError } from "./cloud-error.ts";
 import type {
   CloudTransport,
   PlannerQueries,
@@ -8,22 +9,21 @@ import type {
   TaskArguments,
 } from "./commands.ts";
 import { WEEKLY_AI_VERSION } from "./constants.ts";
-import { errorCode } from "./errors.ts";
-import { forgetPush } from "./push.ts";
-import type { LocalQueue } from "./local-queue.ts";
+import { MESSAGES } from "./messages.ts";
+import { pushNotifications, type SavedSubscription } from "./push.ts";
+import { SuggestionCache } from "./suggestion-cache.ts";
 import type {
   AuthStatus,
+  CheckInPlan,
   Dashboard,
   EmailPreferences,
   MonthStats,
   ScheduleState,
+  SuggestionTarget,
   Task,
   TaskSuggestion,
-  CheckInPlan,
   WeeklyOverview,
 } from "./types.ts";
-
-type SuggestionTarget = "today" | "tomorrow";
 
 /** Must match the allowlist in planner_track (20261122000100_planner_history.sql). */
 export type JourneyEvent =
@@ -39,8 +39,10 @@ export type JourneyEvent =
   | "change_rejected"
   | "error_shown";
 
-/** Short codes only (no typed text): the server rejects anything else. */
-export type JourneyDetail = Record<string, string | number | boolean>;
+/** Codes that mean the signed-in identity is no longer the one on screen. */
+const IDENTITY_LOST: readonly string[] = ["unauthorized", "account_changed"];
+/** Review states that a request can move forward. */
+const REVIEW_DUE: readonly WeeklyOverview["status"][] = ["pending", "failed"];
 
 interface PlanningClientOptions {
   cloud?: CloudTransport;
@@ -50,15 +52,11 @@ interface PlanningClientOptions {
 export class PlanningClient {
   private readonly cloud: CloudTransport;
   private readonly timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  private readonly cleanups: (() => void)[] = [];
-  private queue: LocalQueue | null = null;
+  private readonly suggestions = new SuggestionCache(() => this.accountKey);
+  private account: AccountQueue | null = null;
   private accountKey: string | null = null;
   private disposed = false;
   private generatingReview = false;
-  private readonly suggestions = new Map<
-    SuggestionTarget,
-    { key: string; result: Promise<TaskSuggestion[]> }
-  >();
   onQueueChange: () => void = () => {};
 
   constructor({ cloud = new BrowserCloud() }: PlanningClientOptions = {}) {
@@ -69,12 +67,16 @@ export class PlanningClient {
     };
   }
 
+  private get queue() {
+    return this.account?.queue ?? null;
+  }
+
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
     this.onQueueChange = () => {};
     this.cloud.onAccountChange = () => {};
-    this.cleanups.splice(0).forEach((cleanup) => cleanup());
+    this.account?.dispose();
     await Promise.all([this.queue?.stop(), this.cloud.dispose()]);
   }
 
@@ -102,107 +104,12 @@ export class PlanningClient {
     return this.queue?.discardPending() ?? Promise.resolve();
   }
 
-  private prepareQueue(accountKey: string): void {
-    if (this.queue) {
-      if (accountKey !== this.accountKey)
-        throw new Error(
-          "The account changed. Reload before accessing planner data.",
-        );
-      return;
-    }
-    const { queue, dispose } = createAccountQueue(
-      accountKey,
-      this.timezone,
-      (command, args) => this.request(command, args),
-      () => this.onQueueChange(),
-    );
-    this.accountKey = accountKey;
-    this.queue = queue;
-    this.cleanups.push(dispose);
-  }
-
-  private assertOpen(): void {
-    if (this.disposed) throw new Error("The planner client is closed.");
-  }
-
-  private async request<T>(
-    command: string,
-    args: Record<string, unknown> = {},
-  ): Promise<T> {
-    this.assertOpen();
-    try {
-      const result = await this.cloud.execute<T>(command, args);
-      this.assertOpen();
-      return result;
-    } catch (error) {
-      if (this.disposed) throw error;
-      const code = errorCode(error);
-      if (code === "account_deleted") {
-        await this.cloud.execute("sign_out");
-        window.location.reload();
-      }
-      if (
-        this.accountKey &&
-        ["unauthorized", "account_changed"].includes(code)
-      ) {
-        // Never keep old account data visible after credentials or identity change.
-        window.location.reload();
-      }
-      throw error;
-    }
-  }
-
-  private query<Action extends keyof PlannerQueries>(
-    action: Action,
-    args: Record<string, unknown> = {},
-  ): Promise<PlannerQueries[Action]> {
-    return this.request("planner_call", {
-      action,
-      args: {
-        ...args,
-        ...(this.accountKey ? { _accountKey: this.accountKey } : {}),
-      },
-      timezone: this.timezone,
-    });
-  }
-
-  private async mutate<Action extends TaskAction>(
-    action: Action,
-    args: TaskArguments[Action],
-  ): Promise<Task> {
-    this.assertOpen();
-    if (!this.queue)
-      throw new Error("Sign in and load your planner before making changes.");
-    return this.queue.enqueue(action, args, this.timezone);
-  }
-
-  private async loadAccount(status: AuthStatus): Promise<AuthStatus> {
-    if (!status.accountKey) return status;
-    // Only a verified identity may unlock its cached planner during a network outage.
-    this.prepareQueue(status.accountKey);
-    let account: { isDeleted: boolean };
-    try {
-      account = await this.query("account_status");
-    } catch (error) {
-      if (errorCode(error) === "network" && this.cachedDashboard())
-        return status;
-      throw error;
-    }
-    if (account.isDeleted) {
-      await this.queue?.stop();
-      await this.request("sign_out");
-      throw new Error(
-        "This account has been marked for deletion and can no longer be used.",
-      );
-    }
-    return status;
-  }
+  // Authentication
 
   async authStatus(): Promise<AuthStatus> {
     return this.loadAccount(await this.request<AuthStatus>("auth_status"));
   }
 
-  /** Leaves the page for Google; authStatus() completes the return trip. */
   async sendCode(email: string): Promise<void> {
     await this.request("send_code", { email });
   }
@@ -213,24 +120,16 @@ export class PlanningClient {
     );
   }
 
+  /** Leaves the page for Google; authStatus() completes the return trip. */
   async signInWithGoogle(): Promise<void> {
     await this.request("sign_in_with_google");
   }
 
-  /** Failed online account operations may resume the outbox; confirmed deletion may not. */
-  private async withQueueStopped(work: () => Promise<void>): Promise<void> {
-    await this.queue?.stop();
-    try {
-      await work();
-    } catch (error) {
-      if (!this.disposed) this.queue?.resume();
-      throw error;
-    }
-  }
-
   async signOut(): Promise<void> {
     // A signed-out browser must not keep receiving this account's task titles.
-    await forgetPush((endpoint) => this.removePushSubscription(endpoint));
+    await pushNotifications.forget((endpoint) =>
+      this.removePushSubscription(endpoint),
+    );
     await this.withQueueStopped(() => this.request("sign_out"));
   }
 
@@ -238,33 +137,13 @@ export class PlanningClient {
     await this.withQueueStopped(async () => {
       const result = await this.query("delete_account");
       if (result?.isDeleted !== true)
-        throw new Error(
-          "Account deletion was not confirmed. Please try again.",
-        );
+        throw new Error(MESSAGES.deletionUnconfirmed);
     });
     // Do not resume the outbox if local sign-out fails after confirmed deletion.
     await this.request("sign_out");
   }
 
-  /** Returns the overview it read, unless it requested a review (then it is stale). */
-  async generateIfDue(): Promise<WeeklyOverview | null> {
-    if (this.generatingReview) return null;
-    this.generatingReview = true;
-    try {
-      const overview = await this.weeklyOverview();
-      if (
-        overview.settings.enabled &&
-        overview.available &&
-        ["pending", "failed"].includes(overview.status)
-      ) {
-        await this.retryWeeklyReview();
-        return null;
-      }
-      return overview;
-    } finally {
-      this.generatingReview = false;
-    }
-  }
+  // Planner data
 
   async dashboard(): Promise<Dashboard> {
     this.assertOpen();
@@ -279,141 +158,8 @@ export class PlanningClient {
   }
 
   /** `month` is YYYY-MM. Read-only and never queued: offline, the stats are simply absent. */
-  async monthStats(month: string): Promise<MonthStats> {
-    this.assertOpen();
+  monthStats(month: string): Promise<MonthStats> {
     return this.query("month_stats", { month });
-  }
-
-  /** Never queued: a preference must not be replayed later over a newer choice. */
-  async emailPreferences(): Promise<EmailPreferences> {
-    this.assertOpen();
-    return this.query("email_preferences");
-  }
-
-  async setEmailPreferences(
-    preferences: EmailPreferences,
-  ): Promise<EmailPreferences> {
-    this.assertOpen();
-    return this.query("set_email_preferences", { ...preferences });
-  }
-
-  /** Never queued, like every preference. */
-  private scheduleCall(
-    action: string,
-    args: Record<string, unknown> = {},
-  ): Promise<ScheduleState> {
-    this.assertOpen();
-    return this.request("planner_schedule", {
-      action,
-      args,
-      timezone: this.timezone,
-    });
-  }
-
-  /**
-   * Records a step of the owner's journey in their server-side history
-   * (planner_history). Best effort: never queued, never retried, never thrown;
-   * an older backend without planner_track simply records nothing.
-   */
-  track(event: JourneyEvent, detail: JourneyDetail = {}): void {
-    if (this.disposed || !this.accountKey) return;
-    // Mirrored to optional analytics only after cookie consent (else a no-op).
-    capture(event, detail);
-    void this.cloud.execute("planner_track", { event, detail }).catch(() => {});
-  }
-
-  schedule(): Promise<ScheduleState> {
-    return this.scheduleCall("schedule");
-  }
-
-  /** `minute` after local midnight, or null to clear the focus time. */
-  setFocusTime(
-    minute: number | null,
-    weekdaysOnly: boolean,
-  ): Promise<ScheduleState> {
-    return this.scheduleCall("set_focus_time", { minute, weekdaysOnly });
-  }
-
-  savePushSubscription(subscription: {
-    endpoint: string;
-    p256dh: string;
-    auth: string;
-  }): Promise<ScheduleState> {
-    return this.scheduleCall("save_push", subscription);
-  }
-
-  removePushSubscription(endpoint: string): Promise<ScheduleState> {
-    return this.scheduleCall("remove_push", { endpoint });
-  }
-
-  async weeklyOverview(): Promise<WeeklyOverview> {
-    this.assertOpen();
-    return this.query("weekly_overview");
-  }
-
-  /** Never queued, like every preference. */
-  async setCheckInPlan(plan: CheckInPlan): Promise<WeeklyOverview> {
-    this.assertOpen();
-    return this.query("set_check_in_plan", { ...plan });
-  }
-
-  /** One-way: the server refuses to turn weekly reviews off. */
-  async enableWeeklyAi(): Promise<WeeklyOverview> {
-    this.assertOpen();
-    return this.query("set_weekly_ai_enabled", {
-      enabled: true,
-      consentVersion: WEEKLY_AI_VERSION,
-    });
-  }
-
-  /**
-   * Proposals for `day` derived from the day before. One paid request per
-   * target, day and source-plan version; failures fall back to no proposals.
-   */
-  suggestTasks(
-    target: SuggestionTarget,
-    day: string,
-    sourceVersion = "",
-  ): Promise<TaskSuggestion[]> {
-    this.assertOpen();
-    const key = `${day}:${sourceVersion}`;
-    const cached = this.suggestions.get(target);
-    if (cached?.key === key) return cached.result;
-    // Reloads reuse the last answer so they never spend the daily allowance.
-    const storageKey = `prune:suggestions:v1:${this.accountKey}:${target}`;
-    try {
-      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-      if (stored?.key === key && Array.isArray(stored.suggestions)) {
-        const result = Promise.resolve(stored.suggestions as TaskSuggestion[]);
-        this.suggestions.set(target, { key, result });
-        return result;
-      }
-    } catch {
-      /* Without storage, fall back to one request per page. */
-    }
-    const result = this.request<{ day: string; suggestions: TaskSuggestion[] }>(
-      "suggest_tasks",
-      { timezone: this.timezone, target },
-    )
-      .then((value) => {
-        if (value.day !== day) return [];
-        try {
-          localStorage.setItem(
-            storageKey,
-            JSON.stringify({ key, suggestions: value.suggestions }),
-          );
-        } catch {
-          /* Caching is best-effort. */
-        }
-        return value.suggestions;
-      })
-      .catch(() => []);
-    this.suggestions.set(target, { key, result });
-    return result;
-  }
-
-  private async retryWeeklyReview(): Promise<void> {
-    await this.request("generate_weekly_review", { timezone: this.timezone });
   }
 
   create(
@@ -450,5 +196,228 @@ export class PlanningClient {
 
   complete(id: string): Promise<Task> {
     return this.mutate("complete_task", { id });
+  }
+
+  // Preferences: never queued, so a choice is never replayed over a newer one.
+
+  emailPreferences(): Promise<EmailPreferences> {
+    return this.query("email_preferences");
+  }
+
+  setEmailPreferences(
+    preferences: EmailPreferences,
+  ): Promise<EmailPreferences> {
+    return this.query("set_email_preferences", { ...preferences });
+  }
+
+  schedule(): Promise<ScheduleState> {
+    return this.scheduleCall("schedule");
+  }
+
+  /** `minute` after local midnight, or null to clear the focus time. */
+  setFocusTime(
+    minute: number | null,
+    weekdaysOnly: boolean,
+  ): Promise<ScheduleState> {
+    return this.scheduleCall("set_focus_time", { minute, weekdaysOnly });
+  }
+
+  savePushSubscription(
+    subscription: SavedSubscription,
+  ): Promise<ScheduleState> {
+    return this.scheduleCall("save_push", { ...subscription });
+  }
+
+  removePushSubscription(endpoint: string): Promise<ScheduleState> {
+    return this.scheduleCall("remove_push", { endpoint });
+  }
+
+  // Weekly check-in
+
+  weeklyOverview(): Promise<WeeklyOverview> {
+    return this.query("weekly_overview");
+  }
+
+  setCheckInPlan(plan: CheckInPlan): Promise<WeeklyOverview> {
+    return this.query("set_check_in_plan", { ...plan });
+  }
+
+  /** One-way: the server refuses to turn weekly reviews off. */
+  enableWeeklyAi(): Promise<WeeklyOverview> {
+    return this.query("set_weekly_ai_enabled", {
+      enabled: true,
+      consentVersion: WEEKLY_AI_VERSION,
+    });
+  }
+
+  /** Returns the overview it read, unless it requested a review (then it is stale). */
+  async generateIfDue(): Promise<WeeklyOverview | null> {
+    if (this.generatingReview) return null;
+    this.generatingReview = true;
+    try {
+      const overview = await this.weeklyOverview();
+      if (
+        overview.settings.enabled &&
+        overview.available &&
+        REVIEW_DUE.includes(overview.status)
+      ) {
+        await this.request("generate_weekly_review", {
+          timezone: this.timezone,
+        });
+        return null;
+      }
+      return overview;
+    } finally {
+      this.generatingReview = false;
+    }
+  }
+
+  /**
+   * Proposals for `day` derived from the day before. One paid request per
+   * target, day and source-plan version; failures fall back to no proposals.
+   */
+  suggestTasks(
+    target: SuggestionTarget,
+    day: string,
+    sourceVersion = "",
+  ): Promise<TaskSuggestion[]> {
+    this.assertOpen();
+    const key = `${day}:${sourceVersion}`;
+    const cached = this.suggestions.find(target, key);
+    if (cached) return cached;
+    const result = this.request<{ day: string; suggestions: TaskSuggestion[] }>(
+      "suggest_tasks",
+      { timezone: this.timezone, target },
+    )
+      .then((value) => {
+        if (value.day !== day) return [];
+        this.suggestions.store(target, key, value.suggestions);
+        return value.suggestions;
+      })
+      .catch((): TaskSuggestion[] => []);
+    return this.suggestions.remember(target, key, result);
+  }
+
+  /**
+   * Records a step of the owner's journey in their server-side history
+   * (planner_history). Best effort: never queued, never retried, never thrown;
+   * an older backend without planner_track simply records nothing.
+   */
+  track(event: JourneyEvent, detail: EventProperties = {}): void {
+    if (this.disposed || !this.accountKey) return;
+    // Mirrored to optional analytics only after cookie consent (else a no-op).
+    analytics.capture(event, detail);
+    void this.cloud.execute("planner_track", { event, detail }).catch(() => {});
+  }
+
+  // Internals
+
+  private assertOpen(): void {
+    if (this.disposed) throw new Error(MESSAGES.clientClosed);
+  }
+
+  private prepareQueue(accountKey: string): void {
+    if (this.account) {
+      if (accountKey !== this.accountKey)
+        throw new Error(MESSAGES.accountChanged);
+      return;
+    }
+    this.account = new AccountQueue(
+      accountKey,
+      this.timezone,
+      (command, args) => this.request(command, args),
+      () => this.onQueueChange(),
+    );
+    this.accountKey = accountKey;
+  }
+
+  private async loadAccount(status: AuthStatus): Promise<AuthStatus> {
+    if (!status.accountKey) return status;
+    // Only a verified identity may unlock its cached planner during a network outage.
+    this.prepareQueue(status.accountKey);
+    let account: { isDeleted: boolean };
+    try {
+      account = await this.query("account_status");
+    } catch (error) {
+      if (CloudError.codeOf(error) === "network" && this.cachedDashboard())
+        return status;
+      throw error;
+    }
+    if (account.isDeleted) {
+      await this.queue?.stop();
+      await this.request("sign_out");
+      throw new Error(MESSAGES.accountDeleted);
+    }
+    return status;
+  }
+
+  /** Failed online account operations may resume the outbox; confirmed deletion may not. */
+  private async withQueueStopped(work: () => Promise<unknown>): Promise<void> {
+    await this.queue?.stop();
+    try {
+      await work();
+    } catch (error) {
+      if (!this.disposed) this.queue?.resume();
+      throw error;
+    }
+  }
+
+  private async request<T>(
+    command: string,
+    args: Record<string, unknown> = {},
+  ): Promise<T> {
+    this.assertOpen();
+    try {
+      const result = await this.cloud.execute<T>(command, args);
+      this.assertOpen();
+      return result;
+    } catch (error) {
+      if (this.disposed) throw error;
+      const code = CloudError.codeOf(error);
+      if (code === "account_deleted") {
+        await this.cloud.execute("sign_out");
+        window.location.reload();
+      }
+      // Never keep old account data visible after credentials or identity change.
+      if (this.accountKey && IDENTITY_LOST.includes(code))
+        window.location.reload();
+      throw error;
+    }
+  }
+
+  private async query<Action extends keyof PlannerQueries>(
+    action: Action,
+    args: Record<string, unknown> = {},
+  ): Promise<PlannerQueries[Action]> {
+    this.assertOpen();
+    return this.request("planner_call", {
+      action,
+      args: {
+        ...args,
+        ...(this.accountKey ? { _accountKey: this.accountKey } : {}),
+      },
+      timezone: this.timezone,
+    });
+  }
+
+  private async scheduleCall(
+    action: string,
+    args: Record<string, unknown> = {},
+  ): Promise<ScheduleState> {
+    this.assertOpen();
+    return this.request("planner_schedule", {
+      action,
+      args,
+      timezone: this.timezone,
+    });
+  }
+
+  private async mutate<Action extends TaskAction>(
+    action: Action,
+    args: TaskArguments[Action],
+  ): Promise<Task> {
+    this.assertOpen();
+    if (!this.queue) throw new Error(MESSAGES.signInFirst);
+    return this.queue.enqueue(action, args, this.timezone);
   }
 }

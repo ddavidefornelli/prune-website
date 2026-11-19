@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PlanningClient } from "../../src/planner/api.ts";
-import { applyCommand } from "../../src/planner/task-projection.ts";
+import { PlannerSnapshot } from "../../src/planner/planner-snapshot.ts";
+
+const applyCommand = (data, command, result) =>
+  PlannerSnapshot.own(data).apply(command, result);
 import { dashboard, persistence } from "../helpers/queue.mjs";
 import { environment } from "../helpers/reactivity.mjs";
 

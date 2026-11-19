@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { publicConfig } from "../src/planner/config.ts";
-import { httpError } from "../src/planner/http-error.ts";
-import { hasPrivacyAcknowledgement, acknowledgePrivacy } from "../src/planner/privacy-state.ts";
+import { CloudError } from "../src/planner/cloud-error.ts";
+import { PublicConfig } from "../src/planner/config.ts";
+import { PrivacyNotice } from "../src/planner/privacy-state.ts";
 import { LocalQueue } from "../src/planner/local-queue.ts";
+
+const publicConfig = (url, key) => {
+  const { url: origin, publicKey } = PublicConfig.parse(url, key);
+  return { url: origin, publicKey };
+};
+const httpError = CloudError.fromResponse;
 import { persistence, dashboard } from "./helpers/queue.mjs";
 
 const key = "sb_publishable_fixture";
@@ -34,18 +40,22 @@ test("auth expiry and AI cooldowns remain distinct from planner validation", () 
   assert.equal(httpError(401, {}).code, "unauthorized");
   assert.equal(httpError(400, { code: "PT401", message: "Sign in" }).code, "unauthorized");
   assert.equal(httpError(429, {}).code, "rate_limited");
-  const error = httpError(429, { error: { code: "rate_limited", message: "raw provider text" } }, true, true);
-  assert.match(error.message, /10 minutes/);
+  const error = httpError(429, { error: { code: "rate_limited", message: "raw provider text" } }, true);
+  assert.equal(error.code, "rate_limited");
+  assert.match(error.message, /retry allowance/);
   assert.ok(!error.message.includes("raw provider"));
 });
 
 test("notice acknowledgement is versioned, initially absent, and storage failure cannot be ignored", () => {
   const { storage, values } = persistence();
-  assert.equal(hasPrivacyAcknowledgement(storage), false);
-  acknowledgePrivacy(storage);
-  assert.equal(hasPrivacyAcknowledgement(storage), true);
+  const notice = new PrivacyNotice(storage);
+  assert.equal(notice.isAcknowledged(), false);
+  notice.acknowledge();
+  assert.equal(notice.isAcknowledged(), true);
   assert.ok([...values.values()].every((raw) => !raw.includes("email") && !raw.includes("enabled")));
-  assert.throws(() => acknowledgePrivacy({ setItem() { throw new Error("Storage denied"); } }), /Storage denied/);
+  const denied = new PrivacyNotice({ getItem: () => null, setItem() { throw new Error("Storage denied"); } });
+  assert.throws(() => denied.acknowledge(), /Storage denied/);
+  assert.throws(() => denied.require(), /Could not save your terms acceptance/);
 });
 
 test("cross-tab storage refresh reads without writing or starting an empty sync loop", async () => {
@@ -54,7 +64,13 @@ test("cross-tab storage refresh reads without writing or starting an empty sync 
   let writes = 0, calls = 0, changes = 0;
   const save = storage.setItem;
   storage.setItem = (...args) => { writes++; save(...args); };
-  const queue = new LocalQueue("alice", storage, lock, async () => { calls++; throw new Error("Unexpected send"); }, async () => { calls++; return dashboard(); });
+  const queue = new LocalQueue({
+    key: "alice",
+    storage,
+    lock,
+    send: async () => { calls++; throw new Error("Unexpected send"); },
+    fetchDashboard: async () => { calls++; return dashboard(); },
+  });
   queue.onChange = () => { changes++; };
   await queue.refreshFromStorage();
   await queue.refreshFromStorage();

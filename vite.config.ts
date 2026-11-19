@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import solid from "vite-plugin-solid";
-import { publicConfig } from "./src/planner/config.ts";
+import { PublicConfig } from "./src/planner/config.ts";
 import { productionCsp } from "./scripts/csp-plugin.ts";
 
 export default defineConfig(({ mode, command }) => {
@@ -9,7 +9,7 @@ export default defineConfig(({ mode, command }) => {
   // must never silently ship a broken signup or a privileged credential.
   const config =
     command === "build" || env.VITE_SUPABASE_URL || env.VITE_SUPABASE_ANON_KEY
-      ? publicConfig(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+      ? PublicConfig.parse(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
       : null;
   // Dev stays relaxed for Vite's injected styles and HMR WebSocket. Build and
   // preview use the same hash-locked policy, derived from the final artifact.

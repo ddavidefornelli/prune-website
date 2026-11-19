@@ -1,11 +1,11 @@
 import { Show, untrack } from "solid-js";
-import type { WeeklyReviewState } from "../../reviews/create-weekly-review";
+import type { WeeklyReviewState } from "../../reviews/weekly-review-state";
 import { WeeklyReview } from "../../reviews/WeeklyReview";
 import { CheckInMeter } from "../../reviews/CheckInMeter";
-import { streakFor } from "../streak";
+import { Streak } from "../streak";
 import { StreakCounter } from "./StreakCounter";
 import type { PlanningClient } from "../api";
-import type { PlannerState } from "../create-planner";
+import type { PlannerState } from "../planner-state";
 import type { ScheduleState } from "../types";
 import { ActivityCalendar } from "./ActivityCalendar";
 import { FocusTimeLine } from "./FocusTimeLine";
@@ -37,7 +37,7 @@ export function Overview(props: {
         {/* The streak and the check-in, stacked on phones, side by side on laptops. */}
         <div class="today-panels">
           <Show when={planner.data()} keyed>
-            {(data) => <StreakCounter streak={streakFor(data)} />}
+            {(data) => <StreakCounter streak={Streak.of(data)} />}
           </Show>
           <CheckInMeter
             review={props.review}

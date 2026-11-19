@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { buildReminderEmail } from "../server/reminders/email.ts";
-import { sendWithBrevo } from "../server/reminders/brevo.ts";
-import { createReminderHandler, createUnsubscribeHandler } from "../server/reminders/handler.ts";
+import { ReminderMessages } from "../server/reminders/email.ts";
+import { BrevoMailer } from "../server/reminders/brevo.ts";
+import { ReminderJob, UnsubscribeEndpoint } from "../server/reminders/handler.ts";
+
+const buildReminderEmail = (reminder, site) => new ReminderMessages(site).email(reminder);
+const sendWithBrevo = (email, config) => new BrevoMailer(config).send(email);
+const createReminderHandler = (deps) => new ReminderJob(deps).handle;
+const createUnsubscribeHandler = (deps) => new UnsubscribeEndpoint(deps).handle;
 
 const owner = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";

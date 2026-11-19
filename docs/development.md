@@ -1,10 +1,10 @@
 # prune web app: development and operations
 
-A mobile-first daily planner and focus timer. Signed-out visitors land on the landing page at `/`, whose **Get started** button opens `/login`, where they continue with Google or an emailed code; a new account then gets its first-task prompt and a short tour. `/download` starts the Mac download.
+A mobile-first daily planner and focus timer. Signed-out visitors land on the landing page at `/`, whose **Get started** button opens `/login`, where they continue with Google or an emailed code; a new account then gets its first-task prompt and a short tour.
 
 **Launch status:** see [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md) for the security review, test results and remaining hosted launch gates. Passing local tests is not production approval.
 
-An idiomatic **SolidJS + TypeScript** application using reactive components, signals/stores and lifecycle-managed effects. The planner's timing/statistics rules and durable local outbox share the sibling Mac application's protocol in `../pro`. This is a browser client for the **same Supabase backend**, not a local demo or a new database. There is one Solid render root; screens do not manually build or replace DOM subtrees. No Tauri runtime or sibling checkout is required to build this website.
+An idiomatic **SolidJS + TypeScript** application using reactive components, signals/stores and lifecycle-managed effects. The durable local outbox speaks the planner's RPC protocol on the shared Supabase backend (whose base schema lives in `../pro`). This is a browser client for that backend, not a local demo or a new database. There is one Solid render root; screens do not manually build or replace DOM subtrees. No sibling checkout is required to build this website. How the code is organised (classes, constants, what was removed) is described in [the code structure notes](refactoring.md).
 
 ## Configure and run
 
@@ -13,7 +13,7 @@ Requires Node.js 22.12+.
 ```sh
 npm ci
 cp .env.example .env.local
-# Fill in the two public values from the SAME Supabase project used by the Mac app.
+# Fill in the two public values from the prune Supabase project.
 npm run dev
 ```
 
@@ -31,28 +31,28 @@ Earlier builds had a guest planner (`prune:guest:v1`), an onboarding survey (`pr
 ## Features
 
 - Today and Tomorrow: up to five equal tasks per day with editable titles and estimates; start any task in any order. No main-task designation, crowns, or completion animation. Tomorrow is available immediately. Desktop resource metadata is preserved, but the current web UI does not display or edit resources.
-- Focus: one active task, timestamp-based timer, pause/resume, written stop reasons, completion, and an in-memory-only notes scratchpad. Pause before switching views, just like the Mac app.
-- Overview: completion calendar, the automatic weekly check-in (trends, next week's plan, AI note) and saved check-in history. Manual current-week previews remain Mac-only.
+- Focus: one active task, timestamp-based timer, pause/resume, written stop reasons, completion, and an in-memory-only notes scratchpad. Pause before switching views.
+- Overview: completion calendar, the automatic weekly check-in (trends, next week's plan, AI note) and saved check-in history.
 - Profile: all-time/recent stats, streaks, AI preferences, sign-out and confirmed account deletion (soft-delete flag, followed by manual removal after 30 days).
 - Durable local snapshot/outbox: optimistic local saves, ordered automatic retries, idempotent requests, cross-device conflict handling and multi-tab coordination with Web Locks. A failed local save is not reported as success. Only definitively rejected changes can be discarded.
 - Phone-first layouts: touch-sized controls, 16px form inputs, stacked focus screen, bounded dialogs, safe-area padding, and natural vertical scrolling when the viewport or software keyboard is short.
 
 ### Browser differences and limitations
 
-- **Resources are retired.** The Mac app that attached links and file paths to tasks is gone, and `20261123000100_drop_mac_only_tables.sql` dropped `planner_resources`. Task API responses still carry `resources: []` so saved browser snapshots stay valid, and old `add_task_link`/`remove_task_resource` commands in an offline queue replay as no-ops.
+- **The Mac app is retired.** `20261123000100_drop_mac_only_tables.sql` dropped `planner_resources` and the preview tables. Task API responses may still carry `resources: []` and `isPriority`; the browser ignores them. Retired commands still sitting in an old offline queue (`prioritize_task`, `pause_task`, `add_task_link`, `remove_task_resource`) replay without changing the local plan, and the server settles them. The `/download` page and installer are gone.
 - **Browser sessions are not Keychain sessions.** The Supabase browser client persists access/refresh tokens in a separate localStorage entry, handles token refresh, and coordinates auth across tabs. Tokens never enter the planner snapshot/outbox. This is JavaScript-accessible storage, not HttpOnly cookies; use a trusted device/browser profile. A server-mediated cookie session would be a separate architecture change.
-- Sign-out is local to this browser session, not global across the Mac app. It clears browser credentials, signs out other web tabs, and retains that account's pending planner changes. Remote token revocation is best-effort when offline; already-issued access tokens can remain valid until expiry.
+- Sign-out is local to this browser session. It clears browser credentials, signs out other web tabs, and retains that account's pending planner changes. Remote token revocation is best-effort when offline; already-issued access tokens can remain valid until expiry.
 - Sign-in/session verification requires Auth connectivity on startup. After Auth verifies the immutable identity, a planner-only network outage can restore that account's existing cache; unauthorized responses and confirmed deletion never unlock it. Cached planner actions then work through connection losses. This also means a device disconnected from planner services cannot learn about a remote deletion until it reconnects. The cache is not a full account-history archive. Clearing site data can permanently lose unsynced work.
 - The timer uses timestamps, not interval counts, so background throttling/reload does not reset elapsed focus time. Review scheduling catches up on focus/visibility/next launch; no browser task runs after all tabs are closed.
 - HTTPS and a current browser with Web Locks support are required (localhost is allowed for development). Unencrypted site storage is shared by tabs on this origin but isolated by Supabase project and immutable user ID.
 
 ## Connect the existing backend
 
-Sign-in on this website is Supabase Auth with Google or an emailed code. Apply `supabase/migrations/20261105000200_drop_clerk_bridge.sql` to remove the unused Clerk bridge (`planner_clerk_identities` and `planner_call_as`). It refuses to run while any Clerk identity mapping exists: check `select count(*) from public.planner_clerk_identities;` first, and delete those rows only once you are sure. The accounts themselves stay in `auth.users`.
+Sign-in on this website is Supabase Auth with Google or an emailed code. Clerk is not used; `20261105000200_drop_clerk_bridge.sql` removed its bridge and stays only as migration history.
 
-Apply `supabase/migrations/20261025000100_equal_tasks.sql` after the previous shared and website migrations before deploying this client. It removes the server's most-important-task-first restriction while preserving ownership, today's-task validation, the single-active-task rule, and queue safeguards. This affects all clients on the shared backend. Legacy priority fields/actions remain compatible with existing Mac clients and saved outbox commands; the web UI no longer uses them.
+Apply `supabase/migrations/20261025000100_equal_tasks.sql` after the previous shared and website migrations before deploying this client. It removes the server's most-important-task-first restriction while preserving ownership, today's-task validation, the single-active-task rule, and queue safeguards. This affects all clients on the shared backend. The web UI no longer uses task priority.
 
-Do **not** reset the Mac app's database or create a parallel account store. Point both clients at the same project. The web transport calls the existing endpoints:
+Do **not** reset the database or create a parallel account store. The web transport calls the existing endpoints:
 
 ```text
 /auth/v1/user, /token, /logout, /settings
@@ -122,7 +122,7 @@ Setup, once (after the reminder emails above):
 
 ### Account deletion
 
-Apply `supabase/migrations/20261024000200_soft_delete_accounts.sql` after the shared backend migrations and this repo's automatic-weekly-reviews migration **before deploying this client**. It adds `planner_accounts."isDeleted"` (default `false`) and `deleted_at`. Deletion is authenticated, immediate, idempotent and never queued offline. It disables weekly AI and blocks planner RPCs/direct planner-data reads across web and Mac clients. Auth identity and cloud data remain until manual removal; signing in again does not reactivate the account. Other devices may retain offline caches.
+Apply `supabase/migrations/20261024000200_soft_delete_accounts.sql` after the shared backend migrations and this repo's automatic-weekly-reviews migration **before deploying this client**. It adds `planner_accounts."isDeleted"` (default `false`) and `deleted_at`. Deletion is authenticated, immediate, idempotent and never queued offline. It disables weekly AI and blocks planner RPCs/direct planner-data reads. Auth identity and cloud data remain until manual removal; signing in again does not reactivate the account. Other devices may retain offline caches.
 
 After at least 30 days, list accounts ready for manual removal in the Supabase SQL editor:
 
@@ -133,7 +133,7 @@ where "isDeleted" and deleted_at <= now() - interval '30 days'
 order by deleted_at;
 ```
 
-Review this list and permanently delete the corresponding **Auth users** via Supabase's administrative tools; deleting only `planner_accounts` does not remove all user data and may allow reprovisioning. No purge scheduler or automatic hard deletion is installed. Keep this migration in the shared backend's deployment history too so subsequent Mac/backend deployments preserve the guard.
+Review this list and permanently delete the corresponding **Auth users** via Supabase's administrative tools; deleting only `planner_accounts` does not remove all user data and may allow reprovisioning. No purge scheduler or automatic hard deletion is installed. Keep this migration in the shared backend's deployment history too so later backend deployments preserve the guard.
 
 ### Email sign-in
 
@@ -145,15 +145,15 @@ In the Supabase dashboard, enable **Authentication → Providers → Google** wi
 
 Sign-in uses `sign_in_with_google` (PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Supabase links a Google sign-in to an existing account with the same verified email, so accounts created earlier with email codes keep their data when they use the matching Google account.
 
-The website no longer requests email codes. Leave the Supabase email provider enabled while the Mac app signs in with email codes; disabling it there would lock Mac users out. Unconfirmed email-only users that never signed in can be listed in **Authentication → Users** and removed by hand if you want a clean list.
+Keep the Supabase email provider enabled: the login page signs in with emailed codes. Unconfirmed email-only users that never signed in can be listed in **Authentication → Users** and removed by hand if you want a clean list.
 
 ### Weekly AI CORS
 
-The existing Edge Function's `ALLOWED_ORIGINS` must include the exact website origin. The currently reviewed backend source and hosted preflight allow `https://www.prune.win`; do not assume a custom domain or preview origin is also allowed. Setting this secret **replaces** the defaults, so retain the Mac and required development origins:
+The Edge Functions' `ALLOWED_ORIGINS` must include the exact website origin; without it they allow only `https://www.prune.win`. Do not assume a custom domain or preview origin is also allowed. Setting this secret **replaces** the default, so list every origin you need (`EXTRA_ALLOWED_ORIGINS` adds to it instead):
 
 ```sh
 # Run from the linked backend project in ../pro, replacing YOUR_DOMAIN.
-npx supabase secrets set ALLOWED_ORIGINS='tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:1420,http://127.0.0.1:1420,http://127.0.0.1:5173,https://YOUR_DOMAIN'
+npx supabase secrets set ALLOWED_ORIGINS='http://127.0.0.1:5173,https://YOUR_DOMAIN'
 ```
 
 Use explicit production/preview origins rather than `*`. CORS is not an authentication or abuse defense; existing Auth, consent, RLS and server quotas still apply. AI failure does not block planner/timer operations.
@@ -165,11 +165,9 @@ npm run build
 npm run preview
 ```
 
-On Vercel, add the two `VITE_SUPABASE_*` variables to the relevant deployment environments. `vercel.json` selects the **Other** framework and `npm run build:vercel`, which builds `dist/` and packages the exact files and generated HTTP headers into `.vercel/output/` using the [Build Output API](https://vercel.com/docs/build-output-api). Clear any old dashboard Build Command/Output Directory overrides; do **not** publish only `dist/` on Vercel and discard the generated routing/header configuration. `/download` and `/download/` are explicitly preserved. Rebuild/redeploy after changing backend configuration; custom HTTPS Supabase domains work without a wildcard or a manual CSP edit.
+On Vercel, add the two `VITE_SUPABASE_*` variables to the relevant deployment environments. `vercel.json` selects the **Other** framework and `npm run build:vercel`, which builds `dist/` and packages the exact files and generated HTTP headers into `.vercel/output/` using the [Build Output API](https://vercel.com/docs/build-output-api). Clear any old dashboard Build Command/Output Directory overrides; do **not** publish only `dist/` on Vercel and discard the generated routing/header configuration. `/login` and `/login/` are rewritten to the app. Rebuild/redeploy after changing backend configuration; custom HTTPS Supabase domains work without a wildcard or a manual CSP edit.
 
-On another static host, publish `dist/`, install the headers from `dist/security-headers.json` as real HTTP response headers, disable HTML caching (`Cache-Control: no-store`), and configure the download-route fallback. The JSON file is deployment metadata, not something the browser applies automatically. Deploy HTML, assets and headers atomically; never let a CDN rewrite JavaScript/CSS after integrity hashes are generated. Built artifacts require an HTTPS backend (use `npm run dev` for an HTTP local Supabase instance).
-
-The Mac installer remains `public/prune.dmg`; replace it when shipping a newer installer. The header downloads it directly so installing does not navigate away from an active planner.
+On another static host, publish `dist/`, install the headers from `dist/security-headers.json` as real HTTP response headers, disable HTML caching (`Cache-Control: no-store`), and configure the `/login` fallback. The JSON file is deployment metadata, not something the browser applies automatically. Deploy HTML, assets and headers atomically; never let a CDN rewrite JavaScript/CSS after integrity hashes are generated. Built artifacts require an HTTPS backend (use `npm run dev` for an HTTP local Supabase instance).
 
 ### Publish and verify the security fix on Vercel
 
@@ -199,7 +197,7 @@ npx vercel link &&
   npm run check:production -- --url https://www.prune.win --website-only
 ```
 
-Confirm the domain points at this new deployment. The last command must pass on `/`, `/download`, `/download/` and `/index.html`. Do not publish `dist/` alone or manually copy a CSP hash from a different build. Then run the full release checks (including `--require-invite-only` for the closed beta) and complete the manual backend/privacy gates in [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md).
+Confirm the domain points at this new deployment. The last command must pass on `/`, `/login`, `/login/` and `/index.html`. Do not publish `dist/` alone or manually copy a CSP hash from a different build. Then run the full release checks (including `--require-invite-only` for the closed beta) and complete the manual backend/privacy gates in [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md).
 
 ### Content Security Policy (CSP)
 
@@ -217,7 +215,7 @@ The Vite plugin in `scripts/csp-plugin.ts` hashes the finished bundle, adds inte
 
 `npm run preview` reads the **built artifact's headers**, not newly changed environment values. On HTTP loopback only, it omits `upgrade-insecure-requests` so WebKit does not upgrade local assets to a nonexistent TLS listener; deployed HTTPS headers retain it. `npm run dev` deliberately does not enforce CSP because Vite HMR requires injected styles and a WebSocket. Browser DevTools shows CSP violations; adding an integration requires policy review, not adding `*`, `unsafe-inline` or `unsafe-eval`.
 
-After deployment, run `npm run check:production` with the matching public configuration. It verifies the generated hosted policy semantically (directive/source ordering and whitespace do not matter), meta/header agreement and actual deployed JavaScript/CSS integrity on `/`, `/download`, `/download/` and `/index.html`. No reporting collector is configured, so CSP violation data is not sent to a third party.
+After deployment, run `npm run check:production` with the matching public configuration. It verifies the generated hosted policy semantically (directive/source ordering and whitespace do not matter), meta/header agreement and actual deployed JavaScript/CSS integrity on `/`, `/login`, `/login/` and `/index.html`. No reporting collector is configured, so CSP violation data is not sent to a third party.
 
 **Limits:** hash-approved JavaScript (including dependencies) can still read browser tokens and use permitted API endpoints. A compromised build/hosting account can replace both code and its policy; CSP is not protection against that. Trusted Types enforcement is not enabled: Solid's template runtime uses HTML sinks and needs a separately reviewed compatible integration, not a permissive default policy. HSTS subdomain/preload opt-in is also deliberately not assumed without auditing all subdomains. This is a hardened static-client policy, not a claim that the whole service is invulnerable.
 
@@ -227,13 +225,13 @@ After deployment, run `npm run check:production` with the matching public config
 
 Apply `supabase/migrations/20261024000100_automatic_weekly_reviews.sql` after the shared backend migrations before deploying this client. It enables reviews for newly provisioned planner accounts and preserves all existing account preferences (including disabled reviews). It affects all clients using this shared backend. Legacy backend `consent_*` fields remain protocol compatibility gates, not evidence of affirmative consent. Do not automatically enable existing disabled accounts from the browser.
 
-Then apply `supabase/migrations/20261103000100_weekly_reviews_always_on.sql` (after the soft-delete migration) before deploying this client, and keep it in the shared backend's deployment history too. It re-creates the `planner_call` guard so `set_weekly_ai_enabled` accepts only `enabled: true`: no client can turn weekly reviews, or the task suggestions that share `ai_enabled`, off any more. That includes the Mac app, whose toggle and notice need updating to match. Accounts that were already off stay off until they choose **Turn on weekly reviews** in Overview. Profile has no review settings. Account deletion still disables AI. To honour an objection, the operator can still run `update public.planner_accounts set ai_enabled = false, ai_revision = ai_revision + 1 where user_id = '…'` directly.
+Then apply `supabase/migrations/20261103000100_weekly_reviews_always_on.sql` (after the soft-delete migration) before deploying this client, and keep it in the shared backend's deployment history too. It re-creates the `planner_call` guard so `set_weekly_ai_enabled` accepts only `enabled: true`: no client can turn weekly reviews, or the task suggestions that share `ai_enabled`, off any more. Accounts that were already off stay off until they choose **Turn on weekly reviews** in Overview. Profile has no review settings. Account deletion still disables AI. To honour an objection, the operator can still run `update public.planner_accounts set ai_enabled = false, ai_revision = ai_revision + 1 where user_id = '…'` directly.
 
 Then apply `supabase/migrations/20261106000100_month_stats.sql` before deploying this client, and keep it in the shared backend's deployment history too. It re-creates the same `planner_call` guard with one extra read-only action, `month_stats`, which the Overview calendar uses to show the share of a month's tasks that were finished and the time focused. It reads only the caller's own `planner_tasks` rows through a private `planner_month_stats` function; nothing new is stored or sent anywhere. Until it is applied the call fails and Overview simply leaves those stats out.
 
 ### AI reviews every 10 completed tasks
 
-Reviews no longer run on Sundays. A review is due each time an owner completes 10 tasks that no earlier review covered (oldest completion first, counting from `ai_controls.task_reviews_since`, set to the Monday of the week the migration runs). It covers those 10 tasks and the written stop reasons on them; `planner_review_tasks` records which tasks each review covered so every task counts once. Saved reports keep their shape: `weekStart`/`weekEnd` are the batch's first and last dates. `weekly_overview` gains `progress: { completed, target }`, which Overview shows as 10 steps; without it (an older backend) the client falls back to the Sunday countdown. Mac clients use the same loader and Edge Function, so they get batch reviews too, though their UI still shows a countdown until updated.
+Reviews no longer run on Sundays. A review is due each time an owner completes 10 tasks that no earlier review covered (oldest completion first, counting from `ai_controls.task_reviews_since`, set to the Monday of the week the migration runs). It covers those 10 tasks and the written stop reasons on them; `planner_review_tasks` records which tasks each review covered so every task counts once. Saved reports keep their shape: `weekStart`/`weekEnd` are the batch's first and last dates. `weekly_overview` gains `progress: { completed, target }`, which Overview shows as 10 steps; without it (an older backend) the client falls back to the Sunday countdown. 
 
 ### Weekly check-in
 
@@ -247,7 +245,7 @@ Reviews no longer run on Sundays. A review is due each time an owner completes 1
 
 **Since `20261118000100_first_check_in_after_three_days.sql`:** the first check-in is due three days after the account started (S+3, with S the start day in the owner's time zone), then every seven days (S+10, S+17, …); the weekday in `checkIn.day` is the weekday of S+3. Before S+3 the window counts as covered, so nothing is sent and `week.nextUpdate` is S+3. Overlap skipping is unchanged, so accounts moving off the old weekday never re-send days. Apply it after `20261117000100`.
 
-**Five tasks a day (`20261119000100_five_tasks_per_day.sql`):** the shared backend kept three slots per day (`planner_tasks_slot_check` and the slot search in `planner_execute`) after the website moved to five, so a fourth task was rejected on sync. This migration widens the check to 1–5 and patches only the slot range and its message in `planner_execute`, refusing to run if that function's text has changed. Mac clients that assume three slots should be checked before relying on days with more than three tasks.
+**Five tasks a day (`20261119000100_five_tasks_per_day.sql`):** the shared backend kept three slots per day (`planner_tasks_slot_check` and the slot search in `planner_execute`) after the website moved to five, so a fourth task was rejected on sync. This migration widens the check to 1–5 and patches only the slot range and its message in `planner_execute`, refusing to run if that function's text has changed. 
 
 **Deploy order:** apply the migration, redeploy `weekly-review`, then ship the client. An older client against the new backend falls back to the countdown it already had and simply ignores `checkIn`.
 
@@ -269,9 +267,9 @@ npm run test:unit
 npm run test:e2e
 ```
 
-Unit tests cover the durable queue, retry identities, ambiguous failures, storage failures, account isolation, timer projection, public-key validation, privacy records, HTTP error classification, profile statistics, onboarding and review timing. `test:reactivity` additionally runs real Solid browser reactivity under Node's `browser` export condition to check keyed reconciliation, memory-only notes, preference races, late responses and lifecycle cleanup. The active UI never renders Mac resource URLs; browser security tests verify that metadata stays inert. Playwright runs Chromium and WebKit, including real touch/mobile contexts, email-code sign-in/invalid codes, refresh/restoration, task/focus workflows, previews, conflicts, multi-tab sign-out and phone/landscape layouts.
+Unit tests cover the durable queue, retry identities, ambiguous failures, storage failures, account isolation, timer projection, public-key validation, privacy records, HTTP error classification, profile statistics, onboarding and review timing. `test:reactivity` additionally runs real Solid browser reactivity under Node's `browser` export condition to check keyed reconciliation, memory-only notes, preference races, late responses and lifecycle cleanup. Playwright runs Chromium and WebKit, including real touch/mobile contexts, email-code sign-in/invalid codes, refresh/restoration, task/focus workflows, previews, conflicts, multi-tab sign-out and phone/landscape layouts.
 
-Browser tests build production output into ignored `.playwright-dist/` (never overwriting production `dist/`) and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not reach Google, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify a real Google sign-in round trip, Mac↔web sync, timer conflicts, real review generation and sign-out against the actual hosted project.
+Browser tests build production output into ignored `.playwright-dist/` (never overwriting production `dist/`) and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not reach Google, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify a real Google sign-in round trip, multi-device sync, timer conflicts, real review generation and sign-out against the actual hosted project.
 
 ### Hosted release checks (non-destructive)
 
@@ -302,32 +300,29 @@ The checker does not prove authenticated account isolation or backend deployment
 
 ```text
 src/
-  App.tsx                       Error boundary and download/session route selection
+  App.tsx                       Error boundary; the unsubscribe page or the session
   index.tsx                     The single Solid render root and private analytics URLs
-  auth/                         Session restore, the landing page and the login page
-  components/                   Native dialog, privacy policy, download page and canvas
+  analytics.ts                  Analytics: optional PostHog, started only after consent
+  auth/                         SessionState, the landing page and the login page
+  components/                   Native dialog, privacy policy, unsubscribe page and preview
   planner/
     Planner.tsx                 Feature composition and navigation/onboarding state
-    create-planner.ts           Reactive dashboard, mutations, clock and lifecycle
+    planner-state.ts            PlannerState: reactive dashboard, mutations, clock, lifecycle
     components/                 Plans, task editor, estimate dial, focus, calendar and tour
-    api.ts                      Planner client: typed queries, mutations and account access
-    commands.ts                 Typed RPC results, task arguments and saved command format
-    browser.ts                  Supabase authentication and authenticated requests
-    api-fetch.ts                Bounded HTTP requests, cancellation and response limits
-    account-queue.ts            Browser locks, sync listeners and protocol negotiation
-    local-queue.ts              Versioned snapshots, atomic storage and ordered retries
-    task-projection.ts          Pure task mutation replay, including legacy saved commands
-    dashboard.ts                Shared task selection and timezone-aware day alignment
-    types.ts                    Shared API/domain contracts; no UI dependencies
-    constants.ts                UI bounds, estimate ranges, views and polling intervals
-    task-model.ts               Pure task-completion and tracked-time rules
-    onboarding.ts               Pure, account-scoped eligibility/storage key rules
-    starters.ts                 The three first-run starting ideas
-    config.ts                   Public-only backend configuration validation
-    privacy-state.ts            Versioned, device-local legal acknowledgement
-  profile/                      Profile components and pure calendar-based statistics
-  reviews/                      Independent AI state, reports and countdown
-  shared/                       Cross-runtime rules, API paths and browser lifecycle hooks
+    api.ts                      PlanningClient: typed queries, mutations and account access
+    browser.ts                  BrowserCloud: Supabase authentication and requests
+    api-fetch.ts                BoundedFetch: deadlines, cancellation and response limits
+    cloud-error.ts              CloudError: failure codes the outbox relies on
+    account-queue.ts            AccountQueue: locks, sync listeners, protocol negotiation
+    local-queue.ts              LocalQueue: versioned snapshots, atomic storage, retries
+    planner-snapshot.ts         PlannerSnapshot: command replay and day rollover
+    day-plan.ts                 DayPlan and TaskTimer: a day's load and one task's timer
+    completion-history.ts       CompletionHistory: streaks and totals in one pass
+    commands.ts / types.ts      The RPC contract and the plain records it exchanges
+    constants.ts / messages.ts  Planner bounds, rules and timings; shared error copy
+  profile/                      Profile components and ProfileStats
+  reviews/                      WeeklyReviewState, CheckInSummary, reports and countdown
+  shared/                       CalendarDay, Duration, storage keys, routes and time constants
   styles/                       Base component styles and mobile-first web layout
 server/
   http.ts                       Shared bounded reads and explicitly safe API errors
@@ -352,9 +347,9 @@ CI runs the same quality gates before testing and packaging. Supabase CLI, PGlit
 ### Component and data boundaries
 
 - Render with JSX and `Show`/`For`/`Switch`; use effects only for external effects, subscriptions and measurements. No manual `replaceChildren` rendering, nested render roots, unsafe HTML sinks or global DOM-based state synchronization.
-- `createPlanner` owns one session's reactive UI state. Store reconciliation preserves task identities, drafts and focused controls during background refresh. Components own local form drafts; focus notes remain memory-only and reset when the active task changes.
+- `PlannerState` owns one session's reactive UI state. Store reconciliation preserves task identities, drafts and focused controls during background refresh. Components own local form drafts; focus notes remain memory-only and reset when the active task changes.
 - Controllers, dialogs, the canvas and navigation/tour measurements register cleanup with their Solid owner. Session disposal also stops the outbox, auth refresh and browser subscriptions; late startup/read responses cannot initialize a disposed client.
-- `PlanningClient` coordinates account access, typed queries and task mutations; `LocalQueue` and the transport own their respective storage/network details. Persisted snapshot versions, storage keys, idempotency identities and the shared RPC contract are deliberately unchanged. Legacy queue projection branches must remain while saved commands or supported Mac clients can use them.
+- `PlanningClient` coordinates account access, typed queries and task mutations; `LocalQueue` and the transport own their respective storage/network details. Persisted snapshot versions, storage keys, idempotency identities and the shared RPC contract are deliberately unchanged.
 - Weekly AI state is independent of task mutation state. Preference writes invalidate older reads, and pending-review polling stops when its screen is hidden or its owner is disposed.
 - Backend/schema cleanup must consider **all** clients. See [the database review](database-review.md): no table or column was safe to drop, and no hosted schema or user data was changed.
 

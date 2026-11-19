@@ -1,77 +1,41 @@
-import type { Dashboard, Task } from "./types.ts";
+import { CloudError } from "./cloud-error.ts";
 import type { QueuedAction, TaskAction, TaskArguments } from "./commands.ts";
-import { alignDashboardDate } from "./dashboard.ts";
-import { errorCode, errorMessage } from "./errors.ts";
-import { applyCommand, project } from "./task-projection.ts";
-
-export const QUEUE_STORAGE_VERSION = 1;
-const INITIAL_RETRY_MS = 1000;
-const MAX_RETRY_MS = 60_000;
+import { QUEUE } from "./constants.ts";
+import { MESSAGES } from "./messages.ts";
+import { PlannerSnapshot } from "./planner-snapshot.ts";
+import type { Dashboard, Task, TaskStatus } from "./types.ts";
 
 interface SavedState {
-  version: typeof QUEUE_STORAGE_VERSION;
+  version: typeof QUEUE.storageVersion;
   base: Dashboard | null;
   savedAt: number;
   pending: QueuedAction[];
   blocked: string | null;
 }
+
 export interface QueueStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
+
 export type Lock = <T>(name: string, work: () => Promise<T>) => Promise<T>;
-const empty = (): SavedState => ({
-  version: QUEUE_STORAGE_VERSION,
-  base: null,
-  savedAt: 0,
-  pending: [],
-  blocked: null,
-});
-const message = (error: unknown): string =>
-  errorMessage(error, "Could not sync. Your changes remain on this device.");
-function validateAcknowledgement(command: QueuedAction, task: Task): void {
-  const expectedId =
-    command.action === "create_task" ? command.requestId : command.args.id;
-  if (
-    !task ||
-    typeof task !== "object" ||
-    task.id !== expectedId ||
-    typeof task.outcome !== "string" ||
-    typeof task.plannedFor !== "string" ||
-    typeof task.isPriority !== "boolean" ||
-    !Number.isSafeInteger(task.estimatedMinutes) ||
-    !Number.isSafeInteger(task.actualSeconds) ||
-    task.actualSeconds < 0 ||
-    !Number.isSafeInteger(task.createdAt) ||
-    !["planned", "active", "completed"].includes(task.status) ||
-    !(task.startedAt === null || Number.isSafeInteger(task.startedAt)) ||
-    !(task.completedOn === null || typeof task.completedOn === "string") ||
-    !Array.isArray(task.resources) ||
-    task.resources.some(
-      (resource) =>
-        !resource ||
-        typeof resource.id !== "string" ||
-        typeof resource.label !== "string" ||
-        typeof resource.target !== "string" ||
-        !["file", "link"].includes(resource.kind),
-    ) ||
-    (task.serverRevision !== undefined &&
-      task.serverRevision !== command.revision + 1)
-  ) {
-    // A successful HTTP status alone is not an acknowledgement. Keep the same
-    // request identity so an ambiguous/broken response can be retried safely.
-    throw new Error(
-      "The server returned an incomplete acknowledgement. Your changes remain on this device; retry syncing.",
-    );
-  }
+
+export interface LocalQueueOptions {
+  key: string;
+  storage: QueueStorage;
+  lock: Lock;
+  send: (command: QueuedAction) => Promise<Task>;
+  fetchDashboard: () => Promise<Dashboard>;
 }
+
+const TASK_STATUSES: readonly TaskStatus[] = ["planned", "active", "completed"];
 
 /** One atomic storage value contains the acknowledged snapshot AND its ordered outbox. No tokens. */
 export class LocalQueue {
-  private state: SavedState = empty();
+  private state: SavedState = LocalQueue.emptyState();
   private running: Promise<void> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private retryDelay = INITIAL_RETRY_MS;
+  private retryDelay: number = QUEUE.initialRetryMs;
   private stopped = false;
   private lastError = "";
   onChange: () => void = () => {};
@@ -80,39 +44,80 @@ export class LocalQueue {
   private readonly lock: Lock;
   private readonly send: (command: QueuedAction) => Promise<Task>;
   private readonly fetchDashboard: () => Promise<Dashboard>;
-  constructor(
-    key: string,
-    storage: QueueStorage,
-    lock: Lock,
-    send: (command: QueuedAction) => Promise<Task>,
-    fetchDashboard: () => Promise<Dashboard>,
-  ) {
-    this.key = key;
-    this.storage = storage;
-    this.lock = lock;
-    this.send = send;
-    this.fetchDashboard = fetchDashboard;
+
+  constructor(options: LocalQueueOptions) {
+    this.key = options.key;
+    this.storage = options.storage;
+    this.lock = options.lock;
+    this.send = options.send;
+    this.fetchDashboard = options.fetchDashboard;
     this.load();
+  }
+
+  private static emptyState(): SavedState {
+    return {
+      version: QUEUE.storageVersion,
+      base: null,
+      savedAt: 0,
+      pending: [],
+      blocked: null,
+    };
+  }
+
+  private static message(error: unknown): string {
+    return CloudError.messageOf(error, MESSAGES.syncFailed);
+  }
+
+  /**
+   * A successful HTTP status alone is not an acknowledgement. Keep the same
+   * request identity so an ambiguous or broken response can be retried safely.
+   */
+  private static validateAcknowledgement(
+    command: QueuedAction,
+    task: Task,
+  ): void {
+    const expectedId =
+      command.action === "create_task" ? command.requestId : command.args.id;
+    const valid =
+      !!task &&
+      typeof task === "object" &&
+      task.id === expectedId &&
+      typeof task.outcome === "string" &&
+      typeof task.plannedFor === "string" &&
+      Number.isSafeInteger(task.estimatedMinutes) &&
+      Number.isSafeInteger(task.actualSeconds) &&
+      task.actualSeconds >= 0 &&
+      Number.isSafeInteger(task.createdAt) &&
+      TASK_STATUSES.includes(task.status) &&
+      (task.startedAt === null || Number.isSafeInteger(task.startedAt)) &&
+      (task.completedOn === null || typeof task.completedOn === "string") &&
+      (task.serverRevision === undefined ||
+        task.serverRevision === command.revision + 1);
+    if (!valid) throw new Error(MESSAGES.incompleteAcknowledgement);
+  }
+
+  private get stateLock(): string {
+    return `${this.key}:state`;
+  }
+
+  private get senderLock(): string {
+    return `${this.key}:sender`;
   }
 
   private load(): void {
     const raw = this.storage.getItem(this.key);
     if (!raw) {
-      this.state = empty();
+      this.state = LocalQueue.emptyState();
       return;
     }
     const saved = JSON.parse(raw) as SavedState;
-    if (
-      saved.version !== QUEUE_STORAGE_VERSION ||
-      !Array.isArray(saved.pending)
-    )
-      throw new Error(
-        "The local queue cannot be read. Do not clear app data; recover your pending changes first.",
-      );
+    if (saved.version !== QUEUE.storageVersion || !Array.isArray(saved.pending))
+      throw new Error(MESSAGES.queueUnreadable);
     this.state = saved;
   }
+
   private async update(work: () => void): Promise<void> {
-    await this.lock(`${this.key}:state`, async () => {
+    await this.lock(this.stateLock, async () => {
       this.load();
       const previous = structuredClone(this.state);
       try {
@@ -125,50 +130,57 @@ export class LocalQueue {
     });
     this.onChange();
   }
+
   /** Storage events must read, not write, or two browser tabs create a sync loop. */
   async refreshFromStorage(): Promise<void> {
     if (this.stopped) return;
     try {
-      await this.lock(`${this.key}:state`, async () => {
+      await this.lock(this.stateLock, async () => {
         this.load();
       });
       this.onChange();
       if (this.pendingCount && !this.blocked) await this.sync();
     } catch (error) {
-      this.lastError = message(error);
+      this.lastError = LocalQueue.message(error);
       this.onChange();
     }
   }
+
   get pendingCount(): number {
     return this.state.pending.length;
   }
+
   get status(): string {
-    if (this.state.blocked)
-      return `Sync stopped: ${this.state.blocked} Pending changes are kept on this device.`;
+    if (this.state.blocked) return MESSAGES.syncStopped(this.state.blocked);
     if (this.lastError)
-      return `${this.lastError} ${this.pendingCount} change(s) waiting to sync.`;
+      return MESSAGES.waitingToSync(this.lastError, this.pendingCount);
     return this.pendingCount
-      ? `${this.pendingCount} change(s) saved on this device · syncing…`
-      : "All changes synced";
+      ? MESSAGES.syncing(this.pendingCount)
+      : MESSAGES.allSynced;
   }
+
   get blocked(): boolean {
     return !!this.state.blocked;
   }
+
   /** The server's reason for rejecting the first pending change, if any. */
   get blockedReason(): string | null {
     return this.state.blocked;
   }
+
+  /** The acknowledged snapshot with every pending command replayed, as of now. */
   snapshot(): Dashboard | null {
     if (!this.state.base) return null;
-    const data = structuredClone(this.state.base);
-    for (const command of this.state.pending) applyCommand(data, command);
+    const snapshot = PlannerSnapshot.copy(this.state.base);
+    for (const command of this.state.pending) snapshot.apply(command);
+    const data = snapshot.data;
     data.serverNow += Math.max(0, Date.now() / 1000 - this.state.savedAt);
-    return alignDashboardDate(
-      data,
+    return snapshot.alignTo(
       data.serverNow,
       Intl.DateTimeFormat().resolvedOptions().timeZone,
-    );
+    ).data;
   }
+
   async enqueue<Action extends TaskAction>(
     action: Action,
     args: TaskArguments[Action],
@@ -176,16 +188,10 @@ export class LocalQueue {
   ): Promise<Task> {
     let result!: Task;
     await this.update(() => {
-      if (this.stopped) throw new Error("The local queue is closed.");
-      if (this.state.blocked)
-        throw new Error(
-          "Resolve the sync conflict before making more changes.",
-        );
+      if (this.stopped) throw new Error(MESSAGES.queueClosed);
+      if (this.state.blocked) throw new Error(MESSAGES.queueBlocked);
       const current = this.snapshot();
-      if (!current)
-        throw new Error(
-          "Connect once to load your planner before saving local changes.",
-        );
+      if (!current) throw new Error(MESSAGES.queueNeedsSnapshot);
       const command: QueuedAction = {
         requestId: crypto.randomUUID(),
         action,
@@ -196,12 +202,13 @@ export class LocalQueue {
       };
       // Completing an older active task removes it from the dashboard's day
       // lists. Return the mutated task itself, not a lookup in the filtered view.
-      result = applyCommand(current, command);
+      result = PlannerSnapshot.own(current).apply(command);
       this.state.pending.push(command);
     });
     void this.sync();
     return structuredClone(result);
   }
+
   private scheduleRetry(delay: number): void {
     if (this.stopped || this.retryTimer) return;
     this.retryTimer = setTimeout(() => {
@@ -210,57 +217,19 @@ export class LocalQueue {
     }, delay);
   }
 
+  private clearRetry(): void {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+  }
+
   sync(): Promise<void> {
     if (this.stopped) return Promise.resolve();
     if (this.running) return this.running;
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
-    this.running = this.lock(`${this.key}:sender`, async () => {
-      this.load();
-      if (this.state.blocked || this.stopped) return;
-      try {
-        while (!this.stopped) {
-          this.load();
-          const command = this.state.pending[0];
-          if (!command) break;
-          const result = await this.send(command);
-          validateAcknowledgement(command, result);
-          await this.update(() => {
-            if (this.state.pending[0]?.requestId !== command.requestId)
-              throw new Error("Local queue changed during sync.");
-            this.state.base = project(this.state.base!, command, result);
-            this.state.pending.shift();
-          });
-        }
-        if (this.stopped) return;
-        const dashboard = await this.fetchDashboard();
-        await this.update(() => {
-          // An enqueue during this read may refer to a task from the previous day.
-          // Keep its source snapshot until those actions have been acknowledged.
-          if (!this.state.pending.length) {
-            this.state.base = dashboard;
-            this.state.savedAt = Date.now() / 1000;
-          }
-        });
-        this.lastError = "";
-        this.retryDelay = INITIAL_RETRY_MS;
-      } catch (error) {
-        if (errorCode(error) === "validation" && this.state.pending.length) {
-          await this.update(() => {
-            this.state.blocked = message(error);
-          });
-        } else {
-          this.lastError = message(error);
-          this.scheduleRetry(this.retryDelay);
-          this.retryDelay = Math.min(this.retryDelay * 2, MAX_RETRY_MS);
-        }
-      }
-    })
+    this.clearRetry();
+    this.running = this.lock(this.senderLock, () => this.drain())
       .catch((error) => {
-        this.lastError = message(error);
-        this.scheduleRetry(MAX_RETRY_MS);
+        this.lastError = LocalQueue.message(error);
+        this.scheduleRetry(QUEUE.maxRetryMs);
       })
       .finally(() => {
         this.running = null;
@@ -276,20 +245,65 @@ export class LocalQueue {
       });
     return this.running;
   }
+
+  /** Sends pending commands in order, then refreshes the acknowledged snapshot. */
+  private async drain(): Promise<void> {
+    this.load();
+    if (this.state.blocked || this.stopped) return;
+    try {
+      while (!this.stopped) {
+        this.load();
+        const command = this.state.pending[0];
+        if (!command) break;
+        const result = await this.send(command);
+        LocalQueue.validateAcknowledgement(command, result);
+        await this.update(() => {
+          if (this.state.pending[0]?.requestId !== command.requestId)
+            throw new Error(MESSAGES.queueChanged);
+          this.state.base = PlannerSnapshot.project(
+            this.state.base!,
+            command,
+            result,
+          );
+          this.state.pending.shift();
+        });
+      }
+      if (this.stopped) return;
+      const dashboard = await this.fetchDashboard();
+      await this.update(() => {
+        // An enqueue during this read may refer to a task from the previous day.
+        // Keep its source snapshot until those actions have been acknowledged.
+        if (!this.state.pending.length) {
+          this.state.base = dashboard;
+          this.state.savedAt = Date.now() / 1000;
+        }
+      });
+      this.lastError = "";
+      this.retryDelay = QUEUE.initialRetryMs;
+    } catch (error) {
+      if (
+        CloudError.codeOf(error) === "validation" &&
+        this.state.pending.length
+      ) {
+        await this.update(() => {
+          this.state.blocked = LocalQueue.message(error);
+        });
+      } else {
+        this.lastError = LocalQueue.message(error);
+        this.scheduleRetry(this.retryDelay);
+        this.retryDelay = Math.min(this.retryDelay * 2, QUEUE.maxRetryMs);
+      }
+    }
+  }
+
   async discardPending(): Promise<void> {
     // Never discard an ambiguously committed request. Only a definitive rejection allows discarding.
-    if (!this.blocked)
-      throw new Error(
-        "Only rejected changes can be discarded. Retry syncing first.",
-      );
-    await this.lock(`${this.key}:sender`, () =>
+    if (!this.blocked) throw new Error(MESSAGES.queueDiscardRefused);
+    await this.lock(this.senderLock, () =>
       this.update(() => {
         // Another window may have resolved the rejection and enqueued new work.
         // Authorize discarding against the freshly loaded state, under both locks.
-        if (!this.state.blocked)
-          throw new Error(
-            "Only rejected changes can be discarded. Retry syncing first.",
-          );
+        if (!this.state.blocked) throw new Error(MESSAGES.queueDiscardRefused);
         this.state.pending = [];
         this.state.blocked = null;
       }),
@@ -297,14 +311,15 @@ export class LocalQueue {
     this.lastError = "";
     void this.sync();
   }
+
   resume(): void {
     this.stopped = false;
     void this.sync();
   }
+
   async stop(): Promise<void> {
     this.stopped = true;
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.retryTimer = null;
+    this.clearRetry();
     await this.running;
   }
 }

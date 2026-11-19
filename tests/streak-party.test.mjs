@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BITS, DANCES, isMilestone, milestoneHeadline, pickParty } from "../src/planner/streak-party.ts";
+import { BITS, DANCES, PartyPlanner } from "../src/planner/streak-party.ts";
+
+const pickParty = (days, random) => new PartyPlanner(random).plan(days);
+const { isMilestone, milestoneHeadline } = PartyPlanner;
 
 const seeded = (seed) => () => {
   seed = (seed * 16807) % 2147483647;

@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { loadEnv } from "vite";
-import { publicConfig } from "../src/planner/config.ts";
-import { ANALYTICS_SCRIPTS, POSTHOG_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
+import { PublicConfig } from "../src/planner/config.ts";
+import { ANALYTICS_SCRIPTS, DOCUMENT_ROUTES, POSTHOG_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 
 const TABLES = ["planner_accounts", "planner_tasks", "planner_stops", "planner_reviews", "planner_receipts", "ai_controls", "ai_usage", "ai_review_requests"];
@@ -253,7 +253,7 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
     canonical = new URL(home.url).origin;
     if (home.redirected) add("WARN", "site:canonical", "Website redirect followed", `Checking final HTTPS origin ${canonical}; use it as PRUNE_SITE_URL.`, "Prefer the canonical origin in links and AI CORS configuration.");
     await safely("site/:inspection", "/: document inspection", () => inspectDocument(home, "/", canonical));
-    for (const path of ["/download", "/download/", "/login", "/login/", "/index.html"]) {
+    for (const path of DOCUMENT_ROUTES.aliases) {
       await safely(`site${path}:inspection`, `${path}: document inspection`, async () => {
         const page = await request(`${canonical}${path}`, { followRedirects: true, lockedOrigin: canonical, maxBytes: 2 * 1024 * 1024 });
         await inspectDocument(page, path, canonical);
@@ -333,7 +333,7 @@ export async function main(args = process.argv.slice(2)) {
   }
   try {
     const env = loadEnv("production", process.cwd(), "VITE_SUPABASE_");
-    if (!options["website-only"] || env.VITE_SUPABASE_URL || env.VITE_SUPABASE_ANON_KEY) config = publicConfig(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+    if (!options["website-only"] || env.VITE_SUPABASE_URL || env.VITE_SUPABASE_ANON_KEY) config = PublicConfig.parse(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
   } catch { configError = true; }
   if (!options.json) console.log(`Production checks: ${site}\nRead-only public probes; no credentials or response bodies will be printed.\n`);
   const report = await runProductionChecks({ site, config, configError, timeoutMs, requireInviteOnly: !!options["require-invite-only"], websiteOnly: !!options["website-only"], skipAi: !!options["skip-ai"] }, options.json ? undefined : (item) => {

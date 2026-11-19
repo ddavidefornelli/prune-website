@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { capture } from "../../analytics.ts";
+import { analytics } from "../../analytics.ts";
 import type { Task } from "../types";
 import { PLANNER_LIMITS } from "../constants";
 
@@ -27,7 +27,7 @@ export function TaskTitle(props: TaskTitleProps) {
     }
     saving = true;
     if (await props.onRename(outcome)) {
-      capture("task_renamed");
+      analytics.capture("task_renamed");
       setEditing(false);
     }
     saving = false;

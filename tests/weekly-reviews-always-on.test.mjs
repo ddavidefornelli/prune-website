@@ -70,21 +70,3 @@ test('the replaced guard keeps authenticated-only access and a private dispatche
     assert.deepEqual(rows[0], { authenticated: true, anon: false, dispatcher: false });
   } finally { await db.close(); }
 });
-
-test('the Clerk bridge drops cleanly, but never while identity mappings remain', async () => {
-  const db = await fixture();
-  try {
-    await db.exec('reset role');
-    await db.exec(migration('20261027000100_clerk_bridge.sql'));
-    await db.exec(`insert into public.planner_clerk_identities values ('user_clerk', '${owner}', now())`);
-    await assert.rejects(db.exec(migration('20261105000200_drop_clerk_bridge.sql')), /still has rows/);
-    await db.exec('rollback');
-    assert.ok((await db.query(`select to_regclass('public.planner_clerk_identities') as t`)).rows[0].t, 'a refused drop changes nothing');
-    await db.exec('delete from public.planner_clerk_identities');
-    await db.exec(migration('20261105000200_drop_clerk_bridge.sql'));
-    const { rows } = await db.query(`select to_regclass('public.planner_clerk_identities') as t,
-      to_regprocedure('public.planner_call_as(uuid,text,jsonb,text)') as f`);
-    assert.deepEqual(rows[0], { t: null, f: null });
-    await db.exec(migration('20261105000200_drop_clerk_bridge.sql'));
-  } finally { await db.close(); }
-});

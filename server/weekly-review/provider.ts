@@ -1,11 +1,12 @@
-import { type Analysis, type ReviewInput, validateAnalysis } from "./domain.ts";
-import { ApiError, readLimited } from "../http.ts";
-import type { AiGenerationObserver } from "../ai-observability.ts";
-import { completedTaskTimings } from "../../src/shared/task-timing.ts";
+import { HTTP_STATUS } from "../../src/shared/api-routes.ts";
+import { TaskTimingReport } from "../../src/shared/task-timing.ts";
+import { OPENAI, WEEKLY_REVIEW_AI } from "../constants.ts";
+import { ApiError } from "../http.ts";
+import { OpenAiChat, ProviderError } from "../openai.ts";
+import { ReviewValidator, type Analysis, type ReviewInput } from "./domain.ts";
 
-export const MODEL = "gpt-4.1-mini";
-const MAX_OUTPUT_TOKENS = 6000;
-const MAX_RESPONSE_BYTES = 131_072;
+const SPAN_NAME = "weekly_review";
+
 const SYSTEM_PROMPT = `You write a concise, evidence-based reflection for a personal focus app.
 A review is the user's weekly check-in: the seven days before their check-in day, every task planned
 or completed in those days, plus the stops recorded in them. Your ONLY purpose is to summarize that stretch, identify the main reported reasons
@@ -45,143 +46,107 @@ to observed reasons or estimate accuracy, not generic motivational advice, task-
 Return the required JSON: summary (1–3000 characters), mainReasons (0–6 items, reason 1–1500 characters,
 nonempty unique evidenceStopIds), improvements (1–3 strings, each 1–1000 characters).`;
 
-export function providerBody(input: ReviewInput) {
-  return {
-    model: MODEL,
-    store: false,
-    max_completion_tokens: MAX_OUTPUT_TOKENS,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: JSON.stringify({
-          weekStart: input.weekStart,
-          weekEnd: input.weekEnd,
-          activity: input.activity,
-          completedTaskTimings: completedTaskTimings(
-            input.activity.tasks,
-            input.weekStart,
-            input.weekEnd,
-          ),
-        }),
-      },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "weekly_reflection",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["summary", "mainReasons", "improvements"],
-          properties: {
-            summary: { type: "string" },
-            mainReasons: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["reason", "evidenceStopIds"],
-                properties: {
-                  reason: { type: "string" },
-                  evidenceStopIds: {
-                    type: "array",
-                    items: { type: "integer" },
+/** Writes one weekly check-in with the model and validates its answer. */
+export class WeeklyReviewProvider {
+  private readonly chat: OpenAiChat;
+
+  constructor(chat: OpenAiChat) {
+    this.chat = chat;
+  }
+
+  /** The chat request: the week's activity and its exact timing comparisons. */
+  static requestBody(input: ReviewInput) {
+    return {
+      model: OPENAI.model,
+      store: false,
+      max_completion_tokens: WEEKLY_REVIEW_AI.maxOutputTokens,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: JSON.stringify({
+            weekStart: input.weekStart,
+            weekEnd: input.weekEnd,
+            activity: input.activity,
+            completedTaskTimings: new TaskTimingReport(
+              input.activity.tasks,
+              input.weekStart,
+              input.weekEnd,
+            ).completed,
+          }),
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "weekly_reflection",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["summary", "mainReasons", "improvements"],
+            properties: {
+              summary: { type: "string" },
+              mainReasons: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["reason", "evidenceStopIds"],
+                  properties: {
+                    reason: { type: "string" },
+                    evidenceStopIds: {
+                      type: "array",
+                      items: { type: "integer" },
+                    },
                   },
                 },
               },
+              improvements: { type: "array", items: { type: "string" } },
             },
-            improvements: { type: "array", items: { type: "string" } },
           },
         },
       },
-    },
-  };
-}
+    };
+  }
 
-export async function generateReview(
-  input: ReviewInput,
-  key: string,
-  fetcher: typeof fetch = fetch,
-  observability?: { observer: AiGenerationObserver; distinctId: string },
-): Promise<Analysis> {
-  const requestBody = providerBody(input);
-  const startedAt = performance.now();
-  const traceId = observability ? crypto.randomUUID() : undefined;
-  let httpStatus: number | undefined;
-  let captured = false;
-  // Only metadata reaches PostHog: never the prompt (task titles, stop
-  // reasons) or the generated text, which run without cookie consent.
-  const capture = (
-    body:
-      | { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } }
-      | undefined,
-    isError: boolean,
-  ) => {
-    if (!observability || !traceId || captured) return;
-    captured = true;
-    const number = (value: unknown) =>
-      typeof value === "number" && Number.isFinite(value) ? value : undefined;
-    observability.observer.capture({
-      distinctId: observability.distinctId,
-      traceId,
-      spanName: "weekly_review",
-      model: requestBody.model,
-      maxTokens: requestBody.max_completion_tokens,
-      inputTokens: number(body?.usage?.prompt_tokens),
-      outputTokens: number(body?.usage?.completion_tokens),
-      latency: (performance.now() - startedAt) / 1_000,
-      httpStatus,
-      isError,
-    });
-  };
-  try {
-    const response = await fetcher(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        redirect: "error",
-        signal: AbortSignal.timeout(90_000),
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
+  async generate(input: ReviewInput): Promise<Analysis> {
+    try {
+      const content = await this.chat.complete(
+        WeeklyReviewProvider.requestBody(input),
+        {
+          spanName: SPAN_NAME,
+          timeoutMs: WEEKLY_REVIEW_AI.timeoutMs,
+          maxResponseBytes: WEEKLY_REVIEW_AI.maxResponseBytes,
         },
-        body: JSON.stringify(requestBody),
-      },
-    );
-    httpStatus = response.status;
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new ApiError(
-        503,
-        "ai_unavailable",
-        "Weekly AI is temporarily unavailable. Please retry later.",
       );
+      return ReviewValidator.analysis(JSON.parse(content), input.activity);
+    } catch (error) {
+      throw WeeklyReviewProvider.safeError(error);
     }
-    const body = JSON.parse(
-      await readLimited(response.body, MAX_RESPONSE_BYTES),
-    );
-    const choice = body?.choices?.[0];
+  }
+
+  /** Never leaks provider bodies, request data, URLs, credentials, or raw exceptions. */
+  private static safeError(error: unknown): ApiError {
+    if (error instanceof ProviderError)
+      return error.reason === "http"
+        ? new ApiError(
+            HTTP_STATUS.unavailable,
+            "ai_unavailable",
+            "Weekly AI is temporarily unavailable. Please retry later.",
+          )
+        : new ApiError(
+            HTTP_STATUS.badGateway,
+            "invalid_review",
+            "The AI returned an incomplete review. Please retry later.",
+          );
     if (
-      choice?.finish_reason !== "stop" ||
-      choice?.message?.refusal ||
-      typeof choice?.message?.content !== "string"
-    ) {
-      throw new ApiError(
-        502,
-        "invalid_review",
-        "The AI returned an incomplete review. Please retry later.",
-      );
-    }
-    capture(body, false);
-    return validateAnalysis(JSON.parse(choice.message.content), input.activity);
-  } catch (error) {
-    capture(undefined, true);
-    if (error instanceof ApiError && error.status !== 413) throw error;
-    // Never leak provider bodies, request data, URLs, credentials, or raw exceptions.
-    throw new ApiError(
-      502,
+      error instanceof ApiError &&
+      error.status !== HTTP_STATUS.payloadTooLarge
+    )
+      return error;
+    return new ApiError(
+      HTTP_STATUS.badGateway,
       "ai_unavailable",
       "Weekly AI could not generate a review. Please retry later.",
     );

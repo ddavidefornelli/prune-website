@@ -4,6 +4,7 @@ import { ProductPreview } from "../components/ProductPreview";
 import type { PlanningClient } from "../planner/api";
 import type { Account } from "../planner/types";
 import { Login } from "./Login";
+import { HOME_PATH, LOGIN_PATH, LOGIN_ROUTE } from "./routes";
 
 interface SignInProps {
   client: PlanningClient;
@@ -12,8 +13,7 @@ interface SignInProps {
   onAuthenticated: (account: Account) => void;
 }
 
-const LOGIN_PATH = "/login";
-const onLoginPath = () => /^\/login\/?$/.test(location.pathname);
+const onLoginPath = () => LOGIN_ROUTE.test(location.pathname);
 
 /**
  * The signed-out site: the landing page at `/` and the login page at `/login`.
@@ -68,7 +68,7 @@ export function SignIn(props: SignInProps) {
         initialError={props.initialError}
         configurationError={props.configurationError}
         onAuthenticated={props.onAuthenticated}
-        onBack={(event) => navigate(event, "/")}
+        onBack={(event) => navigate(event, HOME_PATH)}
       />
     </Show>
   );

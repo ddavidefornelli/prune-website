@@ -1,5 +1,5 @@
 import { Show } from "solid-js";
-import { formatMinute } from "../focus-time";
+import { FocusTime } from "../focus-time";
 import type { ScheduleState } from "../types";
 
 /** Today's single line about the focus time: what it is, or an invitation to set it. */
@@ -30,7 +30,7 @@ export function FocusTimeLine(props: {
         <p>
           <strong>Focus time</strong>
           <span class="focus-time-value">
-            {formatMinute(props.schedule.focusMinute!)}
+            {new FocusTime(props.schedule.focusMinute!).label()}
           </span>
           <span class="focus-time-days">
             {props.schedule.weekdaysOnly ? " · weekdays" : " · every day"}

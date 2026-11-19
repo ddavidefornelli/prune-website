@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { browserFamily, deviceType, handleErrorLog } from "../server/error-log.ts";
+import { ErrorLogRelay } from "../server/error-log.ts";
+
+const { browserFamily, deviceType } = ErrorLogRelay;
+const handleErrorLog = (request, config) => new ErrorLogRelay(config).handle(request);
 
 const SITE = "https://www.prune.win";
 const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";

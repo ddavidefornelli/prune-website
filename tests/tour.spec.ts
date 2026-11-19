@@ -9,7 +9,7 @@ import type { Task } from "../src/planner/types";
 
 test.use({ signedIn: true, firstVisit: true });
 
-const planned = (day: string, outcome: string): Task => ({ id: "existing", outcome, isPriority: false, plannedFor: day, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: Math.floor(Date.now() / 1000), resources: [] });
+const planned = (day: string, outcome: string): Task => ({ id: "existing", outcome, plannedFor: day, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: Math.floor(Date.now() / 1000) });
 
 const TITLES = ["Busy isn’t done.", "Lock in.", "Get sharper.", "Light it up."];
 

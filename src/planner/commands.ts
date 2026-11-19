@@ -18,7 +18,7 @@ export interface PlannerQueries {
   set_email_preferences: EmailPreferences;
 }
 
-/** Commands sent by the web UI, plus legacy commands kept for saved outboxes. */
+/** Task commands the web UI queues. */
 export interface TaskArguments {
   create_task: { outcome: string; day: string; estimatedMinutes: number };
   rename_task: { id: string; outcome: string };
@@ -28,13 +28,22 @@ export interface TaskArguments {
   save_pause_reason: { id: string; reason: string };
   resume_task: { id: string };
   complete_task: { id: string };
-  prioritize_task: { id: string };
-  pause_task: { id: string };
-  add_task_link: { id: string; label: string; target: string };
-  remove_task_resource: { id: string; resourceId: string };
 }
 
 export type TaskAction = keyof TaskArguments;
+
+/**
+ * Commands no client sends any more (task priority, pausing by the old name,
+ * the Mac app's resources). A browser outbox saved before they were retired
+ * can still hold one: it replays without changing the local plan, and the
+ * server's acknowledgement settles the task.
+ */
+export const RETIRED_TASK_ACTIONS: readonly string[] = [
+  "prioritize_task",
+  "pause_task",
+  "add_task_link",
+  "remove_task_resource",
+];
 
 /** Persisted wire format. Never rename fields without a storage migration. */
 export interface QueuedAction {

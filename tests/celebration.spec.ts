@@ -4,8 +4,6 @@ function seedFinalTask(backend: Backend): void {
   backend.data.todayTasks = ["First outcome", "Second outcome", "Final outcome"].map((outcome, i) => ({
     id: `completion-task-${i}`,
     outcome,
-    // Existing accounts can still have legacy priority data.
-    isPriority: i === 0,
     plannedFor: backend.data.today,
     estimatedMinutes: 30,
     actualSeconds: i < 2 ? 1800 : 0,
@@ -13,7 +11,6 @@ function seedFinalTask(backend: Backend): void {
     startedAt: null,
     completedOn: i < 2 ? backend.data.today : null,
     createdAt: backend.data.serverNow,
-    resources: [],
   }));
   backend.data.completions = [{ day: backend.data.today, count: 2 }];
 }

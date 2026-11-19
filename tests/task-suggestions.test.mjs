@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createHandler } from "../server/task-suggestions/handler.ts";
+import { OpenAiChat } from "../server/openai.ts";
+import { TaskSuggestionEndpoint } from "../server/task-suggestions/handler.ts";
 import {
-  generateSuggestions,
-  providerBody,
-  validateSuggestions,
+  SuggestionPlan,
+  SuggestionProvider,
 } from "../server/task-suggestions/provider.ts";
+
+const createHandler = (deps) => new TaskSuggestionEndpoint(deps).handle;
+const providerBody = (input) => new SuggestionPlan(input).requestBody();
+const validateSuggestions = (value, input) => new SuggestionPlan(input).validate(value);
+const generateSuggestions = (input, key, fetcher, observability) =>
+  new SuggestionProvider(new OpenAiChat(key, fetcher, observability)).generate(input);
 
 const task = (outcome, status = "planned", estimatedMinutes = 30) => ({
   outcome,

@@ -73,7 +73,7 @@ cspTest("every document alias has enforced security headers on GET and HEAD, inc
     "strict-transport-security": "max-age=31536000",
   };
   let policy: string | undefined;
-  for (const path of ["/", "/download", "/download/", "/index.html", "/?security=1", "/download/?security=1"]) {
+  for (const path of ["/", "/login", "/login/", "/index.html", "/?security=1", "/login/?security=1"]) {
     for (const method of ["GET", "HEAD"]) {
       const response = await request.fetch(path, { method, maxRedirects: 0 });
       expect(response.status(), `${method} ${path}`).toBe(200);
@@ -247,7 +247,7 @@ test("a tampered local session identity cannot unlock another account's cached p
   const otherId = "22222222-2222-4222-8222-222222222222";
   const privateTitle = "Never expose this cached outcome";
   const cached = dashboard();
-  cached.todayTasks.push({ id: "private-task", outcome: privateTitle, isPriority: true, plannedFor: cached.today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: cached.serverNow, resources: [] });
+  cached.todayTasks.push({ id: "private-task", outcome: privateTitle, plannedFor: cached.today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: cached.serverNow });
   await page.addInitScript(({ authKey, queueKey, otherId, cached }) => {
     const session = JSON.parse(localStorage.getItem(authKey)!);
     session.user.id = otherId; // The fixture Auth server still verifies USER_ID.

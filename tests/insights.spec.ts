@@ -17,7 +17,7 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
       await page.addInitScript(() => { Math.random = () => 0; });
       const today = backend.data.today;
       backend.data.completions = [1, 2, 3].map((days) => ({ day: dayBefore(today, days), count: 1 }));
-      backend.data.todayTasks = [{ id: "insight-task", outcome: "Write the report", isPriority: false, plannedFor: today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow, resources: [] }];
+      backend.data.todayTasks = [{ id: "insight-task", outcome: "Write the report", plannedFor: today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow }];
       await page.goto("/");
       await expect(page.locator(".insight-drop")).toHaveCount(0);
       // Today keeps to the plan: the streak and check-in are on Overview.
@@ -135,7 +135,7 @@ for (const [width, height] of [[320, 568], [390, 844], [1280, 800]] as const) {
       await page.addInitScript(() => { Math.random = () => 0.99; });
       const today = backend.data.today;
       backend.data.completions = [{ day: dayBefore(today, 1), count: 1 }];
-      backend.data.todayTasks = ["Write the report", "Call the bank"].map((outcome, i) => ({ id: `message-task-${i}`, outcome, isPriority: false, plannedFor: today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow, resources: [] })) as never;
+      backend.data.todayTasks = ["Write the report", "Call the bank"].map((outcome, i) => ({ id: `message-task-${i}`, outcome, plannedFor: today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: backend.data.serverNow })) as never;
       await page.goto("/");
       const streak = page.getByRole("region", { name: "Streak" });
       await visit(page, "Overview");

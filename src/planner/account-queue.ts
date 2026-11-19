@@ -1,82 +1,106 @@
-import type { CloudTransport } from "./commands.ts";
-import { errorCode } from "./errors.ts";
-import { CloudError } from "./http-error.ts";
-import { LocalQueue, QUEUE_STORAGE_VERSION } from "./local-queue.ts";
+import { STORAGE_KEYS } from "../shared/storage-keys.ts";
+import { CloudError } from "./cloud-error.ts";
+import type { CloudTransport, QueuedAction } from "./commands.ts";
+import { QUEUE } from "./constants.ts";
+import { LocalQueue } from "./local-queue.ts";
+import { MESSAGES } from "./messages.ts";
 import type { Dashboard, Task } from "./types.ts";
 
-const QUEUE_PROTOCOL_VERSION = 1;
-const UNSUPPORTED_PROTOCOL =
-  "The server does not support this queue version. Apply Supabase migration 20261017000300_local_queue.sql. Your changes remain on this device; no queued writes were sent.";
+/**
+ * One account's outbox in this browser: Web Locks, account-scoped storage,
+ * online/storage listeners and queue-protocol negotiation. The outbox itself
+ * (`LocalQueue`) only persists and sends.
+ */
+export class AccountQueue {
+  readonly queue: LocalQueue;
+  private ready: Promise<void> | null = null;
+  private readonly storageKey: string;
+  private readonly accountKey: string;
+  private readonly timezone: string;
+  private readonly request: CloudTransport["execute"];
 
-/** Browser coordination and protocol negotiation, separate from outbox persistence. */
-export function createAccountQueue(
-  accountKey: string,
-  timezone: string,
-  request: CloudTransport["execute"],
-  onChange: () => void,
-) {
-  if (!navigator.locks)
-    throw new Error(
-      "Safe local saving requires HTTPS and a browser with Web Locks support. Update your browser before using prune.",
+  constructor(
+    accountKey: string,
+    timezone: string,
+    request: CloudTransport["execute"],
+    onChange: () => void,
+  ) {
+    if (!navigator.locks) throw new Error(MESSAGES.webLocksRequired);
+    this.accountKey = accountKey;
+    this.timezone = timezone;
+    this.request = request;
+    this.storageKey = STORAGE_KEYS.plannerQueue(
+      QUEUE.storageVersion,
+      accountKey,
     );
+    this.queue = new LocalQueue({
+      key: this.storageKey,
+      storage: localStorage,
+      lock: async (name, work) => navigator.locks.request(name, work),
+      send: (command) => this.send(command),
+      fetchDashboard: () => this.call<Dashboard>("dashboard"),
+    });
+    this.queue.onChange = onChange;
+    window.addEventListener("online", this.onOnline);
+    window.addEventListener("storage", this.onStorage);
+  }
 
-  let ready: Promise<void> | null = null;
-  const storageKey = `pro:planner:v${QUEUE_STORAGE_VERSION}:${accountKey}`;
-  const queue = new LocalQueue(
-    storageKey,
-    localStorage,
-    async (name, work) => navigator.locks.request(name, work),
-    async (command) => {
-      // Never send retryable writes to a server that ignores idempotency keys.
-      ready ??= request<{ version: number }>("planner_call", {
-        action: "queue_protocol",
-        args: {},
-        timezone,
+  dispose(): void {
+    window.removeEventListener("online", this.onOnline);
+    window.removeEventListener("storage", this.onStorage);
+  }
+
+  private readonly onOnline = () => void this.queue.sync();
+
+  private readonly onStorage = (event: StorageEvent) => {
+    if (event.key === this.storageKey) void this.queue.refreshFromStorage();
+  };
+
+  private call<T>(
+    action: string,
+    args: Record<string, unknown> = {},
+    timezone = this.timezone,
+  ): Promise<T> {
+    return this.request<T>("planner_call", {
+      action,
+      args: { ...args, _accountKey: this.accountKey },
+      timezone,
+    });
+  }
+
+  /** Never send retryable writes to a server that ignores idempotency keys. */
+  private negotiate(): Promise<void> {
+    this.ready ??= this.request<{ version: number }>("planner_call", {
+      action: "queue_protocol",
+      args: {},
+      timezone: this.timezone,
+    })
+      .then((protocol) => {
+        if (protocol?.version !== QUEUE.protocolVersion)
+          throw new CloudError("configuration", MESSAGES.unsupportedProtocol);
       })
-        .then((protocol) => {
-          if (protocol?.version !== QUEUE_PROTOCOL_VERSION)
-            throw new CloudError("configuration", UNSUPPORTED_PROTOCOL);
-        })
-        .catch((error: unknown) => {
-          ready = null;
-          // Older dispatchers reject queue_protocol. This is not a rejected write:
-          // the outbox must remain retryable, never discardable.
-          if (errorCode(error) === "validation")
-            throw new CloudError("configuration", UNSUPPORTED_PROTOCOL);
-          throw error;
-        });
-      await ready;
-      return request<Task>("planner_call", {
-        action: command.action,
-        timezone: command.timezone,
-        args: {
-          ...command.args,
-          _requestId: command.requestId,
-          _at: command.at,
-          _revision: command.revision,
-          _accountKey: accountKey,
-        },
+      .catch((error: unknown) => {
+        this.ready = null;
+        // Older dispatchers reject queue_protocol. This is not a rejected write:
+        // the outbox must remain retryable, never discardable.
+        if (CloudError.codeOf(error) === "validation")
+          throw new CloudError("configuration", MESSAGES.unsupportedProtocol);
+        throw error;
       });
-    },
-    () =>
-      request<Dashboard>("planner_call", {
-        action: "dashboard",
-        args: { _accountKey: accountKey },
-        timezone,
-      }),
-  );
-  queue.onChange = onChange;
-  const online = () => void queue.sync();
-  const storage = (event: StorageEvent) => {
-    if (event.key === storageKey) void queue.refreshFromStorage();
-  };
-  window.addEventListener("online", online);
-  window.addEventListener("storage", storage);
-  return {
-    queue,
-    dispose() {
-      window.removeEventListener("online", online);
-      window.removeEventListener("storage", storage);
-    },
-  };
+    return this.ready;
+  }
+
+  private async send(command: QueuedAction): Promise<Task> {
+    await this.negotiate();
+    return this.call<Task>(
+      command.action,
+      {
+        ...command.args,
+        _requestId: command.requestId,
+        _at: command.at,
+        _revision: command.revision,
+      },
+      command.timezone,
+    );
+  }
 }

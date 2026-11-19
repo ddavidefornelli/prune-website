@@ -8,18 +8,15 @@ import {
   splitProps,
   type JSX,
 } from "solid-js";
+import { Duration } from "../../shared/duration";
+import { CALENDAR } from "../../shared/time-constants";
 import {
   CALENDAR_MONTHS,
-  calendarMonth,
-  MONTHS,
-  WEEKDAYS,
-  type CalendarDay,
-  type CalendarMonth,
-  type Completion,
+  CalendarMonth,
+  type CalendarCell,
 } from "../activity-calendar-model";
 import { PLANNER_LIMITS } from "../constants";
-import { formatMinutes } from "../quick-entry";
-import type { MonthStats } from "../types";
+import type { Completion, MonthStats } from "../types";
 
 interface ActivityCalendarProps {
   today: string;
@@ -71,7 +68,7 @@ function ActivityLegend() {
 }
 
 function ActivityDay(props: {
-  day: CalendarDay;
+  day: CalendarCell;
   today: string;
   tabIndex: number;
 }) {
@@ -148,7 +145,7 @@ function ActivityGrid(props: {
       aria-labelledby={props.labelledBy}
       onKeyDown={navigate}
     >
-      <For each={WEEKDAYS}>
+      <For each={CALENDAR.weekdayInitials}>
         {(weekday) => (
           <span class="activity-weekday" aria-hidden="true">
             {weekday}
@@ -210,7 +207,11 @@ function ActivityStats(props: {
       />
       <ActivityStat
         label="Time focused"
-        value={props.stats ? formatMinutes(props.stats.focusSeconds) : "\u2014"}
+        value={
+          props.stats
+            ? new Duration(props.stats.focusSeconds).rounded()
+            : "\u2014"
+        }
         detail={props.stats ? "In focus sessions" : "Loading"}
       />
       <ActivityStat
@@ -226,13 +227,11 @@ export function ActivityCalendar(props: ActivityCalendarProps) {
   const headingId = createUniqueId();
   // 0 is the current month; earlier months are negative.
   const [offset, setOffset] = createSignal(0);
-  const calendar = createMemo(() =>
-    calendarMonth(props.today, props.completions, offset()),
+  const calendar = createMemo(
+    () => new CalendarMonth(props.today, props.completions, offset()),
   );
-  const monthName = (calendar: CalendarMonth) =>
-    `${MONTHS[calendar.month]} ${calendar.year}`;
   const heading = () =>
-    `${calendar().total.toLocaleString()} ${calendar().total === 1 ? "task" : "tasks"} completed in ${monthName(calendar())}`;
+    `${calendar().total.toLocaleString()} ${calendar().total === 1 ? "task" : "tasks"} completed in ${calendar().title}`;
   const earliest = -(CALENDAR_MONTHS - 1);
   const monthKey = () =>
     `${calendar().year}-${String(calendar().month + 1).padStart(2, "0")}`;

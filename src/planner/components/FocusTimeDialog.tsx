@@ -8,18 +8,12 @@ import {
   Switch,
   untrack,
 } from "solid-js";
-import { capture } from "../../analytics.ts";
+import { analytics } from "../../analytics.ts";
 import { Dialog } from "../../components/Dialog";
 import type { PlanningClient } from "../api";
-import { errorMessage } from "../errors";
-import {
-  calendarFile,
-  FOCUS_PRESETS,
-  formatMinute,
-  googleCalendarUrl,
-  parseMinute,
-} from "../focus-time";
-import { needsHomeScreen, pushState, subscribePush } from "../push";
+import { CloudError } from "../cloud-error";
+import { FocusTime } from "../focus-time";
+import { PushNotifications, pushNotifications } from "../push";
 import type { ScheduleState } from "../types";
 import { NudgeScene, ONBOARDING, OnboardingScreen } from "./PlannerTour";
 
@@ -47,13 +41,21 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
   const headingId = createUniqueId();
   const current = untrack(() => props.schedule?.focusMinute ?? null);
   const [other, setOther] = createSignal(
-    current !== null && !FOCUS_PRESETS.some((p) => p.minute === current),
+    current !== null &&
+      !FocusTime.PRESETS.some((preset) => preset.time.minute === current),
   );
-  const [value, setValue] = createSignal(formatMinute(current ?? 8 * 60 + 30));
+  const [value, setValue] = createSignal(
+    (current === null
+      ? FocusTime.SUGGESTED_OTHER
+      : new FocusTime(current)
+    ).label(),
+  );
   const [saved, setSaved] = createSignal<ScheduleState | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
-  const [push, { mutate: setPush }] = createResource(() => pushState());
+  const [push, { mutate: setPush }] = createResource(() =>
+    pushNotifications.state(),
+  );
   const site = () => `${window.location.origin}/`;
 
   async function choose(minute: number): Promise<void> {
@@ -67,12 +69,12 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
       );
       props.onSaved(state);
       setSaved(state);
-      capture("focus_time_changed", {
+      analytics.capture("focus_time_changed", {
         focus_minute: minute,
         weekdays_only: state.weekdaysOnly,
       });
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(CloudError.messageOf(cause));
     } finally {
       setBusy(false);
     }
@@ -84,15 +86,15 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
     setError("");
     try {
       // Asked from this click: browsers only prompt from a gesture.
-      const subscription = await subscribePush();
+      const subscription = await pushNotifications.subscribe();
       if (subscription) {
         const state = await client.savePushSubscription(subscription);
         props.onSaved(state);
-        capture("push_notifications_changed", { enabled: true });
+        analytics.capture("push_notifications_changed", { enabled: true });
       }
-      setPush(await pushState());
+      setPush(await pushNotifications.state());
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(CloudError.messageOf(cause));
     } finally {
       setBusy(false);
     }
@@ -105,22 +107,9 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
       await props.onStartNow();
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(CloudError.messageOf(cause));
       setBusy(false);
     }
-  }
-
-  function downloadCalendar(state: ScheduleState): void {
-    const blob = new Blob(
-      [calendarFile(state.focusMinute!, state.weekdaysOnly, site())],
-      { type: "text/calendar" },
-    );
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "prune-focus-time.ics";
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const errorLine = () => (
@@ -131,20 +120,20 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
 
   const presets = () => (
     <div class="focus-presets" role="group" aria-label="Focus time">
-      <For each={FOCUS_PRESETS}>
+      <For each={FocusTime.PRESETS}>
         {(preset, i) => (
           <button
             type="button"
-            class={`focus-preset is-${["morning", "afternoon", "evening"][i()]}`}
-            aria-pressed={current === preset.minute}
+            class={`focus-preset is-${preset.id}`}
+            aria-pressed={current === preset.time.minute}
             disabled={busy()}
-            onClick={() => void choose(preset.minute)}
+            onClick={() => void choose(preset.time.minute)}
           >
             <Show when={props.onboarding}>
               <PresetIcon index={i()} />
             </Show>
             <span class="focus-preset-label">{preset.label}</span>
-            <span class="focus-preset-time">{formatMinute(preset.minute)}</span>
+            <span class="focus-preset-time">{preset.time.label()}</span>
           </button>
         )}
       </For>
@@ -182,9 +171,9 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
 
   const submitOther = (event: SubmitEvent) => {
     event.preventDefault();
-    const minute = parseMinute(value());
-    if (minute === null) setError("Pick a time of day.");
-    else void choose(minute);
+    const time = FocusTime.parse(value());
+    if (time === null) setError("Pick a time of day.");
+    else void choose(time.minute);
   };
 
   const ways = (state: ScheduleState) => (
@@ -199,7 +188,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
               <Match when={push() === "denied"}>
                 Blocked in this browser’s settings.
               </Match>
-              <Match when={needsHomeScreen()}>
+              <Match when={PushNotifications.needsHomeScreen()}>
                 On iPhone, add prune to your Home Screen first (Share → Add to
                 Home Screen).
               </Match>
@@ -232,8 +221,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
         <span class="focus-way-actions">
           <a
             class="focus-way-link"
-            href={googleCalendarUrl(
-              state.focusMinute!,
+            href={new FocusTime(state.focusMinute!).googleCalendarUrl(
               state.weekdaysOnly,
               site(),
             )}
@@ -245,7 +233,12 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
           <button
             type="button"
             class="focus-way-link"
-            onClick={() => downloadCalendar(state)}
+            onClick={() =>
+              new FocusTime(state.focusMinute!).downloadCalendarFile(
+                state.weekdaysOnly,
+                site(),
+              )
+            }
           >
             Apple / Outlook
           </button>
@@ -279,7 +272,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
 
   const savedState = () => (saved()?.focusMinute != null ? saved() : null);
   const when = (state: ScheduleState) =>
-    `${state.weekdaysOnly ? "Weekdays" : "Every day"} at ${formatMinute(state.focusMinute!)}.`;
+    `${state.weekdaysOnly ? "Weekdays" : "Every day"} at ${new FocusTime(state.focusMinute!).label()}.`;
 
   const fullScreen = () => (
     <Dialog

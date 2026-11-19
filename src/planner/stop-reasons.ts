@@ -65,7 +65,18 @@ export const STOP_REASON_AREAS = [
 
 export type StopReasonArea = (typeof STOP_REASON_AREAS)[number];
 
-/** The text saved for a picked reason, area first. */
-export function presetStopReason(area: string, reason: string): string {
-  return `${area}: ${reason}`;
+/** A one-tap reason picked from an area. */
+export class StopReason {
+  readonly area: string;
+  readonly reason: string;
+
+  constructor(area: string, reason: string) {
+    this.area = area;
+    this.reason = reason;
+  }
+
+  /** The text saved for it, area first. */
+  get text(): string {
+    return `${this.area}: ${this.reason}`;
+  }
 }

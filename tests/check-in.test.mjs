@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkInSummary, plannedEstimate, ratioLabel, trend, weekPoint } from "../src/reviews/check-in.ts";
+import { Estimate } from "../src/planner/estimate.ts";
+import { CheckInSummary, Trend, WeekPoint } from "../src/reviews/check-in.ts";
+
+const checkInSummary = (reviews, plan) => new CheckInSummary(reviews, plan);
+const plannedEstimate = Estimate.forFactor;
+const ratioLabel = CheckInSummary.ratioLabel;
+const trend = (values) => new Trend(values).values;
+const weekPoint = (review) => new WeekPoint(review);
 
 const report = (weekStart, weekEnd, tasks) => ({
   weekStart, weekEnd, generatedAt: 0, model: "m",

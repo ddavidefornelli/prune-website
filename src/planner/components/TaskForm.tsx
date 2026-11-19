@@ -1,5 +1,6 @@
 import {
   createEffect,
+  createMemo,
   createSignal,
   on,
   untrack,
@@ -9,8 +10,9 @@ import {
   Show,
 } from "solid-js";
 import { Dialog } from "../../components/Dialog";
-import { ESTIMATE, MOBILE_QUERY, PLANNER_LIMITS } from "../constants";
-import { formatMinutes, parseQuickEntry } from "../quick-entry";
+import { Duration } from "../../shared/duration";
+import { ESTIMATE, MEDIA_QUERIES, PLANNER_LIMITS } from "../constants";
+import { QuickEntry } from "../quick-entry";
 import { EstimateDial } from "./EstimateDial";
 
 interface TaskFormProps {
@@ -41,16 +43,16 @@ export function TaskForm(props: TaskFormProps) {
     ),
   );
   const [mobile, setMobile] = createSignal(
-    window.matchMedia(MOBILE_QUERY).matches,
+    window.matchMedia(MEDIA_QUERIES.mobile).matches,
   );
   const [estimating, setEstimating] = createSignal(false);
   const questionId = createUniqueId();
-  const parsed = () => parseQuickEntry(outcome());
+  const parsed = createMemo(() => QuickEntry.parse(outcome()));
   let input!: HTMLInputElement;
 
   onMount(() => {
     if (props.autofocus) input.focus();
-    const query = window.matchMedia(MOBILE_QUERY);
+    const query = window.matchMedia(MEDIA_QUERIES.mobile);
     const change = () => setMobile(query.matches);
     query.addEventListener("change", change);
     onCleanup(() => query.removeEventListener("change", change));
@@ -111,7 +113,7 @@ export function TaskForm(props: TaskFormProps) {
           >
             {(typed) => (
               <span class="quick-entry-chip" aria-live="polite">
-                {formatMinutes(typed() * 60)}
+                {Duration.ofMinutes(typed()).rounded()}
               </span>
             )}
           </Show>

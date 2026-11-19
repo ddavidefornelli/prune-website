@@ -1,7 +1,8 @@
 import { For, Show, createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { StreakParty } from "../planner/components/StreakParty";
-import { streakFor } from "../planner/streak";
+import { Streak } from "../planner/streak";
+import { CalendarDay } from "../shared/calendar-day";
 import { DANCES, type Dance } from "../planner/streak-party";
 import "../styles/app.css";
 
@@ -25,17 +26,16 @@ const soundUrl = (name: string) =>
  * Dev-only preview of the streak party (`npm run party`), with no sign-in.
  * Try /party.html?days=30&dance=spin to open straight on one.
  */
-const DAY_MS = 86_400_000;
 const params = new URLSearchParams(location.search);
 const today = new Date().toISOString().slice(0, 10);
 
 function streakOf(days: number) {
-  const start = Date.parse(`${today}T00:00:00Z`);
+  const start = CalendarDay.parse(today);
   const completions = Array.from({ length: Math.max(1, days) }, (_, i) => ({
-    day: new Date(start - i * DAY_MS).toISOString().slice(0, 10),
+    day: start.plus(-i).key,
     count: 1,
   }));
-  return streakFor({ today, completions });
+  return Streak.of({ today, completions });
 }
 
 function Preview() {

@@ -1,16 +1,10 @@
 import { createResource, createSignal, For, Show, untrack } from "solid-js";
 import type { PlanningClient } from "../planner/api";
-import { formatMinute } from "../planner/focus-time";
-import {
-  forgetPush,
-  needsHomeScreen,
-  pushState,
-  subscribePush,
-} from "../planner/push";
+import { FocusTime } from "../planner/focus-time";
+import { PushNotifications, pushNotifications } from "../planner/push";
 import type { EmailPreferences } from "../planner/types";
 
-// Every quarter hour from 05:00 to 23:00.
-const TIMES = Array.from({ length: 73 }, (_, index) => 5 * 60 + index * 15);
+const TIMES = FocusTime.CHOICES.map((time) => time.minute);
 
 /**
  * Everything about reminders in one place: the focus time, and the ways
@@ -24,7 +18,9 @@ export function Reminders(props: { client: PlanningClient }) {
   const [emails, { mutate: setEmails }] = createResource(() =>
     client.emailPreferences().catch(() => null),
   );
-  const [push, { mutate: setPush }] = createResource(() => pushState());
+  const [push, { mutate: setPush }] = createResource(() =>
+    pushNotifications.state(),
+  );
   const [saving, setSaving] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
 
@@ -65,14 +61,14 @@ export function Reminders(props: { client: PlanningClient }) {
   const togglePush = (on: boolean) =>
     run(async () => {
       if (on) {
-        const subscription = await subscribePush();
+        const subscription = await pushNotifications.subscribe();
         if (subscription)
           setSchedule(await client.savePushSubscription(subscription));
       } else
-        await forgetPush(async (endpoint) =>
+        await pushNotifications.forget(async (endpoint) =>
           setSchedule(await client.removePushSubscription(endpoint)),
         );
-      setPush(await pushState());
+      setPush(await pushNotifications.state());
     });
 
   return (
@@ -112,7 +108,7 @@ export function Reminders(props: { client: PlanningClient }) {
                     }
                   >
                     <option value={value().focusMinute!} selected>
-                      {formatMinute(value().focusMinute!)}
+                      {new FocusTime(value().focusMinute!).label()}
                     </option>
                   </Show>
                   <For each={TIMES}>
@@ -121,7 +117,7 @@ export function Reminders(props: { client: PlanningClient }) {
                         value={minute}
                         selected={value().focusMinute === minute}
                       >
-                        {formatMinute(minute)}
+                        {new FocusTime(minute).label()}
                       </option>
                     )}
                   </For>
@@ -190,7 +186,7 @@ export function Reminders(props: { client: PlanningClient }) {
         <Show
           when={schedule() && push() && push() !== "unsupported"}
           fallback={
-            <Show when={needsHomeScreen()}>
+            <Show when={PushNotifications.needsHomeScreen()}>
               <p class="muted">
                 On iPhone, add prune to your Home Screen to get notifications.
               </p>

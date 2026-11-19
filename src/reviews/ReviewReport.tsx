@@ -1,7 +1,8 @@
 import { createMemo, For, Show } from "solid-js";
 import type { WeeklyReview } from "../planner/types";
-import { averageTaskTiming, focusDuration } from "../shared/task-timing";
-import { reviewText } from "./format";
+import { Duration } from "../shared/duration";
+import { TaskTimingReport } from "../shared/task-timing";
+import { ReviewFormat } from "./format";
 
 /** Decorative bars supplement explicit values, never color-only information. */
 function ReviewBar(props: { value: number; maximum: number; class: string }) {
@@ -19,11 +20,11 @@ function ReviewBar(props: { value: number; maximum: number; class: string }) {
 
 function TimingComparison(props: { review: WeeklyReview }) {
   const timing = createMemo(() =>
-    averageTaskTiming(
+    new TaskTimingReport(
       props.review.activity.tasks,
       props.review.weekStart,
       props.review.weekEnd,
-    ),
+    ).average(),
   );
   return (
     <Show
@@ -50,7 +51,7 @@ function TimingComparison(props: { review: WeeklyReview }) {
               ·{" "}
               {value().differenceSeconds === 0
                 ? "On estimate"
-                : `${focusDuration(Math.abs(value().differenceSeconds))} ${value().differenceSeconds > 0 ? "over" : "under"} estimate`}
+                : `${new Duration(Math.abs(value().differenceSeconds)).precise()} ${value().differenceSeconds > 0 ? "over" : "under"} estimate`}
             </span>
           </div>
           <For each={["estimate", "actual"] as const}>
@@ -64,7 +65,7 @@ function TimingComparison(props: { review: WeeklyReview }) {
                   <div class="review-timing-caption">
                     <span class="review-timing-label">Average {kind}</span>
                     <span class="review-timing-value">
-                      {focusDuration(seconds())}
+                      {new Duration(seconds()).precise()}
                     </span>
                   </div>
                   <ReviewBar
@@ -160,7 +161,7 @@ export function ReviewReport(props: { review: WeeklyReview }) {
         {(reason) => (
           <div class="weekly-reason">
             <div class="review-reason-caption">
-              <p>{reviewText(reason.reason)}</p>
+              <p>{ReviewFormat.text(reason.reason)}</p>
               <span class="review-count">
                 {reason.evidenceStopIds.length}{" "}
                 {reason.evidenceStopIds.length === 1 ? "entry" : "entries"}

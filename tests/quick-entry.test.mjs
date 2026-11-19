@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatMinutes, parseQuickEntry, summarizeDay } from "../src/planner/quick-entry.ts";
+import { DayPlan } from "../src/planner/day-plan.ts";
+import { QuickEntry } from "../src/planner/quick-entry.ts";
+import { Duration } from "../src/shared/duration.ts";
+
+const parseQuickEntry = (text) => ({ ...QuickEntry.parse(text) });
+const summarizeDay = (tasks, now) => new DayPlan(tasks).summary(now);
 
 test("quick entry reads a trailing duration and clamps it to the dial", () => {
   assert.deepEqual(parseQuickEntry("Write the brief 45m"), { outcome: "Write the brief", minutes: 45 });
@@ -28,5 +33,5 @@ test("day summary projects remaining focus from estimates and tracked time", () 
   assert.equal(summary.remainingSeconds, 900 + 1200);
   assert.equal(summary.finishAt, 1300 + 2100);
   assert.equal(summarizeDay([tasks[0]], 0).finishAt, null);
-  assert.equal(formatMinutes(5400), "1 h 30 min");
+  assert.equal(new Duration(5400).rounded(), "1 h 30 min");
 });
