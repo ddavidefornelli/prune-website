@@ -78,26 +78,24 @@ test("background updates preserve task-form drafts", async ({ page, backend }) =
   expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
 });
 
-test("pause reasons survive background updates and Escape cannot discard them", async ({ page, backend }) => {
+test("the stop dialog survives background updates and Escape cannot discard it", async ({ page, backend }) => {
   await openPlanner(page);
-  await addTask(page, "Focus without losing drafts");
+  await addTask(page, "Focus without losing the dialog");
   await synced(page);
   await page.getByRole("button", { name: "Start focus", exact: true }).click();
   await page.locator("#focus-timer").click();
-  const reason = page.getByRole("textbox", { name: "Why are you stopping?" });
-  await reason.fill("An unfinished interruption reason");
-  const original = await reason.elementHandle();
+  const environment = page.getByRole("button", { name: "Environment", exact: true });
+  await expect(page.getByRole("button", { name: "Social media", exact: true })).toBeFocused();
+  const original = await environment.elementHandle();
   backend.data.completions = [{ day: backend.data.today, count: 1 }];
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.locator("#app")).toHaveAttribute("data-completion-level", "1");
-  await expect(reason).toHaveValue("An unfinished interruption reason");
-  await expect(reason).toBeFocused();
   expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
-  await reason.press("Escape");
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Why are you stopping?" })).toBeVisible();
-  await page.getByRole("button", { name: "Save reason", exact: true }).click();
+  await environment.click();
   await synced(page);
-  expect(backend.stops).toContain("An unfinished interruption reason");
+  expect(backend.stops).toContain("Environment");
 });
 
 test("failed durable estimate saves roll back the dial and allow retry", async ({ page, backend }) => {

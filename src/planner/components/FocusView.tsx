@@ -2,7 +2,6 @@ import {
   createEffect,
   createMemo,
   onCleanup,
-  createSignal,
   createUniqueId,
   Show,
   untrack,
@@ -13,15 +12,10 @@ import { Dialog } from "../../components/Dialog";
 import { Duration } from "../../shared/duration";
 import { TIME } from "../../shared/time-constants";
 import type { PlanningClient } from "../api";
-import { MEDIA_QUERIES, PLANNER_LIMITS } from "../constants";
 import { TaskTimer } from "../day-plan";
 import type { PlannerState } from "../planner-state";
 import type { Task } from "../types";
-import {
-  StopReason,
-  STOP_REASON_AREAS,
-  type StopReasonArea,
-} from "../stop-reasons";
+import { STOP_REASONS } from "../stop-reasons";
 import { FocusSounds } from "./FocusSounds";
 import { TaskTitle } from "./TaskTitle";
 
@@ -38,17 +32,7 @@ export function FocusView(props: {
 }) {
   const planner = untrack(() => props.planner);
   const task = () => planner.data()?.activeTask;
-  const [reason, setReason] = createSignal("");
-  /** The area picked in the stop dialog; its reasons replace the areas. */
-  const [area, setArea] = createSignal<StopReasonArea | null>(null);
-  let presets: HTMLDivElement | undefined;
-  /** Keep keyboard focus in the presets as they swap between steps. */
-  const showArea = (next: StopReasonArea | null) => {
-    setArea(next);
-    presets?.querySelector<HTMLElement>(".pause-preset")?.focus();
-  };
   const reasonId = createUniqueId();
-  const reasonHintId = createUniqueId();
   const notesId = createUniqueId();
   const paused = () => task()?.startedAt === null;
   const remaining = createMemo(() => {
@@ -91,18 +75,16 @@ export function FocusView(props: {
     }
   }
 
-  function saveReason(text: string, preset: boolean): void {
+  function saveReason(text: string): void {
     const active = task();
     if (!active) return;
     void planner
       .mutate(async () => {
         await props.client.savePauseReason(active.id, text);
-        setReason("");
-        setArea(null);
         planner.setPauseReasonOpen(false);
       })
       .then((saved) => {
-        if (saved) analytics.capture("pause_reason_saved", { preset });
+        if (saved) analytics.capture("pause_reason_saved", { reason: text });
       });
   }
 
@@ -234,113 +216,36 @@ export function FocusView(props: {
               preventCancel
               onDismiss={() => {}}
               initialFocus={(dialog) =>
-                // On touch screens a focused box would raise the keyboard over
-                // the one-tap reasons, so start on the first of those instead.
-                (window.matchMedia(MEDIA_QUERIES.finePointer).matches
-                  ? dialog.querySelector("textarea")
-                  : dialog.querySelector<HTMLElement>(".pause-preset")
-                )?.focus()
+                dialog.querySelector<HTMLElement>(".pause-preset")?.focus()
               }
             >
-              <form
-                class="pause-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const input = event.currentTarget.querySelector("textarea")!;
-                  input.setCustomValidity(
-                    reason().trim()
-                      ? ""
-                      : "Pick a reason or write one for stopping.",
-                  );
-                  if (!event.currentTarget.reportValidity()) return;
-                  saveReason(reason(), false);
-                }}
-              >
+              <div class="pause-form">
                 <div class="pause-heading">
                   <h2 id={reasonId}>Why are you stopping?</h2>
-                  <p id={reasonHintId} class="muted">
-                    Pick where it came from, then the closest reason — or write
-                    exactly what happened. The more precise the reason, the
-                    faster you’ll improve.
-                  </p>
+                  <p class="muted">Tap what pulled you away.</p>
                 </div>
                 <div
-                  ref={(element) => (presets = element)}
                   class="pause-presets"
                   role="group"
-                  aria-label={area()?.area ?? "Where it came from"}
+                  aria-label="What pulled you away"
                 >
-                  <Show
-                    when={area()}
-                    fallback={
-                      <For each={STOP_REASON_AREAS}>
-                        {(group) => (
-                          <button
-                            type="button"
-                            class="pause-preset is-area"
-                            disabled={planner.busy()}
-                            onClick={() => showArea(group)}
-                          >
-                            {group.area}
-                            <span class="pause-preset-arrow" aria-hidden="true">
-                              ›
-                            </span>
-                          </button>
-                        )}
-                      </For>
-                    }
-                  >
-                    {(picked) => (
-                      <>
-                        <For each={picked().reasons}>
-                          {(preset) => (
-                            <button
-                              type="button"
-                              class="pause-preset"
-                              disabled={planner.busy()}
-                              onClick={() =>
-                                saveReason(
-                                  new StopReason(picked().area, preset).text,
-                                  true,
-                                )
-                              }
-                            >
-                              {preset}
-                            </button>
-                          )}
-                        </For>
-                        <button
-                          type="button"
-                          class="pause-preset is-back"
-                          disabled={planner.busy()}
-                          onClick={() => showArea(null)}
-                        >
-                          <span aria-hidden="true">←</span> Other areas
-                        </button>
-                      </>
+                  <For each={STOP_REASONS}>
+                    {(preset) => (
+                      <button
+                        type="button"
+                        class="pause-preset"
+                        disabled={planner.busy()}
+                        onClick={() => saveReason(preset.label)}
+                      >
+                        <span class="pause-preset-emoji" aria-hidden="true">
+                          {preset.emoji}
+                        </span>
+                        {preset.label}
+                      </button>
                     )}
-                  </Show>
+                  </For>
                 </div>
-                <textarea
-                  aria-labelledby={reasonId}
-                  aria-describedby={reasonHintId}
-                  required
-                  // No native "Please fill out this field." hover tooltip.
-                  title=""
-                  maxLength={PLANNER_LIMITS.stopReasonLength}
-                  rows={3}
-                  placeholder="e.g. A colleague asked about the release, and I didn’t know where the spec was"
-                  value={reason()}
-                  disabled={planner.busy()}
-                  onInput={(event) => {
-                    event.currentTarget.setCustomValidity("");
-                    setReason(event.currentTarget.value);
-                  }}
-                />
                 <div class="pause-actions">
-                  <button type="submit" disabled={planner.busy()}>
-                    Save reason
-                  </button>
                   <button
                     type="button"
                     disabled={planner.busy()}
@@ -348,8 +253,6 @@ export function FocusView(props: {
                       void planner
                         .mutate(async () => {
                           await props.client.resume(active().id);
-                          setReason("");
-                          setArea(null);
                           planner.setPauseReasonOpen(false);
                         })
                         .then((resumed) => {
@@ -360,7 +263,7 @@ export function FocusView(props: {
                     Resume focusing
                   </button>
                 </div>
-              </form>
+              </div>
             </Dialog>
           </Show>
         </>
