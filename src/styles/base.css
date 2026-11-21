@@ -394,7 +394,9 @@ h2 {
   overflow-wrap: anywhere;
 }
 .editable-title button {
-  display: block;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
   max-width: 100%;
   padding: 0;
   border: 0;
@@ -403,6 +405,21 @@ h2 {
   letter-spacing: inherit;
   text-align: left;
   overflow-wrap: anywhere;
+}
+.editable-title .task-title-text {
+  min-width: 0;
+}
+.edit-title-icon {
+  flex: none;
+  width: 0.9em;
+  height: 0.9em;
+  margin-top: 0.2em;
+  color: var(--muted);
+  transition: color 120ms ease;
+}
+.editable-title button:hover:not(:disabled) .edit-title-icon,
+.editable-title button:focus-visible .edit-title-icon {
+  color: var(--accent);
 }
 .editable-title button:hover:not(:disabled) {
   background: transparent;
