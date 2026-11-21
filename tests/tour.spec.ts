@@ -71,7 +71,9 @@ for (const width of [1100, 390]) {
     await expect(picker.getByRole("heading")).toHaveText("Every day at 14:00.");
     expect(backend.schedule).toEqual({ focusMinute: 14 * 60, weekdaysOnly: false, pushDevices: 0 });
     await expect(picker).toContainText("We’ll email you then");
-    await expect(picker.getByRole("listitem").filter({ hasText: "Notification" })).toBeVisible();
+    // Finishing asks for notifications: only the calendar is offered.
+    await expect(picker.getByRole("listitem").filter({ hasText: "Notification" })).toHaveCount(0);
+    await expect(picker.getByRole("button", { name: "Turn on" })).toHaveCount(0);
     await expect(picker.getByRole("link", { name: "Google" })).toHaveAttribute("href", /calendar\.google\.com.*recur=RRULE%3AFREQ%3DDAILY/);
     await expect(picker.getByRole("button", { name: "Apple / Outlook" })).toBeVisible();
     await expect(picker).toBeInViewport({ ratio: 1 });

@@ -13,7 +13,11 @@ import { Dialog } from "../../components/Dialog";
 import type { PlanningClient } from "../api";
 import { CloudError } from "../cloud-error";
 import { FocusTime } from "../focus-time";
-import { PushNotifications, pushNotifications } from "../push";
+import {
+  PushNotifications,
+  pushNotifications,
+  type SavedSubscription,
+} from "../push";
 import type { ScheduleState } from "../types";
 import { NudgeScene, ONBOARDING, OnboardingScreen } from "./PlannerTour";
 
@@ -35,8 +39,9 @@ interface FocusTimeDialogProps {
 /**
  * Two screens. First the question (one tap picks the daily focus time), then
  * what that gets you: the email, a notification on this device and a
- * repeating calendar block, each turned on explicitly. During onboarding
- * both are full screens drawn like the pitch; from Overview, one card.
+ * repeating calendar block. During onboarding both are full screens drawn
+ * like the pitch, and finishing asks for notifications, so only the
+ * calendar is offered; from Overview, one card with a button for each.
  */
 export function FocusTimeDialog(props: FocusTimeDialogProps) {
   const client = untrack(() => props.client);
@@ -70,11 +75,11 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
         props.schedule?.weekdaysOnly ?? false,
       );
       props.onSaved(state);
-      setSaved(state);
       analytics.capture("focus_time_changed", {
         focus_minute: minute,
         weekdays_only: state.weekdaysOnly,
       });
+      setSaved(state);
     } catch (cause) {
       setError(CloudError.messageOf(cause));
     } finally {
@@ -82,24 +87,40 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
     }
   }
 
+  async function savePush(subscription: SavedSubscription | null) {
+    try {
+      if (subscription) {
+        props.onSaved(await client.savePushSubscription(subscription));
+        analytics.capture("push_notifications_changed", { enabled: true });
+      }
+    } catch (cause) {
+      setError(CloudError.messageOf(cause));
+    }
+    setPush(await pushNotifications.state());
+  }
+
   async function enablePush(): Promise<void> {
     if (busy()) return;
     setBusy(true);
     setError("");
-    try {
-      // Asked from this click: browsers only prompt from a gesture.
-      const subscription = await pushNotifications.subscribe();
-      if (subscription) {
-        const state = await client.savePushSubscription(subscription);
-        props.onSaved(state);
-        analytics.capture("push_notifications_changed", { enabled: true });
-      }
-      setPush(await pushNotifications.state());
-    } catch (cause) {
-      setError(CloudError.messageOf(cause));
-    } finally {
+    // Asked from this click: browsers only prompt from a gesture.
+    await savePush(await pushNotifications.subscribe().catch(() => null));
+    setBusy(false);
+  }
+
+  /**
+   * Onboarding's last tap turns notifications on: the browser's own prompt
+   * must open from this tap, before anything is awaited.
+   */
+  async function finish(then: "start" | "close"): Promise<void> {
+    if (busy()) return;
+    if (push() === "off") {
+      setBusy(true);
+      await savePush(await pushNotifications.subscribe().catch(() => null));
       setBusy(false);
     }
+    if (then === "start") await startNow();
+    else props.onClose();
   }
 
   async function startNow(): Promise<void> {
@@ -180,41 +201,44 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
 
   const ways = (state: ScheduleState) => (
     <ul class="focus-ways">
-      <li>
-        <span class="focus-way-text">
-          <strong>Notification</strong>
-          <span>
-            <Switch fallback="Not available in this browser.">
-              <Match when={push() === "on"}>On for this device.</Match>
-              <Match when={push() === "off"}>On this device.</Match>
-              <Match when={push() === "denied"}>
-                Blocked in this browser’s settings.
-              </Match>
-              <Match when={PushNotifications.needsHomeScreen()}>
-                On iPhone, add prune to your Home Screen first (Share → Add to
-                Home Screen).
-              </Match>
-            </Switch>
-          </span>
-        </span>
-        <Switch>
-          <Match when={push() === "off"}>
-            <button
-              type="button"
-              class="primary-button"
-              disabled={busy()}
-              onClick={() => void enablePush()}
-            >
-              Turn on
-            </button>
-          </Match>
-          <Match when={push() === "on"}>
-            <span class="focus-way-done" aria-hidden="true">
-              ✓
+      {/* Onboarding asks on its last tap: only the calendar is offered. */}
+      <Show when={!props.onboarding}>
+        <li>
+          <span class="focus-way-text">
+            <strong>Notification</strong>
+            <span>
+              <Switch fallback="Not available in this browser.">
+                <Match when={push() === "on"}>On for this device.</Match>
+                <Match when={push() === "off"}>On this device.</Match>
+                <Match when={push() === "denied"}>
+                  Blocked in this browser’s settings.
+                </Match>
+                <Match when={PushNotifications.needsHomeScreen()}>
+                  On iPhone, add prune to your Home Screen first (Share → Add to
+                  Home Screen).
+                </Match>
+              </Switch>
             </span>
-          </Match>
-        </Switch>
-      </li>
+          </span>
+          <Switch>
+            <Match when={push() === "off"}>
+              <button
+                type="button"
+                class="primary-button"
+                disabled={busy()}
+                onClick={() => void enablePush()}
+              >
+                Turn on
+              </button>
+            </Match>
+            <Match when={push() === "on"}>
+              <span class="focus-way-done" aria-hidden="true">
+                ✓
+              </span>
+            </Match>
+          </Switch>
+        </li>
+      </Show>
       <li>
         <span class="focus-way-text">
           <strong>Calendar</strong>
@@ -316,7 +340,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
               headingId={headingId}
               eyebrow="You’re all set"
               title={when(state)}
-              text="We’ll email you then with today’s plan. Make it impossible to miss:"
+              text="We’ll email you then with today’s plan. Put it in your calendar too:"
               glow="var(--pearl-deep)"
               visual={
                 <NudgeScene
@@ -332,7 +356,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
                     class="tour-primary"
                     disabled={busy()}
                     onClick={() =>
-                      props.onStartNow ? void startNow() : props.onClose()
+                      void finish(props.onStartNow ? "start" : "close")
                     }
                   >
                     {props.onStartNow ? "Start now" : "Done"}
@@ -345,7 +369,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
                       type="button"
                       class="tour-later"
                       disabled={busy()}
-                      onClick={() => props.onClose()}
+                      onClick={() => void finish("close")}
                     >
                       Done
                     </button>
