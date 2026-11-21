@@ -24,6 +24,8 @@ interface FocusTimeDialogProps {
   onboarding?: boolean;
   /** Onboarding's first task, shown in the reminder on the last screen. */
   firstTask?: { outcome: string; minutes: number };
+  /** That first task is tomorrow's, so is its first reminder. */
+  firstTaskTomorrow?: boolean;
   /** Present right after the first task: starting now is still an option. */
   onStartNow?: () => Promise<void>;
   onSaved: (state: ScheduleState) => void;
@@ -320,6 +322,7 @@ export function FocusTimeDialog(props: FocusTimeDialogProps) {
                 <NudgeScene
                   minute={state.focusMinute!}
                   task={props.firstTask}
+                  tomorrow={props.firstTaskTomorrow}
                 />
               }
               actions={

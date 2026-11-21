@@ -80,6 +80,12 @@ export const HINT_RULES = {
   shortcutsAfterVisits: 3,
 } as const;
 
+/** Onboarding's first task. */
+export const ONBOARDING_RULES = {
+  /** From this local hour, the first task is planned for tomorrow. */
+  lateHour: 20,
+} as const;
+
 /** The words for a daily target, "one" to "five". */
 export const COUNT_WORDS = ["one", "two", "three", "four", "five"] as const;
 

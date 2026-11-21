@@ -24,6 +24,7 @@ const TOUR_TIMING = {
   checkInPhases: [250, 1500],
   checkInCountUp: { delay: 300, duration: 1100, onTargetDelay: 500 },
   nudgePhases: [700, 1100, 2300, 2700],
+  tonightPhases: [150, 650],
   streak: { firstEmber: 450, betweenEmbers: 260 },
 } as const;
 
@@ -42,7 +43,8 @@ interface Scene {
  * A new, empty planner opens on a short pitch, not a feature list:
  * full-screen scenes that show what a day with prune feels like. Onboarding
  * then continues on screens drawn the same way (OnboardingScreen): the first
- * task (FirstTaskDialog), the focus time and its reminders (FocusTimeDialog).
+ * task (FirstTaskDialog, tomorrow's when it is late), the focus time and its
+ * reminders (FocusTimeDialog).
  */
 const SCENES: readonly Scene[] = [
   {
@@ -472,11 +474,15 @@ function CheckInScene() {
 export function NudgeScene(props: {
   minute: number;
   task?: { outcome: string; minutes: number };
+  /** The task is tomorrow's, so the reminder is too. */
+  tomorrow?: boolean;
 }) {
   const phase = usePhases(TOUR_TIMING.nudgePhases);
   const time = () => new FocusTime(props.minute);
   const day = () =>
-    FocusTime.of(new Date()).minute < props.minute ? "Today" : "Tomorrow";
+    !props.tomorrow && FocusTime.of(new Date()).minute < props.minute
+      ? "Today"
+      : "Tomorrow";
   const started = () => phase() >= 4 && props.task;
   return (
     <div class="nudge-scene" data-phase={phase()}>
@@ -502,6 +508,59 @@ export function NudgeScene(props: {
           </div>
           <span class="nudge-tap" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Late in the evening: tomorrow's page under a night sky ---------- */
+
+const tomorrowLabel = {
+  weekday: new Intl.DateTimeFormat("en", { weekday: "long", timeZone: "UTC" }),
+  day: new Intl.DateTimeFormat("en", { day: "numeric", timeZone: "UTC" }),
+  month: new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }),
+};
+
+/** Where the stars sit, in percent of the sky, and how big they are. */
+const STARS = [
+  { x: 12, y: 18, s: 1 },
+  { x: 28, y: 8, s: 0.6 },
+  { x: 44, y: 22, s: 0.8 },
+  { x: 8, y: 52, s: 0.7 },
+  { x: 90, y: 58, s: 0.9 },
+  { x: 62, y: 6, s: 0.6 },
+  { x: 20, y: 80, s: 0.6 },
+  { x: 84, y: 86, s: 0.7 },
+] as const;
+
+/** The moon is up and tomorrow's page drops onto the desk, still blank. */
+export function TonightScene(props: { date: string }) {
+  const phase = usePhases(TOUR_TIMING.tonightPhases);
+  const date = () => new Date(`${props.date}T00:00:00Z`);
+  return (
+    <div class="tonight-scene" data-phase={phase()}>
+      <For each={STARS}>
+        {(star, i) => (
+          <span
+            class="tonight-star"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              "--s": star.s,
+              "--i": i(),
+            }}
+          />
+        )}
+      </For>
+      <span class="tonight-moon" />
+      <div class="tonight-page">
+        <span class="tonight-page-head">Tomorrow</span>
+        <span class="tonight-page-day">{tomorrowLabel.day.format(date())}</span>
+        <span class="tonight-page-weekday">
+          {tomorrowLabel.weekday.format(date())} ·{" "}
+          {tomorrowLabel.month.format(date())}
+        </span>
+        <span class="tonight-page-line" />
       </div>
     </div>
   );

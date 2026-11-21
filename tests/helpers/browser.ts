@@ -53,11 +53,20 @@ export interface Backend {
   journey: [string, Record<string, unknown>][];
 }
 
-export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: boolean; firstVisit: boolean }>({
+export const test = base.extend<{ backend: Backend; signedIn: boolean; expired: boolean; firstVisit: boolean; hour: number | null }>({
   signedIn: [false, { option: true }],
   expired: [false, { option: true }],
   firstVisit: [false, { option: true }],
-  backend: async ({ context, signedIn, expired, firstVisit }, use) => {
+  // The browser's local hour today. Onboarding plans tomorrow late in the
+  // evening, so first visits default to the morning.
+  hour: [null, { option: true }],
+  backend: async ({ context, signedIn, expired, firstVisit, hour }, use) => {
+    const at = hour ?? (firstVisit ? 10 : null);
+    if (at !== null) {
+      const time = new Date();
+      time.setHours(at, 0, 0, 0);
+      await context.clock.install({ time });
+    }
     const state: Backend = { data: dashboard(), weekly: overview(), requests: [], stops: [], offline: false, rejectWrites: false, isDeleted: false, loseNextAcknowledgement: false, malformedAcknowledgement: false, googleDisabled: false, googleCancelled: false, previewStatus: 200, suggestions: [], protocolVersion: 1, monthStats: { planned: 4, completed: 3, focusSeconds: 5400 }, emailPreferences: { daily: true, comeback: true }, schedule: { focusMinute: null, weekdaysOnly: false, pushDevices: 0 }, receipts: new Map(), journey: [] };
     // Seed once per browser context, not on reload/sign-out or each new tab.
     await context.addInitScript(({ signedIn, initialSession, authKey, privacyKey, version, firstVisit, onboardingKey, tourKey }) => {

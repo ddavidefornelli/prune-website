@@ -31,7 +31,7 @@ import { InsightDrops, type Insight } from "./insights";
 import { FirstRun } from "./onboarding";
 import { PlannerState } from "./planner-state";
 import { KeyboardShortcuts } from "./shortcuts";
-import type { Account, Task } from "./types";
+import type { Account, SuggestionTarget, Task } from "./types";
 
 export function Planner(props: { client: PlanningClient; account: Account }) {
   const client = untrack(() => props.client);
@@ -47,8 +47,9 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   const [firstRun, setFirstRun] = createSignal(false);
   const [shortcuts, setShortcuts] = createSignal(false);
   const [tour, setTour] = createSignal(false);
-  // Onboarding's step after the tour; the tour counts as seen once it is answered.
-  const [firstTask, setFirstTask] = createSignal(false);
+  // Onboarding's step after the tour, for today or (when it is late) tomorrow;
+  // the tour counts as seen once it is answered.
+  const [firstTask, setFirstTask] = createSignal<SuggestionTarget | null>(null);
   const [insight, setInsight] = createSignal<Insight | null>(null);
   const [checkInReady, setCheckInReady] = createSignal(false);
   // The focus-time question; `onboarding` also offers to start right away.
@@ -63,6 +64,13 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
   const startLink = StartLink.take();
   const plannedToday = () =>
     new DayPlan(planner.data()?.todayTasks ?? []).nextPlanned();
+  // Onboarding's first task, whichever day it went to.
+  const [firstTaskDay, setFirstTaskDay] =
+    createSignal<SuggestionTarget>("today");
+  const onboardingTask = () =>
+    firstTaskDay() === "tomorrow"
+      ? new DayPlan(planner.data()?.tomorrowTasks ?? []).nextPlanned()
+      : plannedToday();
   // A check-in that lands while the planner is open is announced on Today.
   let newestReview: number | null = null;
   createEffect(() => {
@@ -119,13 +127,15 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
     outcome: string,
     minutes: number,
   ): Promise<boolean> {
-    const today = planner.data()?.today;
-    if (!today) return false;
+    const data = planner.data();
+    const day = firstTaskDay();
+    if (!data) return false;
+    const date = day === "tomorrow" ? data.tomorrow : data.today;
     const added = await planner.mutate(() =>
-      client.create(outcome, today, minutes),
+      client.create(outcome, date, minutes),
     );
     if (added) {
-      client.track("first_task_added", { minutes });
+      client.track("first_task_added", { minutes, day });
       endFirstTask();
     }
     return added;
@@ -133,7 +143,7 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
 
   /** After the first task (or Later): remember the tour, then ask for the focus time. */
   function endFirstTask(): void {
-    setFirstTask(false);
+    setFirstTask(null);
     finishTour();
     // Only with a backend that can save a focus time.
     if (schedule()) setFocusPicker("onboarding");
@@ -334,21 +344,31 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
             onFinish={() => {
               setTour(false);
               client.track("tour_finished");
-              planner.visit("today");
-              setFirstTask(true);
-              client.track("first_task_shown");
+              const day = FirstRun.firstTaskDay(new Date());
+              setFirstTaskDay(day);
+              planner.visit(day);
+              setFirstTask(day);
+              client.track("first_task_shown", { day });
             }}
           />
         </Show>
-        <Show when={firstTask()}>
-          <FirstTaskDialog
-            step={ONBOARDING.task}
-            onAdd={addFirstTask}
-            onLater={() => {
-              client.track("first_task_later");
-              endFirstTask();
-            }}
-          />
+        <Show when={firstTask()} keyed>
+          {(day) => (
+            <FirstTaskDialog
+              step={ONBOARDING.task}
+              day={day}
+              date={
+                day === "tomorrow"
+                  ? planner.data()!.tomorrow
+                  : planner.data()!.today
+              }
+              onAdd={addFirstTask}
+              onLater={() => {
+                client.track("first_task_later");
+                endFirstTask();
+              }}
+            />
+          )}
         </Show>
         <Show when={focusPicker()} keyed>
           {(mode) => (
@@ -357,12 +377,15 @@ export function Planner(props: { client: PlanningClient; account: Account }) {
               schedule={schedule() ?? null}
               onboarding={mode === "onboarding"}
               firstTask={
-                mode === "onboarding" && plannedToday()
+                mode === "onboarding" && onboardingTask()
                   ? {
-                      outcome: plannedToday()!.outcome,
-                      minutes: plannedToday()!.estimatedMinutes,
+                      outcome: onboardingTask()!.outcome,
+                      minutes: onboardingTask()!.estimatedMinutes,
                     }
                   : undefined
+              }
+              firstTaskTomorrow={
+                mode === "onboarding" && firstTaskDay() === "tomorrow"
               }
               onStartNow={
                 mode === "onboarding" && plannedToday()

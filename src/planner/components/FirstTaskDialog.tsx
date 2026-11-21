@@ -1,19 +1,39 @@
 import { createSignal, createUniqueId, For } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import { ESTIMATE, MEDIA_QUERIES, PLANNER_LIMITS } from "../constants";
-import { OnboardingScreen } from "./PlannerTour";
+import type { SuggestionTarget } from "../types";
+import { OnboardingScreen, TonightScene } from "./PlannerTour";
 
 const label = (minutes: number) =>
   minutes === 60 ? "1 hour" : `${minutes} min`;
+
+/** The screen's words: today's win, or late in the evening, tomorrow's. */
+const COPY = {
+  today: {
+    eyebrow: "Your first win",
+    title: "What’s today’s win?",
+    text: "The one thing you’ll finish today. Nail it and your streak lights up for the first time.",
+  },
+  tomorrow: {
+    eyebrow: "It’s late",
+    title: "Let’s plan tomorrow.",
+    text: "Today’s nearly done. Pick the one thing you’ll finish tomorrow and wake up knowing where to start.",
+  },
+} as const satisfies Record<SuggestionTarget, object>;
 
 /**
  * Onboarding's first task, drawn like the pitch before it: the task is the
  * hero card (the "kept" card from the first scene, now with your words), a
  * tap for the estimate, one big button. "Later" goes on without a task, so
- * nobody types a placeholder just to get in.
+ * nobody types a placeholder just to get in. Late in the evening it plans
+ * tomorrow instead, under a night sky.
  */
 export function FirstTaskDialog(props: {
   step: number;
+  /** Which day the task is for. */
+  day: SuggestionTarget;
+  /** That day, as YYYY-MM-DD. */
+  date: string;
   /** Resolves true once the task is saved (or queued offline). */
   onAdd: (outcome: string, minutes: number) => Promise<boolean>;
   onLater: () => void;
@@ -22,6 +42,7 @@ export function FirstTaskDialog(props: {
   const [outcome, setOutcome] = createSignal("");
   const [minutes, setMinutes] = createSignal<number>(ESTIMATE.defaultMinutes);
   const [busy, setBusy] = createSignal(false);
+  const copy = () => COPY[props.day];
   const ready = () => outcome().trim().length > 0;
 
   async function add(): Promise<void> {
@@ -53,10 +74,15 @@ export function FirstTaskDialog(props: {
         <OnboardingScreen
           step={props.step}
           headingId={headingId}
-          eyebrow="Your first win"
-          title="What’s today’s win?"
-          text="The one thing you’ll finish today. Nail it and your streak lights up for the first time."
+          eyebrow={copy().eyebrow}
+          title={copy().title}
+          text={copy().text}
           glow="var(--pearl-deep)"
+          visual={
+            props.day === "tomorrow" ? (
+              <TonightScene date={props.date} />
+            ) : undefined
+          }
           actions={
             <>
               <button

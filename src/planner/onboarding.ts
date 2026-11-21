@@ -1,5 +1,6 @@
 import { DONE_FLAG, STORAGE_KEYS } from "../shared/storage-keys.ts";
-import type { Dashboard } from "./types.ts";
+import { ONBOARDING_RULES } from "./constants.ts";
+import type { Dashboard, SuggestionTarget } from "./types.ts";
 
 type FlagStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -26,6 +27,11 @@ export class FirstRun {
       data.tomorrowTasks.length === 0 &&
       !data.completions.some((day) => day.count > 0)
     );
+  }
+
+  /** Late in the evening, the first task is tomorrow's: today is nearly over. */
+  static firstTaskDay(now: Date): SuggestionTarget {
+    return now.getHours() >= ONBOARDING_RULES.lateHour ? "tomorrow" : "today";
   }
 
   /** The first-plan prompt. Without storage it still shows, since it helps. */

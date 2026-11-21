@@ -14,7 +14,7 @@ const planned = (day: string, outcome: string): Task => ({ id: "existing", outco
 const TITLES = ["Busy isn’t done.", "Lock in.", "Get sharper.", "Light it up."];
 
 /** The three scenes of the pitch; ends on the first-task card. */
-async function walkTour(page: Page) {
+async function walkTour(page: Page, view = "today") {
   const popup = page.locator(".planner-tour-dialog");
   for (const [index, title] of TITLES.entries()) {
     await expect(popup.getByRole("heading")).toHaveText(title);
@@ -26,7 +26,7 @@ async function walkTour(page: Page) {
   await expect(page.locator(".planner-tour-dialog")).toHaveCount(0);
   const card = page.locator(".first-task-dialog");
   await expect(card.getByRole("list", { name: "Step 5 of 7" })).toBeVisible();
-  await expect(page.locator("#app")).toHaveAttribute("data-view", "today");
+  await expect(page.locator("#app")).toHaveAttribute("data-view", view);
   return card;
 }
 
@@ -84,7 +84,7 @@ for (const width of [1100, 390]) {
       "focus_time_shown", "focus_time_saved", "focus_time_closed",
     ]);
     expect(backend.journey[0]![1]).toMatchObject({ new_account: true, from: "app" });
-    expect(backend.journey[4]![1]).toEqual({ minutes: 45 });
+    expect(backend.journey[4]![1]).toEqual({ minutes: 45, day: "today" });
     expect(backend.journey[6]![1]).toMatchObject({ mode: "onboarding", minute: 14 * 60 });
     expect(JSON.stringify(backend.journey)).not.toContain("Write the intro");
 
@@ -181,4 +181,33 @@ test("a reminder link starts the next planned task", async ({ page, backend }) =
   await page.goto("/?start=next");
   await expect(page.locator("#focus-timer")).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test.describe("late in the evening", () => {
+  test.use({ hour: 21 });
+
+  test("the first task plans tomorrow, and its reminder is tomorrow's", async ({ page, backend }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const card = await walkTour(page, "tomorrow");
+    await expect(card.getByRole("heading")).toHaveText("Let’s plan tomorrow.");
+    await expect(card.locator(".tonight-page")).toContainText("Tomorrow");
+    await expect(card).toBeInViewport({ ratio: 1 });
+    await card.getByRole("textbox", { name: "Your first task" }).fill("Write the intro");
+    await card.getByRole("button", { name: "Commit to it", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await synced(page);
+    expect(backend.data.todayTasks).toHaveLength(0);
+    expect(backend.data.tomorrowTasks.map((task) => task.outcome)).toEqual(["Write the intro"]);
+    expect(backend.journey.find(([event]) => event === "first_task_added")![1]).toEqual({ minutes: 30, day: "tomorrow" });
+
+    // Nothing to start tonight; the reminder shows tomorrow's task.
+    const picker = page.locator(".focus-time-dialog");
+    await expect(picker.getByRole("button", { name: "Start now instead" })).toHaveCount(0);
+    await picker.getByRole("button", { name: /Morning/ }).click();
+    await expect(picker.locator(".nudge-date")).toHaveText("Tomorrow");
+    await expect(picker.locator(".nudge-body")).toContainText("Write the intro");
+    await picker.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.locator(".task")).toContainText("Write the intro");
+  });
 });
