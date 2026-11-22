@@ -18,7 +18,7 @@ export class ErrorReporter {
   private readonly sent = new Set<string>();
 
   report(event: ErrorLogEvent, context: string, detail: string): void {
-    if (!PRODUCTION_ORIGINS.includes(window.location.origin)) return;
+    if (!PRODUCTION_ORIGINS.includes(globalThis.location?.origin ?? "")) return;
     const key = `${event}:${context}:${detail}`;
     if (this.sent.has(key)) return;
     this.sent.add(key);

@@ -6,8 +6,14 @@ type PolicyBlock =
   | { kind: "heading" | "paragraph"; text: string }
   | { kind: "list"; items: string[] };
 
+interface Policy {
+  blocks: PolicyBlock[];
+  /** Operator details are still to be filled in. */
+  draft: boolean;
+}
+
 /** Deliberately limited Markdown, rendered as text; never interpret raw HTML. */
-function parsePolicy(source: string): PolicyBlock[] {
+function parsePolicy(source: string): Policy {
   const blocks: PolicyBlock[] = [];
   let paragraph: string[] = [];
   let list: string[] | undefined;
@@ -38,12 +44,18 @@ function parsePolicy(source: string): PolicyBlock[] {
     }
   }
   flush();
-  return blocks;
+  return {
+    blocks,
+    draft: source.includes("[TO COMPLETE:") || /^Status: Draft\b/m.test(source),
+  };
 }
 
-const blocks = parsePolicy(policy);
-const isDraft =
-  policy.includes("[TO COMPLETE:") || /^Status: Draft\b/m.test(policy);
+let parsed: Policy | undefined;
+/**
+ * Parsed the first time someone opens it, not on every page load. The one
+ * reference to the text keeps the bundle from carrying copies of it.
+ */
+const loadPolicy = (): Policy => (parsed ??= parsePolicy(policy));
 
 export function PrivacyPolicyButton(props: { label?: string }) {
   const [open, setOpen] = createSignal(false);
@@ -73,7 +85,7 @@ export function PrivacyPolicyButton(props: { label?: string }) {
               Close privacy policy
             </button>
           </header>
-          <Show when={isDraft}>
+          <Show when={loadPolicy().draft}>
             <p class="privacy-template-warning">
               Draft policy. Operator details and deployed services still require
               review before public release.
@@ -84,7 +96,7 @@ export function PrivacyPolicyButton(props: { label?: string }) {
             tabIndex={0}
             aria-label="Full terms and privacy policy"
           >
-            <For each={blocks}>
+            <For each={loadPolicy().blocks}>
               {(block) =>
                 block.kind === "list" ? (
                   <ul>

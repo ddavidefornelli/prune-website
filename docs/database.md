@@ -1,0 +1,43 @@
+# Database
+
+The hosted Supabase project, after `20261125000100_retire_day_planner.sql`. The base schema came from the shared backend (`../pro/supabase/migrations`); this repository's migrations are applied on top of it, in file order, and stay as applied history: never rewrite or delete one.
+
+## Tables
+
+| Table | What it holds | Who reaches it |
+| --- | --- | --- |
+| `planner_accounts` | One row per account: `user_id`, `"isDeleted"`, `deleted_at` (deletion and the 30-day manual removal). | `planner_list`, `planner_call`; owners may read their own row. |
+| `planner_list_tasks` | The list: one row per task (title, done, created, last edited, finished), at most 1,000 per account. | Only `planner_list` (no browser grants). |
+| `planner_email_reminders` | Come-back emails for accounts from before guests: time zone, last visit, the switch, send count, unsubscribe token, and the focus time and weekdays-only choice that set the morning window. | The reminder functions (service role); `planner_list` records visits. |
+| `planner_push_subscriptions` | Browsers that turned notifications on in the day planner. | The reminder functions (service role). |
+| `error_log` | Connection error reports from `/api/error-log`, 90 days. | `log_client_error` (anon); service role. |
+
+Every row goes with its Auth user (`on delete cascade`).
+
+## Functions
+
+| Function | Caller |
+| --- | --- |
+| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` and `'erase'`. |
+| `planner_call(action, args, timezone)` | The browser (`authenticated`, not guests): only `'delete_account'`. |
+| `planner_claim_reminders`, `planner_release_reminder`, `planner_push_targets`, `planner_push_result` | The `daily-reminders` Edge Function. |
+| `planner_unsubscribe` | The `email-unsubscribe` Edge Function. |
+| `log_client_error` | The `/api/error-log` relay (anon). |
+
+## Retired with the day planner
+
+`20261125000100_retire_day_planner.sql` copies each account's unfinished planner tasks for today and later into its list (for accounts that had not opened the list yet), then drops:
+
+- `planner_tasks`, `planner_stops`, `planner_reviews`, `planner_receipts`, `planner_review_tasks`, `planner_history`, `planner_suggestion_usage`, `ai_controls`, `ai_usage`, `ai_review_requests`, and their triggers and policies;
+- every function that read them (the executor `planner_execute` and `planner_call_active`, `planner_task_json`, month stats, reviews and check-ins, suggestions, history) and the scheduling entry points (`planner_schedule`, `planner_schedule_state`, `planner_track`);
+- `planner_accounts`: `ai_enabled`, `ai_revision`, `consent_version`, `consent_recorded_at`, `check_in_day`, `check_in_plan`, `revision`, `last_event_at`, `list_started_at`;
+- `planner_email_reminders`: the daily, start-time and getting-started columns.
+
+It unschedules cron jobs that used them (`pro-ai-retention`) and runs the reminder job hourly again. Without `CASCADE`, an unknown view, trigger or foreign key on a retired table makes it fail and change nothing; its last step fails if any remaining function still names a retired table or column. Earlier drops: `planner_resources` and `ai_review_previews` (`20261123000100`, with the Mac app), `planner_clerk_identities` (`20261105000200`), the guest-mode and survey tables (`20261105000300`).
+
+## Before any destructive migration
+
+1. Back up the database. Check the hosted catalog (functions, grants, policies, views, triggers, cron jobs) with read-only access.
+2. Check every caller: the website, each Edge Function, the cron jobs, open tabs of the previous website.
+3. Deploy the callers that no longer need the objects first; drop them in a separate, reviewed, forward-only migration without `CASCADE`.
+4. Test it in PGlite on top of the full chain (`tests/helpers/backend-db.mjs`).

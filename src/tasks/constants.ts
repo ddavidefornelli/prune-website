@@ -23,6 +23,9 @@ export const LIST_SYNC = {
   maxIdentityRetryMs: 5 * TIME.minuteMs,
 } as const;
 
+/** A mouse or trackpad: the page can open ready to type without a keyboard covering it. */
+export const FINE_POINTER = "(pointer: fine)";
+
 /** Moments the list waits for, in milliseconds. */
 export const LIST_TIMING = {
   /** A ticked task stays in place this long before it moves to Done. */

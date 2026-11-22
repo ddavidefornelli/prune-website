@@ -1,7 +1,16 @@
-import { test, expect, addTask, newTask, openList, savedList, synced, AUTH_KEY, ACCOUNT_ID, GUEST_ID, PROJECT } from "./helpers/browser";
+import { test, expect, addTask, newTask, openList, savedList, session, synced, AUTH_KEY, ACCOUNT_ID, GUEST_ID, PROJECT } from "./helpers/browser";
 import { PRIVACY_ACKNOWLEDGEMENT_KEY, PRIVACY_POLICY_VERSION } from "../src/cloud/privacy-state";
 
 const consentNotice = (page: import("@playwright/test").Page) => page.getByText("By adding a task you agree to the Terms and Privacy Policy.");
+/** This browser's saved session expires in `seconds`, as it would after a while away. */
+const expiringSession = (page: import("@playwright/test").Page, id: string, guest: boolean, seconds = 30) =>
+  page.addInitScript(({ key, value }) => {
+    if (sessionStorage.getItem("prune:test:expiring")) return;
+    sessionStorage.setItem("prune:test:expiring", "set");
+    localStorage.setItem(key, value);
+  }, { key: AUTH_KEY, value: JSON.stringify(session(id, guest, undefined, seconds)) });
+const savedSession = (page: import("@playwright/test").Page) =>
+  page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), AUTH_KEY);
 
 test.describe("a new visitor", () => {
   test.use({ visitor: "new" });
@@ -127,6 +136,36 @@ test.describe("a returning guest", () => {
     expect(backend.tasks.map((task) => task.title)).toEqual(["Agreed by adding"]);
   });
 
+  test("a session about to expire is refreshed once, and the list syncs with the new token", async ({ page, backend }) => {
+    await expiringSession(page, GUEST_ID, true);
+    await openList(page);
+    await addTask(page, "After a while away");
+    await synced(page);
+    expect(backend.refreshes).toEqual([GUEST_ID]);
+    expect(backend.guests).toEqual([]);
+    const saved = await savedSession(page);
+    expect(saved.expires_at).toBeGreaterThan(Date.now() / 1000 + 600);
+    const calls = backend.requests.filter((request) => request.path === "/rest/v1/rpc/planner_list");
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((request) => request.authorization === `Bearer ${saved.access_token}`)).toBe(true);
+  });
+
+  test("a session the server ended becomes a new guest, and the list stays", async ({ page, backend }) => {
+    await expiringSession(page, GUEST_ID, true);
+    backend.refreshRevoked = true;
+    // Nothing to keep yet, so no new guest until the first task.
+    await page.goto("/");
+    await expect(newTask(page)).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(backend.guests).toEqual([]);
+    expect(await savedSession(page)).toBeNull();
+    await addTask(page, "Still here");
+    await synced(page);
+    expect(backend.guests).toHaveLength(1);
+    expect((await savedList(page))?.owner).toBe(`${PROJECT}:${backend.guests[0]}`);
+    expect(backend.tasks.map((task) => task.title)).toEqual(["Still here"]);
+  });
+
   test("a guest the server no longer knows becomes a new guest and keeps this browser's list", async ({ page, backend }) => {
     await openList(page);
     await addTask(page, "Mine all along");
@@ -152,5 +191,14 @@ test.describe("an account from before guests", () => {
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toContainText("user@example.com");
     expect(await page.evaluate((key) => localStorage.getItem(key) !== null, AUTH_KEY)).toBe(true);
+  });
+
+  test("its session is refreshed as the same account, saved by an earlier version of the site", async ({ page, backend }) => {
+    await expiringSession(page, ACCOUNT_ID, false);
+    await openList(page);
+    expect(backend.refreshes).toEqual([ACCOUNT_ID]);
+    expect(backend.guests).toEqual([]);
+    expect((await savedList(page))?.owner).toBe(`${PROJECT}:${ACCOUNT_ID}`);
+    expect((await savedSession(page)).user.id).toBe(ACCOUNT_ID);
   });
 });

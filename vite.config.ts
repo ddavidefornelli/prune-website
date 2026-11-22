@@ -14,9 +14,6 @@ export default defineConfig(({ mode, command }) => {
   // Dev stays relaxed for Vite's injected styles and HMR WebSocket. Build and
   // preview use the same hash-locked policy, derived from the final artifact.
   return {
-    plugins: [
-      solid(),
-      productionCsp(config?.url ?? null, env.VITE_POSTHOG_HOST),
-    ],
+    plugins: [solid(), productionCsp(config?.url ?? null)],
   };
 });

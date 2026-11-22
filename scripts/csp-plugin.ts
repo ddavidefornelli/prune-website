@@ -1,18 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
-import {
-  DOCUMENT_ROUTES,
-  hardenHtml,
-  POSTHOG_API_HOST,
-} from "./security-policy.ts";
+import { DOCUMENT_ROUTES, hardenHtml } from "./security-policy.ts";
 
 const DOCUMENT = new RegExp(DOCUMENT_ROUTES.noStore);
 
-export function productionCsp(
-  apiOrigin: string | null,
-  posthogHost?: string,
-): Plugin {
+export function productionCsp(apiOrigin: string | null): Plugin {
   return {
     name: "production-csp",
     apply: (_config, { command, isPreview }) =>
@@ -22,12 +15,6 @@ export function productionCsp(
       handler(_options, bundle) {
         if (!apiOrigin)
           throw new Error("Production CSP requires a configured backend.");
-        // The CSP only allows PostHog's EU cloud; any other host would be
-        // silently blocked in production.
-        if (posthogHost && posthogHost !== POSTHOG_API_HOST)
-          throw new Error(
-            `VITE_POSTHOG_HOST must be ${POSTHOG_API_HOST} to match the production CSP.`,
-          );
         const entry = bundle["index.html"];
         if (!entry || entry.type !== "asset")
           throw new Error("Production HTML is missing.");

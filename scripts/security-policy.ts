@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { hasMarketingTracker } from "./tracking-policy.ts";
-import { PRODUCTION_ORIGINS } from "../src/shared/site.ts";
+import { POSTHOG, PRODUCTION_ORIGINS } from "../src/shared/site.ts";
 import { ERROR_LOG_PATH, SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
 
 /** Every path that answers with the app's one HTML document. */
@@ -11,6 +11,15 @@ export const DOCUMENT_ROUTES = {
   rewrite: "^/login/?$",
   /** The aliases hosted checks fetch besides "/". */
   aliases: ["/login", "/login/", "/index.html"],
+} as const;
+
+/**
+ * Built scripts and styles are named by their content hash, so browsers may
+ * keep them for a year without asking again: a new build has new names.
+ */
+export const IMMUTABLE_ASSETS = {
+  route: "^/assets/[A-Za-z0-9_.-]+\\.(?:js|css)$",
+  cacheControl: "public, max-age=31536000, immutable",
 } as const;
 
 // Deliberately no origin-wide allowlist: do not permit Storage, arbitrary RPCs,
@@ -29,13 +38,11 @@ export const ANALYTICS_CONNECTIONS = ANALYTICS_ORIGINS.map(
 export const ERROR_LOG_CONNECTIONS = PRODUCTION_ORIGINS.map(
   (origin) => `${origin}${ERROR_LOG_PATH}`,
 );
-// PostHog (EU cloud) is bundled and starts only after cookie consent. The
-// API host receives events; the assets host serves remote config and the
-// lazily loaded recorder, by fetch and by script. Exact origins, no wildcard.
-export const POSTHOG_API_HOST = "https://eu.i.posthog.com";
-export const POSTHOG_ASSETS_HOST = "https://eu-assets.i.posthog.com";
-export const POSTHOG_SCRIPTS = [POSTHOG_ASSETS_HOST];
-export const POSTHOG_CONNECTIONS = [POSTHOG_API_HOST, POSTHOG_ASSETS_HOST];
+// PostHog (EU cloud) loads only after cookie consent. The API host receives
+// events; the assets host serves the library, remote config and the lazily
+// loaded recorder, by fetch and by script. Exact origins, no wildcard.
+export const POSTHOG_SCRIPTS = [POSTHOG.assetsHost];
+export const POSTHOG_CONNECTIONS = [POSTHOG.apiHost, POSTHOG.assetsHost];
 
 // The service worker (notifications only) and the web app manifest, by exact
 // path: never 'self', which would include /api/.

@@ -102,3 +102,15 @@ test("no-content responses retain their original status without manufacturing a 
   t.mock.method(globalThis, "fetch", async () => original);
   assert.equal(await apiFetch("https://example.test/logout"), original);
 });
+
+test("answers without a body, like a sign-out's 204, come back as they are", async (t) => {
+  // Some engines hand a 204 an empty stream rather than a null body; Node's
+  // Response refuses to build one, so this is a response-shaped object.
+  const empty = { status: 204, statusText: "No Content", headers: new Headers(), body: new ReadableStream({ start: (controller) => controller.close() }) };
+  t.mock.method(globalThis, "fetch", async () => empty);
+  const response = await apiFetch("https://backend.test/auth/v1/logout?scope=local", { method: "POST" });
+  assert.equal(response.status, 204);
+  assert.equal(response.ok, true);
+  assert.equal(await response.text(), "");
+});
+

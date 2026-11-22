@@ -6,6 +6,15 @@ import { TaskList } from "./task-list.ts";
 
 type ListStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
+/** This browser's localStorage, or null where it is blocked. */
+export function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * This browser's list in storage, shared by every tab: each change is made on
  * the copy in storage, so tabs never overwrite each other's edits. When

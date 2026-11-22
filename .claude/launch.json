@@ -26,6 +26,22 @@
         "--strictPort"
       ],
       "port": 4180
+    },
+    {
+      "name": "fixture",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--host",
+        "127.0.0.1",
+        "--outDir",
+        ".playwright-dist",
+        "--port",
+        "4181",
+        "--strictPort"
+      ],
+      "port": 4181
     }
   ]
 }

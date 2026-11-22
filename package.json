@@ -22,16 +22,10 @@
     "test:reactivity": "node --conditions=browser --experimental-strip-types --test tests/reactivity/*.test.mjs",
     "test:e2e": "playwright test",
     "check:production": "node --experimental-strip-types scripts/check-production.mjs",
-    "email:test": "node --experimental-strip-types scripts/send-test-reminder.ts",
-    "email:live": "node --experimental-strip-types scripts/send-live-reminder.ts",
-    "push:keys": "node scripts/generate-vapid-keys.mjs",
-    "dashboard": "node --experimental-strip-types scripts/dashboard.ts"
+    "email:test": "node --experimental-strip-types scripts/send-test-reminder.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.118.0",
     "@vercel/analytics": "^2.0.1",
-    "posthog-js": "^1.452.0",
-    "posthog-node": "^6.0.4",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {

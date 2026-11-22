@@ -1,11 +1,14 @@
 // Supabase Edge Function (Deno). Turns one kind of reminder email off for the
 // holder of an unsubscribe token. Deploy with JWT verification off: mail
 // providers call it directly for one-click unsubscribe.
-// Secrets: ALLOWED_ORIGINS and optional EXTRA_ALLOWED_ORIGINS, as for
-// task-suggestions; SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY come from the platform.
+// Secrets: optional ALLOWED_ORIGINS (default https://www.prune.win) and
+// EXTRA_ALLOWED_ORIGINS, the website origins whose confirmation page may call
+// it; SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY come from the platform.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { AllowedOrigins } from "../../../server/http.ts";
-import { UnsubscribeEndpoint } from "../../../server/reminders/handler.ts";
+import {
+  AllowedOrigins,
+  UnsubscribeEndpoint,
+} from "../../../server/reminders/handler.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };

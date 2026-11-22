@@ -1,10 +1,11 @@
 import { createSignal, Match, Switch } from "solid-js";
+import { boundedFetch } from "../cloud/api-fetch";
 import { PublicConfig } from "../cloud/config";
 import { SUPABASE_ROUTES } from "../shared/api-routes";
 
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** "session" stays for links in start-time emails sent before focus times. */
+/** "daily" and "session" stay for links in the day planner's emails. */
 const KIND_NAMES = {
   daily: "daily reminder",
   comeback: "come-back",
@@ -46,7 +47,8 @@ export class UnsubscribeRequest {
     );
     url.searchParams.set("token", this.token);
     url.searchParams.set("kind", this.kind);
-    const response = await fetch(url, { method: "POST" });
+    // Bounded like every backend call: a deadline, no cookies, no redirects.
+    const response = await boundedFetch.request(url, { method: "POST" });
     return response.ok;
   }
 }
@@ -76,9 +78,6 @@ export function Unsubscribe(props: { request: UnsubscribeRequest }) {
           <h1>Done.</h1>
           <p>
             You will not get {props.request.name} emails from prune any more.
-          </p>
-          <p class="muted">
-            You can turn them back on from your account in prune.
           </p>
           <a href="/">Open prune</a>
         </Match>

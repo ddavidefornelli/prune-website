@@ -1,12 +1,11 @@
 -- READ ONLY. Run in the HOSTED project's SQL Editor as its administrator.
--- This does not apply migrations, reset/seed data, or retrieve planner content.
+-- This does not apply migrations, change data, or read anyone's tasks.
 -- It complements, not replaces, two-account hosted isolation testing.
 
--- 1. Every expected table must exist with RLS enabled (all rows true/true).
+-- 1. Every table the website relies on exists with RLS enabled (all true/true).
 with expected(name) as (values
-  ('planner_accounts'), ('planner_tasks'), ('planner_stops'),
-  ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests'), ('planner_list_tasks')
+  ('planner_accounts'), ('planner_list_tasks'), ('planner_email_reminders'),
+  ('planner_push_subscriptions'), ('error_log')
 )
 select e.name, c.oid is not null as table_exists,
   coalesce(c.relrowsecurity, false) as rls_enabled
@@ -14,13 +13,12 @@ from expected e
 left join pg_catalog.pg_class c on c.oid = to_regclass('public.' || e.name)
 order by e.name;
 
--- 2. No anon or authenticated direct INSERT/UPDATE/DELETE privileges.
--- authenticated SELECT should be true only for the five owner-readable tables
--- (never for planner_list_tasks, which only planner_list reaches).
+-- 2. No anon or authenticated direct INSERT/UPDATE/DELETE privileges, and
+-- SELECT only on planner_accounts (owner policy). The list is reachable only
+-- through planner_list; reminders, push and the error log only server-side.
 with expected(name) as (values
-  ('planner_accounts'), ('planner_tasks'), ('planner_stops'),
-  ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests'), ('planner_list_tasks')
+  ('planner_accounts'), ('planner_list_tasks'), ('planner_email_reminders'),
+  ('planner_push_subscriptions'), ('error_log')
 ), roles(name) as (values ('anon'), ('authenticated'))
 select e.name as table_name, r.name as role_name,
   has_table_privilege(r.name, c.oid, 'SELECT') as can_select,
@@ -29,23 +27,17 @@ from expected e cross join roles r
 join pg_catalog.pg_class c on c.oid = to_regclass('public.' || e.name)
 order by e.name, r.name;
 
--- 3. Only owner SELECT policies should exist for these five planner tables.
--- Inspect qual: user_id must equal auth.uid(); no USING(true), public reads,
--- or permissive INSERT/UPDATE/DELETE/ALL policies. No policies on private AI/
--- receipt tables. This displays policy definitions, not user rows.
+-- 3. Policies: only an owner SELECT policy on planner_accounts is expected.
+-- Inspect qual: user_id must equal auth.uid(); no USING(true) or write policies.
 select tablename, policyname, roles, cmd, qual, with_check
 from pg_catalog.pg_policies
-where schemaname = 'public' and tablename in (
-  'planner_accounts', 'planner_tasks', 'planner_resources', 'planner_stops',
-  'planner_reviews', 'planner_receipts', 'ai_controls', 'ai_usage',
-  'ai_review_requests', 'ai_review_previews'
-)
+where schemaname = 'public'
 order by tablename, policyname;
 
--- 4. All security-definer functions require an empty search_path.
--- No anon execute; authenticated execute ONLY on planner_call(text,jsonb,text),
--- planner_list(text,jsonb,text) and the day planner's planner_schedule/planner_track.
--- PUBLIC execute must be false. All other listed functions are server-only.
+-- 4. Every public function: security definers need an empty search_path; no
+-- PUBLIC execute; authenticated may execute ONLY planner_list and planner_call;
+-- anon ONLY log_client_error. The rest are for the reminder functions
+-- (service_role).
 select p.oid::regprocedure::text as function_name, p.prosecdef as security_definer,
   p.proconfig as function_settings,
   has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
@@ -54,52 +46,21 @@ select p.oid::regprocedure::text as function_name, p.prosecdef as security_defin
     where acl.grantee = 0 and acl.privilege_type = 'EXECUTE') as public_execute
 from pg_catalog.pg_proc p
 join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public' and (
-  p.proname like 'planner\_%' escape '\' or
-  p.proname in ('reserve_weekly_review', 'reserve_planner_review', 'finish_weekly_review',
-    'fail_weekly_review', 'purge_weekly_review_content')
-)
+where n.nspname = 'public'
 order by function_name;
 
--- 4b. Guest planning and the onboarding survey are removed: no anon-callable
--- entry point remains. Expected: true for every column.
+-- 5. The day planner is retired (20261125000100_retire_day_planner.sql).
+-- Expected: true for every column.
 select
-  to_regprocedure('public.guest_record_usage(jsonb)') is null as guest_usage_removed,
-  to_regclass('public.guest_usage_daily') is null as guest_totals_removed,
-  to_regprocedure('public.planner_import_guest(jsonb)') is null as guest_import_removed,
-  to_regclass('public.planner_guest_imports') is null as guest_receipts_removed,
-  to_regprocedure('public.planner_week_goal(uuid,date)') is null as week_goal_removed,
-  to_regclass('public.planner_onboarding') is null as survey_answers_removed;
-
--- 4c. The error log's only anon entry point. Expected: anon may execute only
--- log_client_error; nobody but service_role can read or write error_log directly.
-select
-  has_function_privilege('anon', 'public.log_client_error(text,text,text,text,text,text)', 'EXECUTE') as anon_can_log,
-  not has_function_privilege('authenticated', 'public.log_client_error(text,text,text,text,text,text)', 'EXECUTE') as authenticated_cannot_log,
-  not has_table_privilege('anon', 'public.error_log', 'SELECT,INSERT,UPDATE,DELETE') as anon_no_table_access,
-  not has_table_privilege('authenticated', 'public.error_log', 'SELECT,INSERT,UPDATE,DELETE') as authenticated_no_table_access;
-
--- 5. Queue protocol and latest UI rules must actually be deployed.
--- Expected: true for every column. Missing functions return false rather than applying anything.
-select
+  to_regclass('public.planner_tasks') is null as planner_tasks_removed,
+  to_regclass('public.planner_reviews') is null as reviews_removed,
+  to_regclass('public.ai_review_requests') is null as ai_requests_removed,
+  to_regclass('public.planner_history') is null as history_removed,
+  to_regprocedure('public.planner_execute(text,jsonb,text)') is null as executor_removed,
+  to_regprocedure('public.planner_schedule(text,jsonb,text)') is null as scheduling_removed,
   coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
-    like '%queue_protocol%', false) as queue_protocol_installed,
-  coalesce(pg_get_functiondef(to_regprocedure('public.planner_execute(text,jsonb,text)'))
-    like '%''canPlanTomorrow'', true%', false) as immediate_tomorrow_installed,
-  coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
-    like '%cannot be turned off%', false) as weekly_reviews_always_on,
-  coalesce(pg_get_functiondef(to_regprocedure('public.planner_call(text,jsonb,text)'))
-    like '%month_stats%', false) as month_stats_installed;
+    like '%Unsupported action.%', false) as planner_call_slimmed;
 
--- 6. Never permit unlimited development AI on production.
--- Expected: development_unlimited=false, conservative bounded budgets.
--- If this query fails, migrations/configuration must be investigated; do not reset.
-select enabled, development_unlimited, daily_attempt_limit, monthly_attempt_limit
-from public.ai_controls where id;
-
--- 7. Optional additional checks, run separately when the schemas exist:
--- select version from supabase_migrations.schema_migrations order by version;
--- Expect all nine migrations from ../pro/supabase/migrations/, through 20261019000100.
--- select jobname, schedule, active from cron.job where jobname = 'pro-ai-retention';
--- If hosted AI is enabled, confirm a single active daily retention job and check
--- its successful execution in the dashboard. Do not schedule duplicate jobs.
+-- 6. Scheduled jobs: one hourly reminder job and nothing else of prune's.
+-- select jobname, schedule, active from cron.job order by jobname;
+-- Expected: prune-email-reminders, '5 * * * *', active. No pro-ai-retention.

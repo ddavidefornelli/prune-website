@@ -2,7 +2,7 @@ import { BrowserCloud } from "./browser.ts";
 import { CloudError } from "./cloud-error.ts";
 import { MESSAGES } from "./messages.ts";
 import { PrivacyNotice } from "./privacy-state.ts";
-import type { Account, CloudTransport } from "./types.ts";
+import type { Account, CloudTransport, Rpc } from "./types.ts";
 
 /** What a list sync sends: whole tasks to save and ids to remove. */
 export interface ListChanges {
@@ -10,9 +10,11 @@ export interface ListChanges {
   remove: string[];
 }
 
+type AcceptanceStorage = Pick<Storage, "getItem" | "setItem">;
+
 interface AccountClientOptions {
   cloud?: CloudTransport;
-  storage?: Pick<Storage, "getItem" | "setItem"> | null;
+  storage?: AcceptanceStorage | null;
 }
 
 /**
@@ -22,7 +24,7 @@ interface AccountClientOptions {
  */
 export class AccountClient {
   private readonly cloud: CloudTransport;
-  private readonly storage: Pick<Storage, "getItem" | "setItem"> | null;
+  private readonly storage: AcceptanceStorage | null;
   private readonly timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   private account: Account | null = null;
   private disposed = false;
@@ -70,9 +72,7 @@ export class AccountClient {
     if (this.account) return this.account;
     if (!this.accepted)
       throw new CloudError("privacy", MESSAGES.privacyRequired);
-    const account = await this.cloud.execute<Account | null>("identity", {
-      create,
-    });
+    const account = await this.cloud.identity(create);
     this.assertOpen();
     this.account = account;
     return account;
@@ -108,7 +108,7 @@ export class AccountClient {
 
   /** Forgets this browser's session. */
   async forget(): Promise<void> {
-    if (this.accepted) await this.cloud.execute("sign_out").catch(() => {});
+    if (this.accepted) await this.cloud.signOut().catch(() => {});
     this.account = null;
   }
 
@@ -117,16 +117,16 @@ export class AccountClient {
   }
 
   private call<T>(
-    command: "planner_call" | "planner_list",
+    rpc: Rpc,
     action: string,
     args: Record<string, unknown>,
   ): Promise<T> {
     this.assertOpen();
     if (!this.account)
       throw new CloudError("privacy", MESSAGES.privacyRequired);
-    return this.cloud.execute<T>(command, {
+    return this.cloud.call<T>(rpc, this.account.accountKey, {
       action,
-      args: { ...args, _accountKey: this.account.accountKey },
+      args,
       timezone: this.timezone,
     });
   }

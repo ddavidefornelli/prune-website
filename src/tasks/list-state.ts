@@ -14,7 +14,7 @@ import type { Account } from "../cloud/types.ts";
 import { LIST_TIMING } from "./constants.ts";
 import { ListSync } from "./list-sync.ts";
 import { TaskList } from "./task-list.ts";
-import { TaskStorage } from "./task-storage.ts";
+import { browserStorage, TaskStorage } from "./task-storage.ts";
 import type { ListResponse, Task } from "./types.ts";
 
 /** Deleted tasks that one tap on Undo puts back. */
@@ -43,8 +43,6 @@ export class ListState {
   readonly undo: Accessor<UndoOffer | null>;
   /** One short line about the list: only that it is full. */
   readonly notice: Accessor<string>;
-  /** True until this browser records the current terms acknowledgement. */
-  readonly needsConsent: Accessor<boolean>;
   /** The account the list syncs with, once there is one. */
   readonly account: Accessor<Account | null>;
   readonly erasing: Accessor<boolean>;
@@ -56,7 +54,6 @@ export class ListState {
   private readonly setList: Setter<TaskList>;
   private readonly setUndo: Setter<UndoOffer | null>;
   private readonly setNotice: Setter<string>;
-  private readonly setNeedsConsent: Setter<boolean>;
   private readonly setErasing: Setter<boolean>;
   private readonly setEraseError: Setter<string>;
   private readonly setSettling: Setter<ReadonlySet<string>>;
@@ -65,7 +62,7 @@ export class ListState {
 
   constructor(
     client: AccountClient,
-    storage: Storage | null = ListState.browserStorage(),
+    storage: Storage | null = browserStorage(),
   ) {
     this.client = client;
     TaskStorage.clearRetired(storage);
@@ -73,7 +70,6 @@ export class ListState {
     const [list, setList] = createSignal(this.storage.read());
     const [undo, setUndo] = createSignal<UndoOffer | null>(null);
     const [notice, setNotice] = createSignal("");
-    const [needsConsent, setNeedsConsent] = createSignal(!client.accepted);
     const [account, setAccount] = createSignal<Account | null>(null);
     const [erasing, setErasing] = createSignal(false);
     const [eraseError, setEraseError] = createSignal("");
@@ -86,8 +82,6 @@ export class ListState {
     this.setUndo = setUndo;
     this.notice = notice;
     this.setNotice = setNotice;
-    this.needsConsent = needsConsent;
-    this.setNeedsConsent = setNeedsConsent;
     this.account = account;
     this.erasing = erasing;
     this.setErasing = setErasing;
@@ -142,14 +136,6 @@ export class ListState {
     });
   }
 
-  private static browserStorage(): Storage | null {
-    try {
-      return window.localStorage;
-    } catch {
-      return null;
-    }
-  }
-
   /** The cloud's answer, checked before anything trusts its shape. */
   private static response(value: unknown): ListResponse {
     const body = value as Partial<ListResponse> | null;
@@ -171,10 +157,7 @@ export class ListState {
    */
   add(title: string): boolean {
     if (!this.change((list, now) => list.add(title, now))) return false;
-    if (this.needsConsent() && this.client.accept()) {
-      this.setNeedsConsent(false);
-      this.sync.request(0);
-    }
+    if (!this.client.accepted && this.client.accept()) this.sync.request(0);
     analytics.capture("task_created");
     return true;
   }

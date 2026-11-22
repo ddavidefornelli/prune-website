@@ -25,10 +25,6 @@ function fixture({ signupDisabled = false, override } = {}) {
     if (url.origin === api) {
       if (url.pathname === "/auth/v1/settings") return json({ external: { email: true, anonymous_users: true }, mailer_autoconfirm: false, disable_signup: signupDisabled });
       if (url.pathname.startsWith("/rest/v1/")) return json({ code: "42501" }, 401);
-      if (url.pathname === "/functions/v1/weekly-review") {
-        if (init.method !== "OPTIONS") return json({ error: { code: "unauthorized" } }, 401);
-        return init.headers.Origin === site ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": site } }) : json({ error: { code: "origin_not_allowed" } }, 403);
-      }
     }
     throw new Error("Unexpected fixture route");
   };
@@ -44,7 +40,7 @@ test("checker accepts a correctly deployed artifact and makes only non-destructi
   assert.equal(report.counts.ERROR, 0);
   assert.equal(report.counts.FAIL, 0);
   assert.equal(f.requests.filter(({ url }) => url.pathname === "/assets/app.js").length, 1, "shared bundle is downloaded once");
-  assert.equal(f.requests.filter(({ url }) => url.pathname.startsWith("/rest/v1/") && !url.pathname.includes("/rpc/")).length, 8);
+  assert.equal(f.requests.filter(({ url }) => url.pathname.startsWith("/rest/v1/") && !url.pathname.includes("/rpc/")).length, 5);
   for (const { url, init } of f.requests) {
     assert.equal(init.redirect, "manual");
     assert.equal(init.credentials, "omit");
@@ -52,10 +48,10 @@ test("checker accepts a correctly deployed artifact and makes only non-destructi
     if (url.origin === site) assert.ok(!new Headers(init.headers).has("apikey"));
     if (url.pathname.startsWith("/rest/v1/") && !url.pathname.includes("/rpc/")) assert.equal(url.searchParams.get("limit"), "0");
     if (init.method === "POST") {
-      assert.ok(["/rest/v1/rpc/planner_call", "/rest/v1/rpc/planner_list", "/functions/v1/weekly-review"].includes(url.pathname));
+      assert.ok(["/rest/v1/rpc/planner_call", "/rest/v1/rpc/planner_list"].includes(url.pathname));
       const body = JSON.parse(init.body);
       // Read-only probes: the list probe sends no changes, without a user.
-      assert.ok(body.p_action === "dashboard" || (body.p_action === "sync" && Object.keys(body.p_args).length === 0) || Object.keys(body).join() === "timezone");
+      assert.ok(body.p_action === "dashboard" || (body.p_action === "sync" && Object.keys(body.p_args).length === 0));
     }
   }
   assert.ok(!JSON.stringify(report).includes(config.publicKey));
@@ -144,13 +140,12 @@ test("CSP with internally valid but different script hashes is rejected", async 
   assert.equal(report.exitCode, 1);
 });
 
-test("canonical HTTPS redirects are followed and AI CORS uses the final origin without leaking API headers", async () => {
+test("canonical HTTPS redirects are followed without leaking API headers", async () => {
   const f = fixture({ override: (url) => url.origin === "https://prune.test" ? new Response(null, { status: 308, headers: { Location: site } }) : null });
   const report = await f.run({ site: "https://prune.test" });
   assert.equal(report.site, site);
   assert.equal(report.exitCode, 0);
   assert.equal(result(report, "site:canonical").status, "WARN");
-  assert.equal(result(report, "ai:cors:true").status, "PASS");
   assert.ok(!new Headers(f.requests[0].init.headers).has("apikey"));
 });
 
@@ -162,16 +157,12 @@ test("insecure redirects and redirected assets are not followed", async () => {
   assert.ok(!f.requests.some(({ url }) => url.hostname === "third-party.invalid"));
 });
 
-test("website-only and skip-ai modes visibly report incomplete scope", async () => {
+test("website-only mode visibly reports incomplete scope", async () => {
   const f = fixture();
   const website = await f.run({ websiteOnly: true, config: null });
   assert.equal(website.exitCode, 0);
   assert.equal(result(website, "backend:disabled").status, "SKIP");
   assert.ok(f.requests.every(({ url }) => url.origin === site));
-  const g = fixture();
-  const noAi = await g.run({ skipAi: true });
-  assert.equal(result(noAi, "ai:disabled").status, "SKIP");
-  assert.ok(!g.requests.some(({ url }) => url.pathname.includes("/functions/")));
 });
 
 test("missing backend configuration still checks the website and exits as unverified", async () => {
@@ -193,18 +184,18 @@ test("a rejected public key skips cascaded backend probes and does not log respo
 
 for (const [status, body] of [[200, []], [404, { code: "PGRST205" }], [401, { code: "PGRST301" }]]) {
   test(`anonymous table response ${status} / ${body.code || "allowed"} is not mistaken for SQL permission denial`, async () => {
-    const f = fixture({ override: (url) => url.pathname === "/rest/v1/planner_tasks" ? json(body, status) : null });
+    const f = fixture({ override: (url) => url.pathname === "/rest/v1/planner_list_tasks" ? json(body, status) : null });
     const report = await f.run();
-    assert.equal(result(report, "db:planner_tasks").status, "FAIL");
+    assert.equal(result(report, "db:planner_list_tasks").status, "FAIL");
     assert.equal(report.exitCode, 1);
   });
 }
 
 test("non-JSON responses and absent settings remain unverified with safe diagnostics", async () => {
-  const f = fixture({ override: (url) => url.pathname === "/rest/v1/planner_tasks" ? new Response("secret upstream details", { status: 502 }) : null });
+  const f = fixture({ override: (url) => url.pathname === "/rest/v1/planner_list_tasks" ? new Response("secret upstream details", { status: 502 }) : null });
   const report = await f.run();
   assert.equal(report.exitCode, 2);
-  assert.match(result(report, "db:planner_tasks:request").detail, /HTTP 502 returned non-JSON/);
+  assert.match(result(report, "db:planner_list_tasks:request").detail, /HTTP 502 returned non-JSON/);
   assert.ok(!JSON.stringify(report).includes("secret upstream details"));
   const missing = await fixture({ override: (url) => url.pathname === "/auth/v1/settings" ? json({}) : null }).run();
   assert.equal(result(missing, "auth:anonymous").status, "ERROR");

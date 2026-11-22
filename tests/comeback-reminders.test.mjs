@@ -1,102 +1,122 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFileSync } from "node:fs";
-import { PGlite } from "@electric-sql/pglite";
+import { as, backendDb } from "./helpers/backend-db.mjs";
 
 const owner = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
-const migration = (name) => readFileSync(new URL(`../supabase/migrations/${name}`, import.meta.url), "utf8");
-const as = (db, sub) => db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub, role: "authenticated" })]);
-const schedule = async (db, action, args = {}, timezone = "UTC") =>
-  (await db.query("select public.planner_schedule($1, $2::jsonb, $3) as result", [action, JSON.stringify(args), timezone])).rows[0].result;
 const claim = async (db, now, limit = 100) =>
   (await db.query("select * from public.planner_claim_reminders($1, $2::timestamptz) order by email", [limit, now])).rows;
-const kinds = (rows) => rows.map((row) => [row.email.split("@")[0], row.kind, row.tasks]);
-const ENDPOINT = "https://push.example.test/send/abc";
-const KEYS = { p256dh: "B".repeat(87), auth: "A".repeat(22) };
+const who = (rows) => rows.map((row) => [row.email.split("@")[0], row.kind]);
+const seen = (db, user, iso) => db.query("update public.planner_email_reminders set last_seen_at = $2 where user_id = $1", [user, iso]);
+const token = async (db, user) =>
+  (await db.query("select unsubscribe_token from public.planner_email_reminders where user_id = $1", [user])).rows[0].unsubscribe_token;
+const unsubscribe = async (db, value, kind) => (await db.query("select public.planner_unsubscribe($1, $2) as ok", [value, kind])).rows[0].ok;
 
+/** Two accounts from before guests, both last seen on 2026-11-01. */
 async function fixture() {
-  const db = new PGlite();
-  await db.exec(`
-    create role anon; create role authenticated; create role service_role;
-    create schema auth;
-    create table auth.users(id uuid primary key, email text, created_at timestamptz not null default now());
-    insert into auth.users values ('${owner}', 'owner@example.test', '2026-11-01T08:00:00Z'), ('${other}', 'other@example.test', '2026-10-01T08:00:00Z');
-    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
-    create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt()->>'sub')::uuid $$;
-    create function auth.role() returns text language sql stable as $$ select auth.jwt()->>'role' $$;
-    create table public.planner_accounts(user_id uuid primary key references auth.users, ai_enabled boolean not null default true, ai_revision bigint not null default 0);
-    create table public.planner_tasks(user_id uuid, planned_for date, status text, actual_seconds bigint not null default 0, outcome text, slot integer);
-    create table public.planner_resources(user_id uuid);
-    create table public.planner_stops(user_id uuid); create table public.planner_reviews(user_id uuid);
-    create function public.planner_call(p_action text, p_args jsonb, p_timezone text) returns jsonb language plpgsql security definer as $$ begin
-      return jsonb_build_object('action', p_action);
-    end $$;
-    insert into public.planner_accounts(user_id) values ('${owner}'), ('${other}');
-  `);
-  for (const name of [
-    "20261024000200_soft_delete_accounts.sql",
-    "20261103000100_weekly_reviews_always_on.sql",
-    "20261106000100_month_stats.sql",
-    "20261112000200_email_reminders.sql",
-    "20261120000100_start_times_and_push.sql",
-    "20261121000100_focus_time.sql",
-    "20261124000200_comeback_reminders_only.sql",
-  ])
-    await db.exec(migration(name));
-  await db.exec(`update public.planner_email_reminders set last_seen_at = '2026-11-12T00:00:00Z'`);
+  const db = await backendDb();
+  await db.query("insert into auth.users(id, email) values ($1, 'owner@example.test'), ($2, 'other@example.test')", [owner, other]);
+  await db.query("insert into public.planner_accounts(user_id) values ($1), ($2)", [owner, other]);
+  await db.query("insert into public.planner_email_reminders(user_id, timezone, last_seen_at) values ($1, 'UTC', '2026-11-01T20:00:00Z'), ($2, 'UTC', '2026-11-01T20:00:00Z')", [owner, other]);
   return db;
 }
-const task = (db, user, day, status, outcome, slot) =>
-  db.query("insert into public.planner_tasks(user_id, planned_for, status, outcome, slot) values ($1, $2, $3, $4, $5)", [user, day, status, outcome, slot]);
-const seen = (db, user, iso) => db.query("update public.planner_email_reminders set last_seen_at = $2 where user_id = $1", [user, iso]);
 
-test("planned tasks and an empty day no longer send a daily reminder", async () => {
+test("the come-back email goes after a week away, in the morning, once a week and four times at most", async () => {
   const db = await fixture();
   try {
-    await task(db, owner, "2026-11-13", "planned", "Write report", 1);
-    await as(db, owner);
-    await schedule(db, "set_focus_time", { minute: 9 * 60, weekdaysOnly: false });
-    await seen(db, owner, "2026-11-12T20:00:00Z");
-    assert.deepEqual(await claim(db, "2026-11-13T09:05:00Z"), []);
-    assert.deepEqual(await claim(db, "2026-11-14T09:05:00Z"), []);
-    // The preferences themselves are untouched.
-    const row = (await db.query("select daily_enabled, focus_minute from public.planner_email_reminders where user_id = $1", [owner])).rows[0];
-    assert.deepEqual(row, { daily_enabled: true, focus_minute: 540 });
-  } finally { await db.close(); }
+    await seen(db, owner, "2026-11-08T20:00:00Z");
+    assert.deepEqual(await claim(db, "2026-11-13T15:05:00Z"), [], "outside the morning window");
+    assert.deepEqual(who(await claim(db, "2026-11-13T09:05:00Z")), [["other", "comeback"]], "five days away is not enough");
+    assert.deepEqual(await claim(db, "2026-11-14T09:05:00Z"), [], "not again the next day");
+    const theirs = async (day) => (await claim(db, `${day}T09:05:00Z`)).filter((row) => row.email.startsWith("other"));
+    for (const day of ["2026-11-20", "2026-11-27", "2026-12-04"]) assert.equal((await theirs(day)).length, 1, day);
+    assert.deepEqual(await theirs("2026-12-11"), [], "capped at four in a row");
+  } finally {
+    await db.close();
+  }
 });
 
-test("the come-back email still goes out after a week away, once a week, four times at most", async () => {
+test("coming back resets the count; guests never get a reminder record", async () => {
   const db = await fixture();
   try {
-    await seen(db, other, "2026-11-01T20:00:00Z");
-    // Outside the morning window: nothing.
-    assert.deepEqual(await claim(db, "2026-11-13T15:05:00Z"), []);
-    assert.deepEqual(kinds(await claim(db, "2026-11-13T09:05:00Z")), [["other", "comeback", []]]);
-    assert.deepEqual(await claim(db, "2026-11-14T09:05:00Z"), []);
-    const theirs = async (day) => (await claim(db, `${day}T09:05:00Z`)).filter((row) => row.email.startsWith("other"));
-    for (const day of ["2026-11-20", "2026-11-27", "2026-12-04"])
-      assert.equal((await theirs(day)).length, 1, day);
-    assert.deepEqual(await theirs("2026-12-11"), []);
-  } finally { await db.close(); }
+    for (const day of ["2026-11-13", "2026-11-20", "2026-11-27", "2026-12-04"]) await claim(db, `${day}T09:05:00Z`);
+    assert.deepEqual(await claim(db, "2026-12-11T09:05:00Z"), []);
+    await as(db, owner);
+    await db.query("select public.planner_list('sync', '{}'::jsonb, 'Europe/Rome')");
+    assert.deepEqual((await db.query("select comebacks_sent, timezone from public.planner_email_reminders where user_id = $1", [owner])).rows[0], { comebacks_sent: 0, timezone: "Europe/Rome" });
+    const guest = "33333333-3333-4333-8333-333333333333";
+    await db.query("insert into auth.users(id, is_anonymous) values ($1, true)", [guest]);
+    await as(db, guest, { is_anonymous: true });
+    await db.query("select public.planner_list('sync', '{}'::jsonb, 'UTC')");
+    assert.equal((await db.query("select count(*)::int as n from public.planner_email_reminders where user_id = $1", [guest])).rows[0].n, 0);
+  } finally {
+    await db.close();
+  }
+});
+
+test("the focus time chosen in the day planner still sets the window, and weekdays only still skips weekends", async () => {
+  const db = await fixture();
+  try {
+    await db.query("update public.planner_email_reminders set focus_minute = 19 * 60, weekdays_only = true where user_id = $1", [owner]);
+    // Friday 13 November: 09:05 is too early for a 19:00 focus time; 19:05 is in it.
+    assert.deepEqual(who(await claim(db, "2026-11-13T09:05:00Z")), [["other", "comeback"]]);
+    assert.deepEqual(who(await claim(db, "2026-11-13T19:05:00Z")), [["owner", "comeback"]]);
+    await db.query("update public.planner_email_reminders set last_comeback_at = null, comebacks_sent = 0 where user_id = $1", [owner]);
+    assert.deepEqual(await claim(db, "2026-11-14T19:05:00Z"), [], "Saturday");
+  } finally {
+    await db.close();
+  }
 });
 
 test("turned off, or a deleted account: no come-back email", async () => {
   const db = await fixture();
   try {
-    await seen(db, owner, "2026-11-01T20:00:00Z");
-    await seen(db, other, "2026-11-01T20:00:00Z");
-    await db.exec(`update public.planner_email_reminders set comeback_enabled = false where user_id = '${owner}'`);
-    await db.exec(`update public.planner_accounts set "isDeleted" = true, deleted_at = now() where user_id = '${other}'`);
+    await db.query("update public.planner_email_reminders set comeback_enabled = false where user_id = $1", [owner]);
+    await db.query(`update public.planner_accounts set "isDeleted" = true, deleted_at = now() where user_id = $1`, [other]);
     assert.deepEqual(await claim(db, "2026-11-13T09:05:00Z"), []);
-  } finally { await db.close(); }
+  } finally {
+    await db.close();
+  }
 });
 
-test("a lost race claims nothing twice", async () => {
+test("a lost race claims nothing twice; the batch limit holds; a released claim goes out next run", async () => {
   const db = await fixture();
   try {
-    await seen(db, other, "2026-11-01T20:00:00Z");
-    const [first, second] = await Promise.all([claim(db, "2026-11-13T09:05:00Z"), claim(db, "2026-11-13T09:06:00Z")]);
-    assert.equal(first.length + second.length, 1);
-  } finally { await db.close(); }
+    const [first, second] = await Promise.all([claim(db, "2026-11-13T09:05:00Z", 1), claim(db, "2026-11-13T09:06:00Z", 1)]);
+    assert.equal(first.length + second.length, 2);
+    assert.deepEqual(await claim(db, "2026-11-13T09:07:00Z"), []);
+    await db.query("select public.planner_release_reminder($1, 'comeback')", [owner]);
+    await db.query("select public.planner_release_reminder($1, 'daily')", [other]);
+    assert.deepEqual(who(await claim(db, "2026-11-13T10:05:00Z")), [["owner", "comeback"]]);
+  } finally {
+    await db.close();
+  }
+});
+
+test("an unsubscribe link turns the come-back email off; the day planner's old links answer and change nothing", async () => {
+  const db = await fixture();
+  try {
+    const mine = await token(db, owner);
+    for (const kind of ["daily", "session"]) assert.equal(await unsubscribe(db, mine, kind), true, kind);
+    assert.equal(await unsubscribe(db, mine, "everything"), false);
+    assert.equal(await unsubscribe(db, other, "comeback"), false, "a user id is not a token");
+    assert.deepEqual((await db.query("select comeback_enabled from public.planner_email_reminders order by user_id")).rows.map((row) => row.comeback_enabled), [true, true]);
+    assert.equal(await unsubscribe(db, mine, "comeback"), true);
+    assert.deepEqual((await db.query("select comeback_enabled from public.planner_email_reminders order by user_id")).rows.map((row) => row.comeback_enabled), [false, true]);
+  } finally {
+    await db.close();
+  }
+});
+
+test("browsers cannot reach the reminder functions or table", async () => {
+  const db = await fixture();
+  try {
+    for (const fn of ["planner_claim_reminders(integer, timestamptz)", "planner_release_reminder(uuid, text)", "planner_unsubscribe(uuid, text)", "planner_push_targets(uuid[])", "planner_push_result(text, text)"])
+      for (const role of ["anon", "authenticated"])
+        assert.equal((await db.query(`select has_function_privilege('${role}', 'public.${fn}', 'execute') as ok`)).rows[0].ok, false, `${role} ${fn}`);
+    for (const table of ["planner_email_reminders", "planner_push_subscriptions"])
+      assert.equal((await db.query(`select has_table_privilege('authenticated', 'public.${table}', 'select') as ok`)).rows[0].ok, false, table);
+  } finally {
+    await db.close();
+  }
 });

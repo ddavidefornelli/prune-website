@@ -36,16 +36,6 @@ export class CloudError extends Error {
       : "";
   }
 
-  /** An authored message, or `fallback` for anything unknown. */
-  static messageOf(
-    error: unknown,
-    fallback: string = MESSAGES.generic,
-  ): string {
-    return typeof error === "object" && error !== null && "message" in error
-      ? String(error.message)
-      : fallback;
-  }
-
   /** Classifies a failed HTTP response from Supabase. */
   static fromResponse(status: number, value: unknown): CloudError {
     const body = asObject(value);

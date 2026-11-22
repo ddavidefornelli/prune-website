@@ -34,6 +34,3 @@ export const RETIRED_STORAGE_PREFIXES = [
 export const APP_EVENTS = {
   openPrivacyPreferences: "prune:preferences:open",
 } as const;
-
-/** The value stored to remember that a one-time step is done. */
-export const DONE_FLAG = "done";

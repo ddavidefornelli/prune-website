@@ -1,6 +1,6 @@
 import { HTTP_STATUS } from "../src/shared/api-routes.ts";
 import { PRODUCTION_ORIGINS } from "../src/shared/site.ts";
-import { ERROR_LOG, REQUEST_LIMITS } from "./constants.ts";
+import { ERROR_LOG } from "./constants.ts";
 
 export interface ErrorLogConfig {
   url: string;
@@ -60,7 +60,7 @@ export class ErrorLogRelay {
     let body: { event?: unknown; context?: unknown; detail?: unknown };
     try {
       const text = await request.text();
-      if (text.length > REQUEST_LIMITS.errorReportBytes)
+      if (text.length > ERROR_LOG.maxBodyBytes)
         return empty(HTTP_STATUS.payloadTooLarge);
       body = JSON.parse(text);
     } catch {

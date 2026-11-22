@@ -6,14 +6,7 @@ import { MenuSheet } from "./components/MenuSheet";
 import { TaskItem } from "./components/TaskItem";
 import { UndoBar } from "./components/UndoBar";
 import { ListState } from "./list-state";
-
-function browserStorage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
+import { browserStorage } from "./task-storage";
 
 /** prune: one list, open at once. Nothing to sign up for. */
 export function TaskApp() {

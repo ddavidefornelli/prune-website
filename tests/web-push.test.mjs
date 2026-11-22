@@ -6,7 +6,7 @@ import {
   WebPushSender,
 } from "../server/reminders/web-push.ts";
 import { ReminderMessages } from "../server/reminders/email.ts";
-import { ReminderJob, UnsubscribeEndpoint } from "../server/reminders/handler.ts";
+import { ReminderJob } from "../server/reminders/handler.ts";
 
 const base64url = Base64Url.encode;
 const fromBase64url = Base64Url.decode;
@@ -14,10 +14,7 @@ const encryptPayload = WebPushCrypto.encrypt;
 const vapidAuthorization = WebPushCrypto.vapidAuthorization;
 const sendPush = (target, payload, keys, fetcher) =>
   new WebPushSender(keys, fetcher).send(target, payload);
-const buildReminderEmail = (reminder, site) => new ReminderMessages(site).email(reminder);
-const buildReminderPush = (reminder, site) => new ReminderMessages(site).push(reminder);
 const createReminderHandler = (deps) => new ReminderJob(deps).handle;
-const createUnsubscribeHandler = (deps) => new UnsubscribeEndpoint(deps).handle;
 
 const SITE = "https://www.prune.win/";
 const subtle = crypto.subtle;
@@ -102,24 +99,12 @@ test("push delivery is classified: sent, gone (forget it) or failed", async () =
   assert.equal(await sendPush({ ...target, endpoint: "http://insecure.test/x" }, payload, keys, reply(201)), "gone");
 });
 
-const reminder = (kind, tasks = []) => ({ userId: "u1", email: "a@example.test", kind, tasks, unsubscribeToken: "11111111-1111-4111-8111-111111111111" });
+const reminder = (userId, email) => ({ userId, email, kind: "comeback", unsubscribeToken: "11111111-1111-4111-8111-111111111111" });
 
-test("the focus-time notification starts the timer, or asks for the one thing", () => {
-  assert.deepEqual(buildReminderPush(reminder("daily", ["A", "B"]), SITE), {
-    title: "Time to get it done", body: "A · B", url: "https://www.prune.win/?start=next", tag: "prune-focus",
+test("the come-back notification says what the email says and opens prune", () => {
+  assert.deepEqual(new ReminderMessages(SITE).push(), {
+    title: "Your list is waiting", body: "Open prune to add a task or tick one off.", url: SITE, tag: "prune-comeback",
   });
-  assert.equal(buildReminderPush(reminder("daily"), SITE).title, "What will you get done today?");
-  assert.equal(buildReminderPush(reminder("daily"), SITE).url, SITE);
-  assert.equal(buildReminderPush(reminder("comeback"), SITE).tag, "prune-comeback");
-});
-
-test("reminders from the earlier claim function still render as focus-time reminders", () => {
-  const session = buildReminderEmail(reminder("session", ["Write report"]), SITE);
-  assert.equal(session.subject, "Get it done: Write report");
-  assert.ok(session.html.includes("kind=daily"));
-  const activation = buildReminderEmail(reminder("activation"), SITE);
-  assert.equal(activation.subject, "What will you get done today?");
-  assert.ok(activation.html.includes("kind=comeback"));
 });
 
 test("the job pushes to every device after the email settles, never for a released claim", async () => {
@@ -129,10 +114,7 @@ test("the job pushes to every device after the email settles, never for a releas
     secret: "s3cret",
     siteUrl: SITE,
     unsubscribeEndpoint: "https://api.example.test/functions/v1/email-unsubscribe",
-    claim: async () => [
-      { ...reminder("session", ["Write report"]), userId: "u1" },
-      { ...reminder("daily", ["Later"]), userId: "u2", email: "b@example.test" },
-    ],
+    claim: async () => [reminder("u1", "a@example.test"), reminder("u2", "b@example.test")],
     release: async () => {},
     send: async (email) => (email.to === "b@example.test" ? "retry" : "sent"),
     push: {
@@ -154,17 +136,8 @@ test("the job pushes to every device after the email settles, never for a releas
   const response = await handler(new Request("https://fn.example.test/", { method: "POST", headers: { Authorization: "Bearer s3cret" } }));
   assert.deepEqual(await response.json(), { sent: 1, retry: 1, rejected: 0, released: 1, pushed: 1 });
   assert.deepEqual(pushes.sort(), [
-    ["https://push.example.test/a", "Time to get it done", "Write report"],
-    ["https://push.example.test/b", "Time to get it done", "Write report"],
+    ["https://push.example.test/a", "Your list is waiting", "Open prune to add a task or tick one off."],
+    ["https://push.example.test/b", "Your list is waiting", "Open prune to add a task or tick one off."],
   ]);
   assert.deepEqual(recorded.sort(), [["https://push.example.test/a", "sent"], ["https://push.example.test/b", "gone"]]);
-});
-
-test("unsubscribe links accept the session switch", async () => {
-  const calls = [];
-  const handler = createUnsubscribeHandler({ allowedOrigins: new Set(), unsubscribe: async (token, kind) => { calls.push(kind); } });
-  const url = (kind) => `https://fn.example.test/?token=11111111-1111-4111-8111-111111111111&kind=${kind}`;
-  assert.equal((await handler(new Request(url("session"), { method: "POST" }))).status, 204);
-  assert.equal((await handler(new Request(url("activation"), { method: "POST" }))).status, 400);
-  assert.deepEqual(calls, ["session"]);
 });

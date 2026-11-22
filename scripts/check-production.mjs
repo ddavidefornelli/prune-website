@@ -1,5 +1,5 @@
-// Non-destructive hosted checks: no admin credentials, emails, row downloads,
-// account/planner mutations or paid AI requests. Never print response bodies/keys.
+// Non-destructive hosted checks: no admin credentials, emails, row downloads
+// or account/list mutations. Never print response bodies/keys.
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -8,13 +8,12 @@ import { PublicConfig } from "../src/cloud/config.ts";
 import { ANALYTICS_SCRIPTS, DOCUMENT_ROUTES, POSTHOG_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 
-const TABLES = ["planner_accounts", "planner_tasks", "planner_stops", "planner_reviews", "planner_receipts", "ai_controls", "ai_usage", "ai_review_requests"];
+const TABLES = ["planner_accounts", "planner_list_tasks", "planner_email_reminders", "planner_push_subscriptions", "error_log"];
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const HELP = `Usage: npm run check:production -- [options]
 
   --url https://www.prune.win   Website origin (or PRUNE_SITE_URL)
   --website-only              Inspect the website without contacting Supabase
-  --skip-ai                   Explicitly skip optional AI authentication/CORS
   --timeout-ms 15000           Per-request timeout, including body/redirects
   --json                      Print a machine-readable report
   --help                      Show this help without network/configuration access
@@ -147,7 +146,7 @@ export function summarize(results) {
   return { counts, exitCode: counts.ERROR ? 2 : counts.FAIL ? 1 : 0 };
 }
 
-export async function runProductionChecks({ site = "https://www.prune.win", config = null, configError = null, websiteOnly = false, skipAi = false, timeoutMs = 15000, fetcher = fetch } = {}, onResult = () => {}) {
+export async function runProductionChecks({ site = "https://www.prune.win", config = null, configError = null, websiteOnly = false, timeoutMs = 15000, fetcher = fetch } = {}, onResult = () => {}) {
   const origin = websiteOrigin(site);
   const results = [];
   const add = (status, id, label, detail = "", fix = "") => {
@@ -250,7 +249,7 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
   let canonical = origin;
   if (home) {
     canonical = new URL(home.url).origin;
-    if (home.redirected) add("WARN", "site:canonical", "Website redirect followed", `Checking final HTTPS origin ${canonical}; use it as PRUNE_SITE_URL.`, "Prefer the canonical origin in links and AI CORS configuration.");
+    if (home.redirected) add("WARN", "site:canonical", "Website redirect followed", `Checking final HTTPS origin ${canonical}; use it as PRUNE_SITE_URL.`, "Prefer the canonical origin in links and the unsubscribe function's ALLOWED_ORIGINS.");
     await safely("site/:inspection", "/: document inspection", () => inspectDocument(home, "/", canonical));
     for (const path of DOCUMENT_ROUTES.aliases) {
       await safely(`site${path}:inspection`, `${path}: document inspection`, async () => {
@@ -260,10 +259,10 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
     }
   } else add("SKIP", "site:dependent", "Website headers/content/assets", "Website request failed; dependent checks were not run.");
 
-  if (websiteOnly) add("SKIP", "backend:disabled", "Supabase and AI checks", "Explicit --website-only mode; this is not a full release check.");
+  if (websiteOnly) add("SKIP", "backend:disabled", "Supabase checks", "Explicit --website-only mode; this is not a full release check.");
   else if (!config || configError) {
     add("ERROR", "backend:config", "Public backend configuration", "Missing or unsafe VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.", "Set matching production public values in .env.local or your shell; never supply a service-role, sb_secret_ or provider key.");
-    add("SKIP", "backend:dependent", "Backend authentication/permissions/AI", "Cannot verify without valid public configuration.");
+    add("SKIP", "backend:dependent", "Backend authentication/permissions", "Cannot verify without valid public configuration.");
   } else {
     const headers = { apikey: config.publicKey, "Content-Type": "application/json" };
     const auth = await safely("auth:request", "Auth public settings", async () => {
@@ -273,7 +272,7 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
       if (!settings || typeof settings !== "object" || Array.isArray(settings)) throw new ProbeError("Auth settings response has an unexpected shape.");
       return settings;
     });
-    if (!auth) add("SKIP", "auth:dependent", "Backend permission and AI checks", "Public-key/service validation failed; avoiding misleading cascaded results.");
+    if (!auth) add("SKIP", "auth:dependent", "Backend permission checks", "Public-key/service validation failed; avoiding misleading cascaded results.");
     else {
       for (const [id, value, expected, label] of [
         ["email", auth.external?.email, true, "Email authentication enabled"],
@@ -300,28 +299,15 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
         const body = jsonBody(response);
         check([401, 403].includes(response.status) && ["42501", "PT401"].includes(body?.code), "list:anonymous", "The list rejects requests without a signed-in user or guest", codeDetail(response, body), "Review planner_list grants (authenticated only) and its auth.uid() guard.");
       });
-      if (skipAi) add("SKIP", "ai:disabled", "AI authentication and CORS", "Explicit --skip-ai mode; optional AI was not verified.");
-      else {
-        await safely("ai:request", "Anonymous AI request", async () => {
-          const response = await request(`${config.url}/functions/v1/weekly-review`, { headers, method: "POST", body: JSON.stringify({ timezone: "UTC" }) });
-          check(response.status === 401, "ai:anonymous", "AI rejects missing user tokens", `HTTP ${response.status}; no user token or review activity was supplied.`, "Verify the deployed Edge Function rejects unauthenticated calls before loading activity or reserving provider usage.");
-        });
-        for (const allowed of [true, false]) await safely(`ai:cors:${allowed}:request`, "AI CORS preflight", async () => {
-          const origin = allowed ? canonical : "https://security-fixture.invalid";
-          const response = await request(`${config.url}/functions/v1/weekly-review`, { method: "OPTIONS", headers: { Origin: origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,apikey,content-type" } });
-          const actual = response.headers.get("access-control-allow-origin");
-          check(allowed ? response.status === 204 && actual === origin : response.status === 403 && actual === null, `ai:cors:${allowed}`, allowed ? "AI allows the canonical website origin" : "AI rejects an unapproved origin", `HTTP ${response.status}; allow-origin header ${actual === null ? "is absent" : actual === origin ? "matches the request" : "does not match the request"}; ${allowed ? `expected HTTP 204 and ${origin}` : "expected HTTP 403 with no allow-origin header"}.`, "Check the deployed ALLOWED_ORIGINS allowlist, preserving required desktop origins. CORS is not authentication.");
-        });
-      }
     }
   }
-  return { site: canonical, scope: { websiteOnly, skipAi }, results, ...summarize(results), limitations: "Does not prove authenticated cross-account RLS, SMTP/OTP delivery or limits, migration parity, hosted load capacity, backups, retention, admin security or absence of vulnerabilities. Complete PRODUCTION_READINESS.md." };
+  return { site: canonical, scope: { websiteOnly }, results, ...summarize(results), limitations: "Does not prove authenticated cross-account RLS, SMTP/OTP delivery or limits, migration parity, hosted load capacity, backups, retention, admin security or absence of vulnerabilities. Complete PRODUCTION_READINESS.md." };
 }
 
 export async function main(args = process.argv.slice(2)) {
   let options;
   try {
-    options = parseArgs({ args, options: { url: { type: "string" }, "website-only": { type: "boolean" }, "skip-ai": { type: "boolean" }, "timeout-ms": { type: "string", default: "15000" }, json: { type: "boolean" }, help: { type: "boolean", short: "h" } } }).values;
+    options = parseArgs({ args, options: { url: { type: "string" }, "website-only": { type: "boolean" }, "timeout-ms": { type: "string", default: "15000" }, json: { type: "boolean" }, help: { type: "boolean", short: "h" } } }).values;
   } catch { console.error("Invalid arguments. Run npm run check:production -- --help."); return 2; }
   if (options.help) { console.log(HELP); return 0; }
   const timeoutMs = Number(options["timeout-ms"]);
@@ -340,7 +326,7 @@ export async function main(args = process.argv.slice(2)) {
     if (!options["website-only"] || env.VITE_SUPABASE_URL || env.VITE_SUPABASE_ANON_KEY) config = PublicConfig.parse(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
   } catch { configError = true; }
   if (!options.json) console.log(`Production checks: ${site}\nRead-only public probes; no credentials or response bodies will be printed.\n`);
-  const report = await runProductionChecks({ site, config, configError, timeoutMs, websiteOnly: !!options["website-only"], skipAi: !!options["skip-ai"] }, options.json ? undefined : (item) => {
+  const report = await runProductionChecks({ site, config, configError, timeoutMs, websiteOnly: !!options["website-only"] }, options.json ? undefined : (item) => {
     console.log(`[${item.status}] ${item.label}${item.detail ? ` — ${item.detail}` : ""}`);
   });
   if (options.json) console.log(JSON.stringify(report, null, 2));

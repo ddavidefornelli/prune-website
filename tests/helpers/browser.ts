@@ -61,6 +61,10 @@ export interface Backend {
   full: boolean;
   /** User ids the Auth server no longer knows (a cleaned-up guest). */
   removedUsers: string[];
+  /** Whose sessions were refreshed, in order. */
+  refreshes: string[];
+  /** Refresh tokens are refused, as for a revoked session. */
+  refreshRevoked: boolean;
 }
 
 /** planner_list's merge: removals, then saves where the newest edit wins. */
@@ -91,7 +95,7 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
   /** The cloud's list when the test starts (wrapped: test.use reads a bare array as [value, options]). */
   seed: [{ tasks: [] }, { option: true }],
   backend: async ({ context, visitor, seed }, use) => {
-    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [] };
+    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false };
     const initial = visitor === "account" ? session(ACCOUNT_ID, false) : visitor === "guest" ? session(GUEST_ID, true) : null;
     // Seed once per browser context, not on reload or each new tab.
     await context.addInitScript(({ initialSession, authKey, privacyKey, version }) => {
@@ -127,7 +131,14 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
         await send(user(caller, caller !== ACCOUNT_ID));
         return;
       }
-      if (url.pathname === "/auth/v1/token") { await send(session(GUEST_ID, true)); return; }
+      if (url.pathname === "/auth/v1/token") {
+        // A refresh keeps the session's user, and its sign-in time.
+        const id = String(body.refresh_token ?? "").replace("fixture-refresh-", "");
+        if (state.refreshRevoked || !id) { await send({ code: 400, error_code: "refresh_token_not_found", msg: "Invalid Refresh Token" }, 400); return; }
+        state.refreshes.push(id);
+        await send(session(id, id !== ACCOUNT_ID));
+        return;
+      }
       if (url.pathname === "/auth/v1/logout") { await route.fulfill({ status: 204, headers }); return; }
       const args = body.p_args ?? {};
       if (url.pathname === "/rest/v1/rpc/planner_list") {

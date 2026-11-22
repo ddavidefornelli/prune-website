@@ -7,22 +7,31 @@ import { environment } from "../helpers/reactivity.mjs";
 const guest = { accountKey: "project:guest", email: null, guest: true };
 const account = { accountKey: "project:alice", email: "alice@example.test", guest: false };
 
-/** `session`: the browser already has a saved session (else a guest is made only on request). */
-function fixture(t, { identity = guest, session = true, execute, accepted = true } = {}) {
+/**
+ * `session`: the browser already has a saved session (else a guest is made
+ * only on request). `answer(command, request)` overrides a reply.
+ */
+function fixture(t, { identity = guest, session = true, answer, accepted = true } = {}) {
   const env = environment(t);
   if (accepted) new PrivacyNotice(env.storage).acknowledge();
   const calls = [];
+  const reply = (command, request, fallback) => {
+    const value = answer?.(command, request);
+    return value === undefined ? fallback : value;
+  };
   const cloud = {
     onAccountChange() {},
     async dispose() {},
-    async execute(command, args) {
-      calls.push({ command, args });
-      const answer = execute?.(command, args);
-      if (answer !== undefined) return answer;
-      if (command === "identity") return session || args.create ? identity : null;
-      if (command === "planner_list") return { tasks: [], rejected: [] };
-      if (args?.action === "delete_account") return { isDeleted: true };
-      return null;
+    async identity(create) {
+      calls.push({ command: "identity", create });
+      return reply("identity", { create }, session || create ? identity : null);
+    },
+    async call(rpc, accountKey, request) {
+      calls.push({ command: rpc, accountKey, ...request });
+      return reply(rpc, request, rpc === "planner_list" ? { tasks: [], rejected: [] } : request.action === "delete_account" ? { isDeleted: true } : null);
+    },
+    async signOut() {
+      calls.push({ command: "sign_out" });
     },
   };
   const client = new AccountClient({ cloud, storage: env.storage });
@@ -45,7 +54,7 @@ test("a guest is made only when there is something to keep, then remembered", as
   assert.equal(await f.client.ensureAccount(false), null);
   assert.deepEqual(await f.client.ensureAccount(true), guest);
   assert.deepEqual(await f.client.ensureAccount(true), guest);
-  assert.deepEqual(f.calls.map(({ command, args }) => [command, args.create]), [["identity", false], ["identity", true]]);
+  assert.deepEqual(f.calls.map(({ command, create }) => [command, create]), [["identity", false], ["identity", true]]);
   assert.equal(f.client.current, guest);
 });
 
@@ -53,32 +62,33 @@ test("list syncs name the account they expect, with the browser's time zone", as
   const f = fixture(t);
   await f.client.ensureAccount();
   await f.client.syncList({ save: [], remove: ["x"] });
-  const sync = f.calls.find(({ command, args }) => command === "planner_list" && args.action === "sync");
-  assert.deepEqual(sync.args.args, { save: [], remove: ["x"], _accountKey: guest.accountKey });
-  assert.equal(sync.args.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const sync = f.calls.find(({ command, action }) => command === "planner_list" && action === "sync");
+  assert.equal(sync.accountKey, guest.accountKey);
+  assert.deepEqual(sync.args, { save: [], remove: ["x"] });
+  assert.equal(sync.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
 });
 
 test("erasing a guest erases its list and forgets the session; an older account is also marked for removal", async (t) => {
   const g = fixture(t);
   await g.client.eraseEverything();
-  assert.deepEqual(g.calls.map(({ command, args }) => [command, args?.action ?? null]), [["identity", null], ["planner_list", "erase"], ["sign_out", null]]);
+  assert.deepEqual(g.calls.map(({ command, action }) => [command, action ?? null]), [["identity", null], ["planner_list", "erase"], ["sign_out", null]]);
   assert.equal(g.client.current, null);
   const a = fixture(t, { identity: account });
   await a.client.eraseEverything();
-  assert.deepEqual(a.calls.map(({ command, args }) => [command, args?.action ?? null]), [["identity", null], ["planner_list", "erase"], ["planner_call", "delete_account"], ["sign_out", null]]);
+  assert.deepEqual(a.calls.map(({ command, action }) => [command, action ?? null]), [["identity", null], ["planner_list", "erase"], ["planner_call", "delete_account"], ["sign_out", null]]);
 });
 
 test("erasing never makes a guest just to erase it, and does nothing before acceptance", async (t) => {
-  const noSession = fixture(t, { execute: (command) => (command === "identity" ? null : undefined) });
+  const noSession = fixture(t, { answer: (command) => (command === "identity" ? null : undefined) });
   await noSession.client.eraseEverything();
-  assert.deepEqual(noSession.calls.map(({ command, args }) => [command, args.create]), [["identity", false]]);
+  assert.deepEqual(noSession.calls.map(({ command, create }) => [command, create]), [["identity", false]]);
   const notAccepted = fixture(t, { accepted: false });
   await notAccepted.client.eraseEverything();
   assert.deepEqual(notAccepted.calls, []);
 });
 
 test("an unconfirmed deletion of an older account fails before forgetting the session", async (t) => {
-  const f = fixture(t, { identity: account, execute: (_command, args) => (args?.action === "delete_account" ? { isDeleted: false } : undefined) });
+  const f = fixture(t, { identity: account, answer: (_command, request) => (request?.action === "delete_account" ? { isDeleted: false } : undefined) });
   await assert.rejects(f.client.eraseEverything(), /not confirmed/);
   assert.equal(f.calls.some(({ command }) => command === "sign_out"), false);
 });

@@ -1,7 +1,7 @@
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DOCUMENT_ROUTES, hardenHtml } from "./security-policy.ts";
+import { DOCUMENT_ROUTES, IMMUTABLE_ASSETS, hardenHtml } from "./security-policy.ts";
 
 /** Package immutable bytes + their headers together via Vercel Build Output API. */
 export function buildVercel(source = "dist", destination = ".vercel/output"): void {
@@ -31,6 +31,8 @@ export function buildVercel(source = "dist", destination = ".vercel/output"): vo
       { src: "/(.*)", headers, continue: true },
       // Never cache HTML independently from the deployment's hash policy.
       { src: DOCUMENT_ROUTES.noStore, headers: { "Cache-Control": "no-store" }, continue: true },
+      // Content-hashed bytes never change: repeat visits load them from cache.
+      { src: IMMUTABLE_ASSETS.route, headers: { "Cache-Control": IMMUTABLE_ASSETS.cacheControl }, continue: true },
       { src: DOCUMENT_ROUTES.rewrite, dest: "/index.html" },
       { handle: "filesystem" },
     ],

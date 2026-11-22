@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { buildRelease } from "../scripts/build-release.mjs";
 import { buildVercel } from "../scripts/build-vercel.ts";
 import { checkDeployment } from "../scripts/check-deployment.mjs";
-import { hardenHtml } from "../scripts/security-policy.ts";
+import { IMMUTABLE_ASSETS, hardenHtml } from "../scripts/security-policy.ts";
 
 const paths = ["/", "/login", "/login/", "/index.html"];
 const origin = "https://deployment-fixture.supabase.co";
@@ -60,6 +60,15 @@ for (const header of ["Content-Security-Policy", "X-Content-Type-Options", "X-Fr
     if (id === "csp") assert.equal(result(report, "site/:meta").status, "SKIP", "meta must never substitute for an HTTP policy");
   });
 }
+
+test("hashed scripts and styles are cached for a year; documents never are", (t) => {
+  const { destination } = fixture(t);
+  const { routes } = JSON.parse(readFileSync(join(destination, "config.json"), "utf8"));
+  const cacheFor = (path) => routes.filter((route) => route.headers?.["Cache-Control"] && new RegExp(`^(?:${route.src})$`).test(path)).map((route) => route.headers["Cache-Control"]);
+  for (const path of ["/assets/app.js", "/assets/app.css", "/assets/index-Dvgf6SyV.js"]) assert.deepEqual(cacheFor(path), [IMMUTABLE_ASSETS.cacheControl], path);
+  for (const path of paths) assert.deepEqual(cacheFor(path), ["no-store"], path);
+  for (const path of ["/sw.js", "/manifest.webmanifest", "/assets/", "/assets/app.js.map", "/assets/../index.html"]) assert.deepEqual(cacheFor(path), [], path);
+});
 
 test("no-store and the document rewrite are required on the trailing-slash login route too", async (t) => {
   const { destination } = fixture(t);

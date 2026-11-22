@@ -115,9 +115,6 @@ a {
   font-weight: 650;
   letter-spacing: -0.03em;
 }
-.muted {
-  color: var(--muted);
-}
 .error {
   margin: 0;
   color: var(--danger);
@@ -202,31 +199,6 @@ a {
 }
 .privacy-policy-content li {
   margin-block: 10px;
-}
-
-/* Startup */
-.startup-loading {
-  display: grid;
-  place-items: center;
-  min-height: 100svh;
-}
-.startup-ring {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--line);
-  border-top-color: var(--ink);
-  border-radius: 50%;
-  animation: startup-spin 800ms linear infinite;
-}
-@keyframes startup-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .startup-ring {
-    animation: none;
-  }
 }
 
 /* Startup failure and the unsubscribe page */

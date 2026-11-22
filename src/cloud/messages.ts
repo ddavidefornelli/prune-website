@@ -5,7 +5,6 @@
  * list) reach the screen.
  */
 export const MESSAGES = {
-  generic: "Something went wrong. Please try again.",
   sessionExpired: "This browser's session has ended.",
   accountChanged: "This browser now uses another account.",
   accountDeleted: "This account was deleted.",
@@ -16,6 +15,7 @@ export const MESSAGES = {
     "Could not save your terms acceptance. Allow browser storage and try again.",
   guestUnavailable: "A guest id could not be created right now.",
   signOutStorage: "Could not clear this browser's session.",
+  sessionNotSaved: "Could not save this browser's session.",
 
   // Requests
   unreachable: "Could not reach prune.",
@@ -23,7 +23,6 @@ export const MESSAGES = {
   serverFailed: "prune could not save right now.",
   rateLimited: "Too many requests. Please try again later.",
   responseTooLarge: "The server response is too large.",
-  unsupportedCommand: "Unsupported browser command.",
 
   // The list
   listFull: "Your list is full. Delete some tasks to add more.",

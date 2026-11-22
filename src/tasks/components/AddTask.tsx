@@ -1,6 +1,5 @@
 import { createSignal, onMount } from "solid-js";
-import { MEDIA_QUERIES } from "../../cloud/constants";
-import { TASK_LIMITS } from "../constants";
+import { FINE_POINTER, TASK_LIMITS } from "../constants";
 
 /** The one way to add a task: type it, press Enter. The list grows from the top. */
 export function AddTask(props: { onAdd: (title: string) => boolean }) {
@@ -10,7 +9,7 @@ export function AddTask(props: { onAdd: (title: string) => boolean }) {
   // With a keyboard, the page opens ready to type. Phones wait for a tap, so
   // the keyboard does not cover the list on arrival.
   onMount(() => {
-    if (window.matchMedia(MEDIA_QUERIES.finePointer).matches) input.focus();
+    if (window.matchMedia(FINE_POINTER).matches) input.focus();
   });
 
   function submit(event: SubmitEvent): void {

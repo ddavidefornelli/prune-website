@@ -78,10 +78,9 @@ const titles = (tasks) => tasks.map((task) => task.title);
 
 test("a new visitor's list works at once; the first task accepts the terms and starts syncing as a guest", async (t) => {
   const f = await fixture(t, { accepted: false, session: false });
-  assert.equal(f.state.needsConsent(), true);
+  assert.equal(f.client.accepted, false);
   assert.deepEqual(f.client.syncs, []);
   assert.equal(f.state.add("First"), true);
-  assert.equal(f.state.needsConsent(), false);
   assert.equal(f.client.accepted, true);
   await f.run(LIST_SYNC.debounceMs);
   assert.deepEqual(f.client.identities.at(-1), true);

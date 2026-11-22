@@ -197,7 +197,7 @@ export class ReminderJob {
     const push = this.deps.push;
     const targets = devices.get(reminder.userId);
     if (!push || !targets) return 0;
-    const payload = this.messages.push(reminder);
+    const payload = this.messages.push();
     const results = await Promise.all(
       targets.map(async (target) => {
         const result = await push
@@ -208,6 +208,26 @@ export class ReminderJob {
       }),
     );
     return results.filter((result) => result === "sent").length;
+  }
+}
+
+/** The website origins a function answers from a browser. */
+export class AllowedOrigins {
+  /**
+   * `ALLOWED_ORIGINS` (or the production site when unset) plus
+   * `EXTRA_ALLOWED_ORIGINS`, which adds to the shared list, never replacing it.
+   */
+  static fromEnvironment(
+    allowed: string | undefined,
+    extra: string | undefined,
+  ): Set<string> {
+    return new Set(
+      [allowed || CORS.defaultOrigin, extra]
+        .join(",")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    );
   }
 }
 

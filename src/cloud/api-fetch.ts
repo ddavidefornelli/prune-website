@@ -1,8 +1,18 @@
-import { HTTP_LIMITS, SUPABASE_ROUTES } from "../shared/api-routes.ts";
+import {
+  HTTP_LIMITS,
+  HTTP_STATUS,
+  SUPABASE_ROUTES,
+} from "../shared/api-routes.ts";
 import { CloudError } from "./cloud-error.ts";
 import { MESSAGES } from "./messages.ts";
 
 type Limits = { [Key in keyof typeof HTTP_LIMITS]: number };
+
+/** Statuses whose response never has a body. */
+const NO_BODY: readonly number[] = [
+  HTTP_STATUS.noContent,
+  HTTP_STATUS.resetContent,
+];
 
 /**
  * `fetch` with a deadline that covers the streamed body and a cap on its
@@ -14,10 +24,6 @@ export class BoundedFetch {
   constructor(limits: Limits = HTTP_LIMITS) {
     this.limits = limits;
   }
-
-  /** The `fetch`-compatible form the Supabase SDK takes. */
-  readonly fetch = (input: RequestInfo | URL, init?: RequestInit) =>
-    this.request(input, init);
 
   async request(
     input: RequestInfo | URL,
@@ -100,7 +106,8 @@ export class BoundedFetch {
     const headers = new Headers(response.headers);
     headers.delete("Content-Encoding");
     headers.delete("Content-Length");
-    return new Response(bytes, {
+    // A 204 (sign-out, unsubscribe) or 205 may not be rebuilt with a body, even an empty one.
+    return new Response(NO_BODY.includes(response.status) ? null : bytes, {
       status: response.status,
       statusText: response.statusText,
       headers,
