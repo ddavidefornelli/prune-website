@@ -47,9 +47,6 @@ export function TaskApp() {
             {(id) => <TaskItem id={id} state={state} />}
           </For>
         </ul>
-        <Show when={!state.openIds().length && state.doneIds().length}>
-          <p class="all-done">All done.</p>
-        </Show>
         <DoneTasks state={state} />
       </main>
       <UndoBar state={state} />

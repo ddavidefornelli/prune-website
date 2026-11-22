@@ -248,12 +248,6 @@
   }
 }
 
-.all-done {
-  margin: 28px 0 4px 36px;
-  color: var(--muted);
-  font-size: var(--text-small);
-}
-
 .done {
   margin-top: 24px;
 }

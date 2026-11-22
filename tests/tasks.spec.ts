@@ -27,7 +27,6 @@ test("ticking a task moves it to Done, and unticking brings it back", async ({ p
   // It stays in place for a moment, ticked, then folds into Done.
   await expect(todo(page).getByRole("checkbox", { name: "Send the invoice" })).toBeChecked();
   await expect(todo(page).getByRole("listitem")).toHaveCount(0);
-  await expect(page.getByText("All done.")).toBeVisible();
   const toggle = page.getByRole("button", { name: /^Done/ });
   await expect(toggle).toHaveText("Done 1");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
