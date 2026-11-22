@@ -43,7 +43,7 @@ export class ListState {
   readonly undo: Accessor<UndoOffer | null>;
   /** One short line about the list: only that it is full. */
   readonly notice: Accessor<string>;
-  /** True until this browser accepts the terms, by adding a task. */
+  /** True until this browser records the current terms acknowledgement. */
   readonly needsConsent: Accessor<boolean>;
   /** The account the list syncs with, once there is one. */
   readonly account: Accessor<Account | null>;
@@ -166,8 +166,8 @@ export class ListState {
   }
 
   /**
-   * False when there was nothing to add. The first task also accepts the
-   * terms (the line under the field says so), which lets the list sync.
+   * False when there was nothing to add. The first task records the terms
+   * acknowledgement, which lets the list sync.
    */
   add(title: string): boolean {
     if (!this.change((list, now) => list.add(title, now))) return false;

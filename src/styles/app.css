@@ -99,22 +99,6 @@
   outline: none;
 }
 
-.consent {
-  margin: 10px 0 4px 36px;
-  color: var(--muted);
-  font-size: var(--text-tiny);
-  line-height: 1.5;
-}
-.consent .privacy-policy-button {
-  min-height: 0;
-  padding: 0;
-  color: inherit;
-  font-size: inherit;
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
-}
 .notice {
   margin: 12px 0 0 36px;
   color: var(--danger);

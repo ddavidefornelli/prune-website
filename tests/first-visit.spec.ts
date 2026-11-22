@@ -1,7 +1,7 @@
 import { test, expect, addTask, newTask, openList, savedList, synced, AUTH_KEY, ACCOUNT_ID, GUEST_ID, PROJECT } from "./helpers/browser";
 import { PRIVACY_ACKNOWLEDGEMENT_KEY, PRIVACY_POLICY_VERSION } from "../src/cloud/privacy-state";
 
-const consent = (page: import("@playwright/test").Page) => page.getByText("By adding a task you agree to the Terms and Privacy Policy.");
+const consentNotice = (page: import("@playwright/test").Page) => page.getByText("By adding a task you agree to the Terms and Privacy Policy.");
 
 test.describe("a new visitor", () => {
   test.use({ visitor: "new" });
@@ -10,7 +10,7 @@ test.describe("a new visitor", () => {
     await page.goto("/");
     await expect(page).toHaveTitle("prune — A to-do list. Nothing else.");
     await expect(newTask(page)).toBeFocused();
-    await expect(consent(page)).toBeVisible();
+    await expect(consentNotice(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Google|email|sign/i })).toHaveCount(0);
     await expect(page.getByRole("list", { name: "To do" }).getByRole("listitem")).toHaveCount(0);
     await page.waitForLoadState("networkidle");
@@ -21,7 +21,6 @@ test.describe("a new visitor", () => {
   test("the first task accepts the terms and quietly makes a guest id that the list syncs under", async ({ page, backend }) => {
     await page.goto("/");
     await addTask(page, "Buy milk");
-    await expect(consent(page)).toHaveCount(0);
     const record = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), PRIVACY_ACKNOWLEDGEMENT_KEY);
     expect(record.version).toBe(PRIVACY_POLICY_VERSION);
     await synced(page);
@@ -33,20 +32,17 @@ test.describe("a new visitor", () => {
     await expect(page.getByRole("checkbox", { name: "Buy milk" })).toBeVisible();
     await synced(page);
     expect(backend.guests).toHaveLength(1);
-    await expect(consent(page)).toHaveCount(0);
   });
 
-  test("both links open the terms and privacy notice, and reading them sends nothing", async ({ page, backend }) => {
+  test("the menu opens the terms and privacy notice, and reading it sends nothing", async ({ page, backend }) => {
     await page.goto("/");
-    for (const name of ["Terms", "Privacy Policy"]) {
-      await page.getByRole("button", { name, exact: true }).click();
-      const dialog = page.getByRole("dialog");
-      await expect(dialog.getByRole("heading", { name: "Terms of use", exact: true })).toBeVisible();
-      await expect(dialog).toContainText("There are no subscription fees or in-app purchases.");
-      await expect(dialog).toContainText("Nothing in these terms excludes liability");
-      await expect(dialog).toContainText("browser's localStorage");
-      await page.getByRole("button", { name: "Close privacy policy" }).click();
-    }
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Terms & Privacy" }).click();
+    const dialog = page.getByRole("dialog", { name: "Terms & Privacy" });
+    await expect(dialog.getByRole("heading", { name: "Terms of use", exact: true })).toBeVisible();
+    await expect(dialog).toContainText("There are no subscription fees or in-app purchases.");
+    await expect(dialog).toContainText("Nothing in these terms excludes liability");
+    await expect(dialog).toContainText("browser's localStorage");
     expect(backend.requests).toEqual([]);
   });
 
@@ -73,7 +69,7 @@ test.describe("a new visitor", () => {
     });
     await page.goto("/");
     await addTask(page, "Still here");
-    await expect(consent(page)).toBeVisible();
+    await expect(consentNotice(page)).toHaveCount(0);
     await page.waitForTimeout(800);
     expect(backend.requests).toEqual([]);
   });
@@ -81,7 +77,7 @@ test.describe("a new visitor", () => {
   test.describe("on a phone", () => {
     test.use({ hasTouch: true, isMobile: true });
     for (const banner of [false, true]) {
-      test(`the field, the line and the menu fit, ${banner ? "with" : "without"} the cookie banner`, async ({ page }) => {
+      test(`the field and menu fit, ${banner ? "with" : "without"} the cookie banner`, async ({ page }) => {
         await page.emulateMedia({ reducedMotion: "reduce" });
         if (banner) await page.addInitScript(() => localStorage.removeItem("prune:cookies:v1"));
         for (const viewport of [{ width: 280, height: 568 }, { width: 320, height: 568 }, { width: 375, height: 667 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
@@ -89,7 +85,7 @@ test.describe("a new visitor", () => {
           await page.goto("/");
           const size = `${viewport.width}×${viewport.height}`;
           await expect(newTask(page), `field at ${size}`).toBeInViewport({ ratio: 1 });
-          await expect(consent(page), `line at ${size}`).toBeInViewport({ ratio: 1 });
+          await expect(consentNotice(page), `no consent notice at ${size}`).toHaveCount(0);
           await expect(page.getByRole("button", { name: "Menu" }), `menu at ${size}`).toBeInViewport({ ratio: 1 });
           // A phone does not raise the keyboard on arrival.
           await expect(newTask(page)).not.toBeFocused();
@@ -114,15 +110,15 @@ test.describe("a returning guest", () => {
     await openList(page);
     expect(backend.guests).toEqual([]);
     expect((await savedList(page))?.owner).toBe(`${PROJECT}:${GUEST_ID}`);
-    await expect(consent(page)).toHaveCount(0);
+    await expect(consentNotice(page)).toHaveCount(0);
   });
 
-  test("an outdated acceptance shows the line again, and nothing syncs until the next task", async ({ page, backend }) => {
+  test("an outdated acceptance stays local until the next task without showing a notice", async ({ page, backend }) => {
     await page.addInitScript((key) => {
       localStorage.setItem(key, JSON.stringify({ version: "privacy-old", acknowledgedAt: new Date().toISOString() }));
     }, PRIVACY_ACKNOWLEDGEMENT_KEY);
     await page.goto("/");
-    await expect(consent(page)).toBeVisible();
+    await expect(consentNotice(page)).toHaveCount(0);
     await page.waitForTimeout(800);
     expect(backend.requests).toEqual([]);
     await addTask(page, "Agreed by adding");

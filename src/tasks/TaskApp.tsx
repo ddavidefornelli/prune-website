@@ -1,6 +1,5 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { AccountClient } from "../cloud/account";
-import { PrivacyPolicyButton } from "../components/PrivacyPolicyButton";
 import { AddTask } from "./components/AddTask";
 import { DoneTasks } from "./components/DoneTasks";
 import { MenuSheet } from "./components/MenuSheet";
@@ -45,13 +44,6 @@ export function TaskApp() {
       <main class="list">
         <h1 class="visually-hidden">Tasks</h1>
         <AddTask onAdd={(title) => state.add(title)} />
-        <Show when={state.needsConsent()}>
-          <p class="consent">
-            By adding a task you agree to the{" "}
-            <PrivacyPolicyButton label="Terms" /> and{" "}
-            <PrivacyPolicyButton label="Privacy Policy" />.
-          </p>
-        </Show>
         <Show when={state.notice()}>
           <p class="notice" role="alert">
             {state.notice()}
