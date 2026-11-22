@@ -17,7 +17,7 @@ test.describe("a new visitor", () => {
 
   test("lands on the list, ready to type: no sign-up, and nothing sent anywhere", async ({ page, backend }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle("prune — A to-do list. Nothing else.");
+    await expect(page).toHaveTitle("prune — No-login minimal to-do list");
     await expect(newTask(page)).toBeFocused();
     await expect(consentNotice(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Google|email|sign/i })).toHaveCount(0);

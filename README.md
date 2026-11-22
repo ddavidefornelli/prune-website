@@ -1,8 +1,8 @@
 # prune
 
-**A to-do list. Nothing else.**
+**No-login minimal to-do list.**
 
-prune is the easiest to-do list there is. Open it and type a task: there is nothing to sign up for. Press Enter to add it, tick it off when it's done, tap it to change it or delete it. Your list is saved as you go.
+prune is the easiest to-do list there is. Open it and type a task: there is nothing to sign up for. Press Enter to add it, tick it off when it's done, tap it to change it or delete it. Your list is saved as you go. Make a space and send its link to keep a list together: every change shows up for everyone at once.
 
 <p align="center">
   <img src="screenshots/first.png" width="250" alt="A first visit: the list, ready to type">

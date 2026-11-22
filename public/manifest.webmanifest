@@ -1,7 +1,7 @@
 {
   "name": "prune",
   "short_name": "prune",
-  "description": "A to-do list. Nothing else.",
+  "description": "No-login minimal to-do list.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
