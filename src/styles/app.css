@@ -1,2419 +1,478 @@
 @import "./base.css";
-@import "./preview.css";
-@import "./party.css";
-@import "./tour.css";
 
-:root {
-  -webkit-text-size-adjust: 100%;
+/* ——— The list ——— */
+.app {
+  max-width: var(--column);
+  margin: 0 auto;
+  padding: 0 var(--gutter) calc(120px + env(safe-area-inset-bottom));
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
 }
-html {
-  min-height: 100%;
-}
-body {
-  margin: 0;
-  min-width: 280px;
-  isolation: isolate;
-}
-#root {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-}
-[hidden] {
-  display: none !important;
-}
-a {
-  color: inherit;
-}
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-}
-button,
-input,
-textarea,
-a {
-  -webkit-tap-highlight-color: transparent;
-}
-button {
-  min-height: 44px;
-  border-radius: var(--radius-pill);
-  font-weight: 550;
-  touch-action: manipulation;
-}
-input,
-textarea {
-  min-height: 48px;
-  font-size: 1rem;
-}
-input:focus,
-textarea:focus {
-  border-color: var(--accent);
-}
-input,
-textarea,
-.email-code-digit,
-.error,
-.sync-bar,
-.review-countdown-unit,
-.review-stats > div,
-.weekly-reason,
-.weekly-improvements li,
-.activity-stat,
-.profile-stat,
-.email-reminder {
-  border-radius: var(--radius-control);
-}
-.task,
-.hud,
-.insight-drop,
-.review-unlocked,
-.hint-card,
-.activity-card,
-.review-countdown,
-.weekly-report,
-.review-timing-comparison,
-.pause-dialog {
-  border-radius: var(--radius-card);
-}
-.pause-dialog {
-  box-shadow: var(--shadow-float);
-}
-.review-bar-track,
-.review-countdown-track,
-.plan-slots li,
-.quick-entry-chip {
-  border-radius: var(--radius-pill);
-}
-.quick-entry-hint,
-.shortcut-sheet kbd,
-.shortcut-hint kbd {
-  border-radius: 6px;
-}
-
-#app {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  width: 100%;
-  max-width: 61.1111rem;
-  height: auto;
-  min-height: 100dvh;
-  margin-inline: auto;
-  padding: 16px 20px max(24px, env(safe-area-inset-bottom));
-  overflow: visible;
-}
-#app > main {
-  flex: 1;
-  min-height: auto;
-  width: 100%;
-  padding-top: 24px;
-  container-type: normal;
-}
-.overview-screen {
-  position: relative;
-  min-height: 60dvh;
-  isolation: isolate;
-}
-
-.overview-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-#app .profile-button {
-  display: grid;
-  place-items: center;
-  height: 2.4444rem;
-  padding: 0 16px;
-  font-size: 0.7222rem;
-}
-/* An opaque band keeps scrolling content behind the navigation. */
-#app > .navigation-header {
+.app-header {
   position: sticky;
-  top: 16px;
-  z-index: 10;
-  isolation: isolate;
-  flex: none;
-  margin-top: 16px;
-  padding-block: 12px;
-}
-.navigation-header::before {
-  content: "";
-  position: absolute;
-  inset: -16px calc(50% - 50vw) 0;
-  z-index: -1;
-  background: var(--background);
-  pointer-events: none;
-}
-#app .navigation-header > nav {
-  width: 100%;
-  min-width: 0;
-}
-#app .navigation-header > nav button {
-  min-height: 44px;
-  padding: 10px 4px;
-  font-size: 0.8333rem;
-}
-/* Equal columns squeeze long labels into their neighbours on phones; size each
-   tab to its label and share the leftover space evenly instead. */
-@media (max-width: 759px) {
-  #app .navigation-header > nav {
-    grid-auto-columns: auto;
-    gap: 2px;
-  }
-  #app .navigation-header > nav button {
-    padding-inline: 8px;
-    font-size: 0.7778rem;
-    word-spacing: normal;
-  }
-}
-@media (max-width: 359px) {
-  #app .navigation-header > nav button {
-    padding-inline: 5px;
-    font-size: 0.7222rem;
-    letter-spacing: 0.01em;
-  }
-}
-#app > .error {
-  flex: none;
-  overflow-wrap: anywhere;
-}
-.privacy-policy-button {
-  min-height: auto;
-}
-.startup-loading {
-  flex: 1;
-  min-height: 50dvh;
-}
-
-.auth-panel {
-  flex: none;
-  width: 100%;
-  max-width: 23.3333rem;
-  margin: auto;
-  text-align: left;
-}
-.auth-panel h1 {
-  max-width: none;
-  margin: 0;
-  text-align: left;
-  font-size: clamp(2rem, 8.5vw, 2.5556rem);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.045em;
-}
-.auth-panel form {
-  width: 100%;
-  margin: 0;
-  gap: 16px;
-}
-.auth-panel label {
-  min-width: 0;
-  gap: 8px;
-  font-size: 0.7778rem;
-  line-height: 1.5;
-}
-
-.auth-panel .signup-terms {
-  margin: 14px 0 0;
-  color: var(--muted);
-  font-size: 0.7222rem;
-  line-height: 1.6;
-}
-.auth-panel .signup-terms .privacy-policy-button {
-  color: var(--text);
-}
-
-.auth-panel input[type="email"] {
-  width: 100%;
-  min-width: 0;
-  height: 2.8889rem;
-  padding: 12px 16px;
-  font-size: 0.9444rem;
-  line-height: 1.5;
-}
-.auth-submit {
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
-  font-size: 0.9444rem;
-  font-weight: 550;
-  line-height: 1.5;
+  gap: 12px;
+  height: calc(var(--header) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  background: var(--bg);
 }
-.email-code-boxes {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: clamp(4px, 1vw, 8px);
-}
-/* One native input preserves paste, autofill, selection and keyboard editing. */
-.auth-panel .email-code-boxes .otp-input {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-  opacity: 0;
-  cursor: text;
-}
-.email-code-digit {
+.menu-button {
   display: grid;
   place-items: center;
-  min-width: 0;
-  aspect-ratio: 1;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: clamp(1rem, 4vw, 1.4444rem);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0 -10px 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
 }
-.email-code-boxes:focus-within .email-code-digit.is-active {
-  border-color: var(--accent);
-  outline: 1px solid var(--accent);
-  outline-offset: 2px;
-}
-.email-code-boxes:has(input:disabled) {
-  opacity: 0.5;
-}
-
-#app .google-signin {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
-  color: var(--text);
-  font-size: 0.9444rem;
-  font-weight: 550;
-  line-height: 1.5;
-  background: var(--surface);
-  border-color: var(--border);
+.menu-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
 }
 @media (hover: hover) {
-  #app .google-signin:hover:not(:disabled) {
-    background: var(--surface-hover);
-    border-color: var(--taupe);
+  .menu-button:hover {
+    background: var(--hover);
   }
 }
-.google-signin svg {
+
+.add-task {
+  position: sticky;
+  top: calc(var(--header) + env(safe-area-inset-top));
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.15s;
+}
+.add-task:focus-within {
+  border-bottom-color: var(--ink);
+}
+.add-button {
+  display: grid;
+  place-items: center;
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0 -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
 }
-.auth-panel .error {
-  margin: 20px 0 0;
-  font-size: 0.7222rem;
-  overflow-wrap: anywhere;
+.add-task:focus-within .add-button {
+  color: var(--ink);
+}
+.add-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.add-input {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--text);
+}
+.add-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.add-input:focus,
+.add-input:focus-visible {
+  outline: none;
 }
 
-/* Phone layouts scroll naturally, including when the software keyboard opens. */
-:root {
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+.consent {
+  margin: 10px 0 4px 36px;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+  line-height: 1.5;
 }
-.plan-heading {
-  display: grid;
-  justify-content: stretch;
-  gap: 10px;
-  width: 100%;
+.consent .privacy-policy-button {
+  min-height: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
 }
-.plan-summary.is-prompt {
-  font-size: clamp(1.6667rem, 5vw, 2.4444rem);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.045em;
-}
-.plan-summary em {
-  font-style: normal;
-  color: var(--text);
+.notice {
+  margin: 12px 0 0 36px;
+  color: var(--danger);
+  font-size: var(--text-small);
 }
 
-.plan-summary {
+.tasks {
   margin: 0;
-  font-size: clamp(1.2222rem, 3.4vw, 1.6667rem);
-  font-weight: 650;
-  line-height: 1.2;
-  letter-spacing: -0.035em;
-  text-wrap: balance;
-}
-.plan-slots {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  margin: 6px 0 0;
   padding: 0;
   list-style: none;
 }
-.plan-slots li {
-  height: 4px;
-  background: var(--border);
-  transition: background-color 600ms var(--ease-out);
-}
-.plan-slots li.is-planned {
-  background: color-mix(in srgb, var(--text) 45%, var(--border));
-}
-.plan-slots li.is-active {
-  background: var(--muted);
-}
-.plan-slots li.is-done {
-  background: var(--positive);
-}
-/* Panels: the streak and the review meter on Today. Plain white cards. */
-.hud {
-  --tier: var(--text);
+.task {
   position: relative;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
-/* Today's panels: the streak and the check-in, stacked on phones and side
-   by side on laptops. */
-.today-panels {
+/* A 44px target around a 22px circle; the real checkbox covers it. */
+.check {
+  position: relative;
   display: grid;
-  gap: 8px;
-  margin: 24px 0 0;
-}
-.today-panels:empty {
-  display: none;
-}
-.today-panels > .streak,
-.today-panels > .review-meter {
-  min-width: 0;
-  margin: 0;
-}
-@media (min-width: 760px) {
-  .today-panels {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .today-panels > :only-child {
-    grid-column: 1 / -1;
-  }
-  /* Half a row is too narrow for the count and the week side by side. */
-  .today-panels:not(:has(> :only-child)) .streak-week {
-    flex-basis: 100%;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    justify-items: center;
-    margin: 0;
-  }
-  .today-panels > .review-meter {
-    display: grid;
-  }
-  .today-panels .check-in-meter {
-    align-content: space-between;
-  }
-}
-/* The streak: a flame that is lit while the run is alive, with the count
-   beside it, and this week as seven embers. An hourglass sits on the flame
-   when today still needs a task to keep it. */
-.streak {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
-  margin: 24px 0 0;
-  padding: 12px 14px;
-  overflow: hidden;
-}
-.streak-count {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  margin: 0;
-}
-.streak-flame {
-  position: relative;
+  place-items: center;
   flex: none;
-  width: 34px;
-  height: 42px;
+  width: 24px;
+  height: 52px;
 }
-.streak-flame svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-.streak-fire {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-}
-.streak-core {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-}
-.streak:not(.is-lit) .streak-flame svg {
-  opacity: 0.25;
-}
-.streak:not(.is-lit) .streak-flame path {
-  fill: var(--muted);
-}
-.streak[data-level="warm"] .streak-flame {
-  width: 38px;
-  height: 46px;
-}
-.streak[data-level="hot"] .streak-flame,
-.streak[data-level="blaze"] .streak-flame {
-  width: 42px;
-  height: 50px;
-}
-.streak.is-open .streak-flame svg {
-  opacity: 0.55;
-}
-.streak-hourglass,
-.streak-hundred {
+/* Sized explicitly: WebKit keeps a checkbox at its own 12px otherwise. */
+.check input {
   position: absolute;
-  right: -8px;
-  bottom: -4px;
+  top: 4px;
+  left: -10px;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+.check-mark {
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
+  border: 1.5px solid var(--faint);
   border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
-  font-size: 13px;
-  line-height: 1;
+  transition:
+    background-color 0.18s var(--ease),
+    border-color 0.18s var(--ease);
 }
-.streak-hundred {
-  right: auto;
-  left: -8px;
-}
-.streak-count strong {
-  font-size: 2.25rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.05em;
-  font-variant-numeric: tabular-nums;
-}
-.streak:not(.is-lit) .streak-count strong {
-  color: var(--muted);
-}
-.streak-words {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  line-height: 1.2;
-}
-.streak-unit {
-  font-size: 0.8889rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.streak-note {
-  color: var(--muted);
-  font-size: 0.6667rem;
-}
-.streak.is-open .streak-note {
-  color: var(--flame-low);
-  font-weight: 600;
-}
-.streak-week {
-  display: grid;
-  grid-template-columns: repeat(7, auto);
-  gap: 8px;
-  margin: 0 0 0 auto;
-  padding: 0;
-  list-style: none;
-}
-.streak-week li {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 0.5556rem;
-  font-weight: 600;
-  line-height: 1;
-}
-.streak-dot {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-}
-.streak-dot svg {
-  width: 11px;
-  height: 14px;
-  fill: #fff;
-}
-.streak-week [data-state="done"] .streak-dot {
-  background: linear-gradient(
-    to top,
-    var(--flame-low),
-    var(--flame-mid) 60%,
-    var(--flame-high)
-  );
-}
-.streak-week [data-state="today"] {
-  color: var(--text);
-}
-.streak-week [data-state="today"] .streak-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--text);
-}
-.streak.is-open .streak-week [data-state="today"] .streak-dot {
-  box-shadow: inset 0 0 0 2px var(--flame-mid);
-}
-.streak-week [data-state="ahead"] .streak-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-/* Phones: the week gets its own full-width row under the count. */
-@media (max-width: 759px) {
-  .streak-week {
-    flex-basis: 100%;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    justify-items: center;
-    margin: 0;
-  }
-}
-@media (max-width: 359px) {
-  .streak-week {
-    gap: 5px;
-  }
-  .streak-dot {
-    width: 21px;
-    height: 21px;
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .streak.is-lit:not(.is-open) .streak-fire {
-    animation: flame-flicker 2.4s ease-in-out infinite;
-  }
-  .streak.is-lit:not(.is-open) .streak-core {
-    animation: flame-core 1.3s ease-in-out infinite alternate;
-  }
-  .streak-hourglass {
-    animation: hourglass-tip 2.4s var(--ease-out) infinite;
-  }
-  .streak.is-open .streak-week [data-state="today"] .streak-dot {
-    animation: ember-wait 1.6s ease-in-out infinite alternate;
-  }
-  .streak.is-new .streak-flame {
-    animation: flame-pop 700ms var(--ease-out) both;
-  }
-  .streak.is-new .streak-count strong {
-    animation: count-pop 700ms var(--ease-out) both;
-  }
-}
-@keyframes flame-flicker {
-  0%,
-  100% {
-    transform: scale(1, 1) skewX(0deg);
-  }
-  25% {
-    transform: scale(0.97, 1.04) skewX(-2deg);
-  }
-  50% {
-    transform: scale(1.02, 0.97) skewX(1.5deg);
-  }
-  75% {
-    transform: scale(0.98, 1.03) skewX(-1deg);
-  }
-}
-@keyframes flame-core {
-  from {
-    transform: scale(1, 1);
-  }
-  to {
-    transform: scale(0.88, 1.1);
-  }
-}
-@keyframes hourglass-tip {
-  0%,
-  70% {
-    transform: rotate(0deg);
-  }
-  85%,
-  100% {
-    transform: rotate(180deg);
-  }
-}
-@keyframes ember-wait {
-  to {
-    box-shadow:
-      inset 0 0 0 2px var(--flame-mid),
-      0 0 0 4px color-mix(in srgb, var(--flame-mid) 18%, transparent);
-  }
-}
-@keyframes flame-pop {
-  0% {
-    transform: scale(0.6) translateY(6px);
-  }
-  55% {
-    transform: scale(1.25) translateY(-3px);
-  }
-  100% {
-    transform: none;
-  }
-}
-@keyframes count-pop {
-  0% {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  100% {
-    transform: none;
-    opacity: 1;
-  }
-}
-/* The check-in meter: which day, how far off, and the week as seven cells. */
-.review-meter {
-  margin: 24px 0 0;
-}
-#app .check-in-meter {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-  min-height: 0;
-  padding: 12px 14px 14px;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-#app .check-in-meter:hover {
-  background: var(--surface-hover);
-}
-.check-in-meter-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 2px 12px;
-  line-height: 1.3;
-}
-.check-in-meter-label {
-  font-size: 0.8889rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.check-in-meter-day {
-  color: var(--muted);
-  font-weight: 600;
-}
-.check-in-meter-hint {
-  color: var(--muted);
-  font-size: 0.7222rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.check-in-week {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
-}
-.check-in-week > span {
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  transition: background-color 400ms var(--ease-out);
-}
-.check-in-week > .is-past {
-  background: var(--text);
-}
-.check-in-week > span:last-child {
-  background: var(--pearl-pale);
-}
-.check-in-week > .is-past:last-child {
-  background: var(--pearl-deep);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .check-in-meter.is-writing .check-in-week > span {
-    animation: check-in-pulse 1.2s ease-in-out infinite alternate;
-  }
-}
-@keyframes check-in-pulse {
-  to {
-    opacity: 0.45;
-  }
-}
-/* A review landed while the planner was open. */
-.review-unlocked {
-  --tier: var(--pearl-deep);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-  margin: 12px 0 0;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--border));
-  background: var(--surface);
-  animation: insight-drop 560ms var(--ease-out) both;
-}
-.review-unlocked p {
-  flex: 1 1 200px;
-  margin: 0;
-  font-size: 0.8333rem;
-  line-height: 1.45;
-}
-.review-unlocked strong {
-  display: block;
-  color: var(--tier);
-  font-size: 0.6667rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-#app .review-unlocked button {
-  min-height: 40px;
-  font-size: 0.7222rem;
-}
-#app .review-unlocked + .task-list {
-  margin-top: 24px;
-}
-/* Overview: the check-in, read top to bottom. Trends, plan, note, details. */
-.check-in {
-  margin-top: 28px;
-}
-.check-in-eyebrow,
-.weekly-overview .check-in h4 {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 0.6667rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.check-in-trends {
-  display: grid;
-  gap: 8px;
-}
-.check-in-trend,
-.check-in-plan,
-.check-in-coach {
-  padding: 14px 16px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-}
-.check-in-trend {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 7.5rem;
-  grid-template-areas:
-    "title spark"
-    "value spark"
-    "note note";
-  align-items: center;
-  gap: 2px 12px;
-}
-.weekly-overview .check-in-trend h4 {
-  grid-area: title;
-  margin: 0;
-}
-.weekly-overview .check-in-value {
-  grid-area: value;
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 1.5556rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.04em;
-  line-height: 1.15;
-}
-.check-in-spark {
-  grid-area: spark;
-  width: 100%;
-  height: 40px;
-  overflow: visible;
-}
-.check-in-spark-trend {
+.check-mark svg {
+  width: 16px;
+  height: 16px;
   fill: none;
-  stroke: var(--text);
-  stroke-width: 2;
+  stroke: var(--on-ink);
+  stroke-width: 2.25;
   stroke-linecap: round;
   stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  transition: stroke-dashoffset 0.28s var(--ease) 0.06s;
 }
-.check-in-spark-dot {
-  fill: var(--pearl-deep);
-  opacity: 0.55;
+.task.is-done .check-mark {
+  border-color: var(--ink);
+  background: var(--ink);
 }
-.check-in-spark-reference {
-  stroke: var(--border);
-  stroke-dasharray: 3 3;
-  vector-effect: non-scaling-stroke;
+.task.is-done .check-mark svg {
+  stroke-dashoffset: 0;
 }
-.weekly-overview .check-in-note {
-  grid-area: note;
-  margin: 6px 0 0;
+.check input:focus-visible + .check-mark {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .check:hover .check-mark {
+    border-color: var(--ink);
+  }
+}
+.task-title,
+.task-editor {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  background: none;
+  font-size: var(--text);
+  line-height: 24px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.task-title {
+  cursor: text;
+  transition: color 0.18s var(--ease);
+}
+.task-title:focus-visible {
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.task.is-done .task-title {
   color: var(--muted);
-  font-size: 0.7222rem;
-  line-height: 1.45;
+  text-decoration: line-through;
+  text-decoration-color: var(--faint);
 }
-.check-in-plan {
-  margin-top: 8px;
-  border-color: var(--text);
+.task-editor {
+  display: block;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  box-shadow: inset 0 -1px 0 var(--ink);
 }
-.check-in-plan.is-decided {
-  border-color: var(--border);
-}
-.check-in-plan dl {
+/* Delete appears on hover, on focus and while editing: on a phone, tap the words. */
+.task-delete {
   display: grid;
-  gap: 8px;
-  margin: 4px 0 0;
-}
-.check-in-plan dl > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-.check-in-plan dt {
-  font-size: 0.8333rem;
-}
-.check-in-plan dd {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-.check-in-plan dd s {
-  color: var(--muted);
-}
-.check-in-plan dd strong {
-  font-size: 1.1111rem;
-  font-weight: 600;
-}
-.check-in-plan .is-changed dd strong {
-  color: var(--pearl-deep);
-}
-.check-in-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-top: 12px;
-}
-.check-in-coach {
-  margin-top: 8px;
-}
-.check-in-coach > p {
-  margin: 0 0 12px;
-  font-size: 0.8889rem;
-  line-height: 1.6;
-}
-.check-in-coach .weekly-improvements {
-  margin: 0;
-}
-.check-in-details {
-  margin-top: 16px;
-}
-.check-in-details > summary,
-.weekly-history > summary {
-  font-size: 0.8333rem;
-  font-weight: 600;
-}
-.weekly-overview .check-in-history-title {
-  margin: 32px 0 4px;
-  font-size: 0.8889rem;
-}
-.weekly-history > p {
-  font-size: 0.8333rem;
-  line-height: 1.55;
-}
-@media (min-width: 640px) {
-  .check-in-trends {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .check-in-trend {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "title"
-      "value"
-      "spark"
-      "note";
-    align-content: start;
-  }
-  .check-in-spark {
-    margin-top: 8px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .review-unlocked {
-    animation: none;
-  }
-}
-/* An insight drop: one number about the owner, large, with a line of text.
-   The same white card as the meter above it. */
-.insight-drop {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 4px 16px;
-  margin: 12px 0 0;
-  padding: 12px 52px 14px 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  animation: insight-drop 560ms var(--ease-out) both;
-}
-#app .insight-drop + .task-list {
-  margin-top: 24px;
-}
-.insight-eyebrow {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.6667rem;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.insight-figure {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: clamp(1.7778rem, 8vw, 2.4444rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  animation: insight-figure 700ms var(--ease-out) 180ms both;
-}
-.insight-text {
-  margin: 0;
-  font-size: 0.8333rem;
-  line-height: 1.45;
-  text-wrap: balance;
-}
-#app .insight-dismiss {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 44px;
-  min-height: 44px;
+  place-items: center;
+  flex: none;
+  width: var(--tap);
+  height: 52px;
+  margin-right: -12px;
   padding: 0;
   border: 0;
   background: none;
   color: var(--muted);
-  font-size: 1rem;
-  line-height: 1;
-}
-#app .insight-dismiss:hover:not(:disabled) {
-  color: var(--text);
-  background: none;
-}
-/* It falls into place from above, then the number comes into focus. */
-@keyframes insight-drop {
-  from {
-    opacity: 0;
-    transform: translateY(-14px);
-    clip-path: inset(0 0 100% 0);
-  }
-  60% {
-    opacity: 1;
-    clip-path: inset(0 0 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-@keyframes insight-figure {
-  from {
-    opacity: 0;
-    filter: blur(3px);
-    transform: scale(1.25);
-    transform-origin: left center;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .insight-drop,
-  .insight-figure {
-    animation: none;
-  }
-}
-#app .task-form > label {
-  position: relative;
-}
-.quick-entry-hint,
-.quick-entry-chip {
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  transform: translateY(-50%);
-  pointer-events: none;
-  font-size: 0.6667rem;
-}
-.quick-entry-hint,
-.shortcut-sheet kbd {
-  min-width: 22px;
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  font-family: inherit;
-  text-align: center;
-  color: var(--muted);
-}
-.task-form label:focus-within .quick-entry-hint,
-.task-form input:not(:placeholder-shown) ~ .quick-entry-hint {
   opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
-.quick-entry-chip {
-  padding: 3px 8px;
-  color: var(--on-accent);
-  background: var(--text);
-  animation: settle 260ms var(--ease-out);
+.task-delete svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
 }
-@media (hover: none) {
-  .quick-entry-hint {
-    display: none;
+.task:focus-within .task-delete,
+.task.is-editing .task-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: hover) {
+  .task:hover .task-delete {
+    opacity: 1;
+    pointer-events: auto;
   }
-}
-.shortcut-sheet h2 {
-  margin: 0 0 16px;
-  font-size: 1.1111rem;
-}
-.shortcut-sheet dl {
-  display: grid;
-  margin: 0 0 20px;
-}
-.shortcut-sheet dl > div {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.8333rem;
-}
-.shortcut-sheet dd {
-  margin: 0;
+  .task-delete:hover {
+    color: var(--ink);
+  }
 }
 
-.text-button,
-.text-button:hover:not(:disabled) {
-  min-height: 32px;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
+.all-done {
+  margin: 28px 0 4px 36px;
   color: var(--muted);
-  font-size: 0.7222rem;
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  font-size: var(--text-small);
 }
-.text-button:hover:not(:disabled) {
-  color: var(--text);
-}
-.plan-summary.is-first-plan {
-  font-size: clamp(1.7778rem, 6vw, 2.8889rem);
-}
-.starters {
-  display: grid;
-  gap: 14px;
-  margin-top: 28px;
-}
-.starters > p {
-  margin: 0;
-  font-size: 0.7778rem;
-  line-height: 1.6;
-}
-.hint-card {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.hint-card {
+
+.done {
   margin-top: 24px;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  animation: rise 420ms var(--ease-out) both;
 }
-.hint-card p {
-  flex: 1 1 260px;
-  margin: 0;
-  font-size: 0.8333rem;
-  line-height: 1.6;
-}
-.hint-card button {
-  min-height: 40px;
-  font-size: 0.7222rem;
-}
-.hint-card .primary-button,
-.hint-card .primary-button:hover:not(:disabled) {
-  color: var(--on-accent);
-  background: var(--text);
-  border-color: var(--text);
-}
-.evening-card {
-  gap: 20px 32px;
-  padding: 24px clamp(20px, 4vw, 32px);
-}
-.evening-copy {
-  flex: 1 1 260px;
-}
-.evening-card .evening-eyebrow {
-  margin: 0 0 12px;
-  font-size: 0.6667rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.evening-card .evening-title {
-  margin: 0;
-  font-size: clamp(1.4444rem, 4vw, 1.8889rem);
-  font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-}
-.evening-title em {
-  font-style: normal;
-  color: var(--text);
-}
-.evening-card .evening-note {
-  margin: 8px 0 0;
-  font-size: 0.8333rem;
-  color: var(--muted);
-}
-.evening-actions {
+.done-bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 20px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
 }
-#app .evening-primary {
-  min-height: 48px;
-  padding: 0 20px;
-  color: var(--on-accent);
-  font-weight: 600;
-  background: var(--action);
-  border-color: var(--action);
+.done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 500;
 }
-#app .evening-primary:hover:not(:disabled) {
-  background: var(--action-hover);
-  border-color: var(--action-hover);
+.done-count {
+  font-variant-numeric: tabular-nums;
 }
-#app .task.is-next {
-  border-color: color-mix(in srgb, var(--text) 35%, var(--border));
+.done-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s var(--ease);
 }
-#app .task:not(.is-next) > button:not(:disabled) {
-  color: var(--text);
-  background: transparent;
-  border-color: var(--border);
+.done-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
 }
-#app .task:not(.is-next) > button:hover:not(:disabled) {
-  border-color: var(--text);
+.done-clear {
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 500;
 }
-.shortcut-hint {
+@media (hover: hover) {
+  .done-toggle:hover,
+  .done-clear:hover {
+    color: var(--ink);
+  }
+}
+
+/* ——— Undo ——— */
+.undo-region {
   position: fixed;
-  left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom));
+  right: 0;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 0;
   z-index: 5;
   display: flex;
+  justify-content: center;
+  padding: 0 var(--gutter);
+  pointer-events: none;
+}
+.undo-bar {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 0;
-  transform: translateX(-50%);
-  white-space: nowrap;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 4px 4px 20px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: var(--text-small);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  animation: undo-rise 0.22s var(--ease);
 }
-.shortcut-hint .text-button,
-.shortcut-hint .text-button:hover:not(:disabled) {
-  text-decoration: none;
+.undo-bar button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--on-ink);
+  font-weight: 600;
 }
-#app:has(.shortcut-hint) {
-  padding-bottom: 72px;
+.undo-bar button:focus-visible {
+  outline-color: var(--on-ink);
+  outline-offset: -2px;
 }
-.shortcut-hint kbd {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  font-family: inherit;
-}
-
-#app[data-focus-running] .navigation-header {
-  opacity: 0.18;
-  transition: opacity 600ms ease;
-}
-#app[data-focus-running] .navigation-header:hover,
-#app[data-focus-running] .navigation-header:focus-within {
-  opacity: 1;
-}
-#planner-content > * {
-  animation: rise 420ms var(--ease-out) both;
-}
-#app .task-list > .task {
-  transition:
-    border-color 240ms ease,
-    background-color 240ms ease,
-    opacity 400ms ease;
-  animation: rise 420ms var(--ease-out) both;
-}
-#app .task-list > .task:nth-child(2) {
-  animation-delay: 50ms;
-}
-#app .task-list > .task:nth-child(3) {
-  animation-delay: 100ms;
-}
-#app .task-list > .task:nth-child(4) {
-  animation-delay: 150ms;
-}
-#app .task-list > .task:nth-child(5) {
-  animation-delay: 200ms;
-}
-#app .task-list > .task:hover {
-  border-color: color-mix(in srgb, var(--text) 30%, var(--border));
-}
-/* Completed cards stay opaque so the full-strength background never washes them out. */
-#app .task-list > .task.is-completed {
-  align-items: center;
-  background: var(--surface);
-  border-color: var(--border);
-}
-#app .task.is-completed .task-title-text {
-  color: var(--muted);
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
-#app .task-done {
-  position: relative;
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-}
-#app .task-done .estimate-ring-progress {
-  stroke: var(--positive);
-}
-#app .task-done-check {
-  font-size: 0.7778rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--positive);
-}
-@keyframes rise {
+@keyframes undo-rise {
   from {
     opacity: 0;
     transform: translateY(8px);
   }
 }
-@keyframes settle {
-  from {
-    opacity: 0;
-    transform: translateY(-50%) scale(0.92);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  #planner-content > *,
-  #app .task-list > .task,
-  .hint-card,
-  .quick-entry-chip {
-    animation: none;
-  }
-}
-#app .task-list {
-  min-height: auto;
-  grid-auto-rows: auto;
-  margin: 20px 0 4px;
-  gap: 12px;
-}
-/* An empty list would only push the outcome input toward the fold. */
-#app .task-list:empty {
-  display: none;
-}
-#app .task,
-#app .task:not(:has(> button)) {
-  min-height: auto;
-  grid-template-columns: minmax(0, 1fr) 48px;
-  gap: 16px 12px;
-  padding: 18px;
-}
-#app .task-details > h2 {
-  grid-column: 1;
-  grid-row: 1;
-  font-size: 1rem;
-  letter-spacing: -0.025em;
-  line-height: 1.35;
-}
-#app .task-title-text {
-  -webkit-line-clamp: 3;
-  line-height: 1.4;
-}
-#app .task-details > p {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  font-size: 0.6667rem;
-}
-#app .task-estimate {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-}
-#app .task-estimate .estimate-dial {
-  width: 48px;
-  height: 48px;
-}
-#app .task > button {
-  grid-column: 1 / -1;
-  grid-row: auto;
-  justify-self: stretch;
-  min-height: 48px;
-  height: auto;
-  padding: 10px 16px;
-  font-size: 0.7222rem;
-}
-/* Start focus: the main action on Today, so it is the black one. */
-#app .task > button:not(:disabled) {
-  background: var(--action);
-  border-color: var(--action);
-  color: var(--on-accent);
-}
-#app .task-form {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding-top: 24px;
-}
-#app .task-form > label {
-  grid-column: 1;
-}
-#app .task-form .task-estimate-inline {
-  display: none;
-}
-.task-estimate-dialog h2 {
-  margin: 0 0 24px;
-  font-size: 1.2222rem;
-  line-height: 1.4;
-}
-#app .task-estimate-dialog .estimate-control {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  justify-self: stretch;
-  width: 100%;
-  margin: 0 0 24px;
-}
-.task-estimate-dialog .estimate-dial {
-  width: 88px;
-  height: 88px;
-}
-#app .task-form > label > input {
-  height: 2.7778rem;
-}
-#app .task-form .estimate-control {
-  grid-column: 1;
-  justify-self: end;
-  min-width: 0;
-}
-#app .task-form .estimate-dial {
-  flex: none;
-}
-#app .task-form .add-task {
-  height: 2.6667rem;
-  padding: 0 18px;
-  font-size: 0.7222rem;
-  justify-self: end;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-  transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease;
-}
-/* Stays clickable so a tap can hand focus to the input, but reads as inactive. */
-#app .task-form .add-task.is-empty {
-  background: transparent;
-  border-color: var(--border);
-  color: var(--muted);
-}
-.estimate-dial {
-  width: 48px;
-  height: 48px;
-}
-.estimate-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 
-#app .focus-layout {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 20px;
-  height: auto;
-  min-height: auto;
-  padding: 0;
-}
-#app .focus-details {
-  display: contents;
-}
-#app .focus-details > h1 {
-  order: 0;
-  display: block;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 1.7778rem;
-  line-height: 1.15;
-}
-#app .focus-layout .timer {
-  order: 2;
-  flex: none;
-  align-self: center;
-  width: min(15.5556rem, 76vw);
-  margin: 8px auto;
-  transform: none;
-}
-/* The timer: a white face inside a thick lavender ring that empties as the
-   time runs down. The ring is the one coloured thing on the page; it goes
-   grey while paused. */
-.timer::before,
-.mock-timer::before,
-.focus-scene-timer::before {
-  content: "";
-  position: absolute;
-  inset: 12%;
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.04),
-    0 18px 40px color-mix(in srgb, var(--pearl-deep) 18%, transparent);
-}
-.timer-face,
-.timer-digits,
-.timer-hint,
-.focus-scene-digits,
-.focus-scene-hint {
-  position: relative;
-}
-#app .timer {
-  color: var(--pearl-deep);
-}
-#app .timer.is-paused,
-#app .timer.is-paused:hover:not(:disabled) {
-  color: color-mix(in srgb, var(--muted) 40%, var(--border));
-}
-#app .timer.is-overdue,
-#app .timer.is-overdue:hover:not(:disabled) {
-  color: var(--text);
-}
-#app .timer circle,
-.mock-timer circle {
-  stroke-width: 5;
-}
-#app .timer-track,
-.mock-timer .timer-track {
-  stroke: var(--pearl-pale);
-}
-#app .timer.is-paused .timer-track {
-  stroke: var(--border);
-}
-#app .timer-progress {
-  filter: drop-shadow(
-    0 0 3px color-mix(in srgb, var(--pearl-deep) 45%, transparent)
-  );
-}
-#app .timer.is-paused .timer-progress {
-  filter: none;
-}
-#app .timer-face {
-  justify-items: center;
-  gap: 6px;
-}
-.timer-label {
-  color: var(--muted);
-  font-size: 0.6111rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-#app .timer .timer-value,
-.timer-digits {
-  font-family: var(--font);
-  font-size: clamp(2.6667rem, 13vw, 3.5556rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.045em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-#app .timer.is-paused .timer-value {
-  color: var(--muted);
-}
-#app .timer-caption {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-  color: var(--text);
-  font-size: 0.6667rem;
-  font-weight: 600;
-  transition: background-color 200ms ease;
-}
-#app .timer:hover:not(:disabled) .timer-caption {
-  background: color-mix(in srgb, var(--text) 11%, transparent);
-}
-#app .timer.is-paused .timer-caption {
-  background: var(--action);
-  color: var(--on-accent);
-}
-.timer-icon {
-  position: static !important;
-  width: 10px !important;
-  height: 10px !important;
-  transform: none !important;
-  fill: currentColor;
-}
-.mock-timer .timer-value {
-  stroke: var(--pearl-deep);
-}
-.mock-timer .timer-digits {
-  font-size: 2rem;
-}
-.mock-timer .timer-hint {
-  order: -1;
-  margin: 0 0 4px;
-  color: var(--muted);
-  font-size: 0.5rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-@media (prefers-reduced-motion: no-preference) {
-  #app .timer.is-paused .timer-value {
-    animation: focus-paused 1.6s steps(1) infinite;
-  }
-}
-/* Off, rain or white noise: three quiet pills under the timer on phones,
-   under the title on laptops. The one chosen takes the timer's lavender;
-   Off stays plain black and white. */
-#app .focus-sounds {
-  order: 3;
-  display: grid;
-  gap: 10px;
+/* ——— Account ——— */
+.sheet {
   width: 100%;
-  min-width: 0;
-  margin: 0;
+  max-width: 100%;
+  max-height: calc(100dvh - 24px);
+  margin: auto 0 0;
   padding: 0;
   border: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: var(--shadow);
 }
-.focus-sounds-label {
-  float: left;
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 0;
-  color: var(--muted);
-  font-size: 0.6111rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.sheet::backdrop {
+  background: var(--backdrop);
 }
-.focus-sounds-options {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+.sheet[open] {
+  animation: sheet-rise 0.24s var(--ease);
 }
-#app .focus-sound {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.8889rem;
-  font-weight: 600;
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease;
-}
-.focus-sound input {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.focus-sound:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-.focus-sound svg,
-.focus-sounds-volume svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-@media (hover: hover) {
-  #app .focus-sound:hover:not(:has(input:checked)) {
-    background: var(--surface-hover);
-    border-color: var(--taupe);
-  }
-}
-#app .focus-sound:has(input:checked) {
-  background: var(--pearl-pale);
-  border-color: var(--pearl);
-  color: var(--pearl-deep);
-}
-#app .focus-sound:has(input[value="off"]:checked) {
-  background: var(--action);
-  border-color: var(--action);
-  color: var(--on-accent);
-}
-.focus-sound.is-loading {
-  cursor: progress;
-}
-@media (max-width: 399px) {
-  #app .focus-sound {
-    padding-inline: 12px;
-  }
-  .focus-sound svg {
-    display: none;
-  }
-}
-.focus-sounds-error {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.7778rem;
-}
-.focus-sounds-volume {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-inline: 4px;
-  color: var(--muted);
-}
-.focus-sounds-volume input {
-  flex: 1;
-  min-width: 0;
-  height: 24px;
-  margin: 0;
-  accent-color: var(--pearl-deep);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .focus-sound:has(input:checked):not(:has(input[value="off"])) svg {
-    animation: focus-sound-breathe 2.4s ease-in-out infinite;
-  }
-  .focus-sound.is-loading svg {
-    animation-duration: 0.8s;
-  }
-}
-@keyframes focus-sound-breathe {
-  50% {
-    opacity: 0.45;
-  }
-}
-#app .focus-notes {
-  order: 3;
-  width: 100%;
-  margin: 0;
-}
-#app .focus-notes textarea {
-  height: 7.1111rem;
-}
-#app .focus-actions {
-  order: 4;
-  margin: 0;
-}
-#app .focus-actions > button {
-  width: 100%;
-  min-height: 48px;
-  background: var(--action);
-  border-color: var(--action);
-  color: var(--on-accent);
-}
-.pause-dialog {
-  width: min(35.5556rem, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-}
-/* Question, box and buttons share one left edge and one width, with even gaps. */
-.pause-form {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-}
-.pause-form textarea {
-  display: block;
-  min-height: 6.5rem;
-  outline-offset: 0;
-}
-.pause-heading {
-  display: grid;
-  gap: 6px;
-}
-.pause-heading h2 {
-  margin: 0;
-  font-size: 1.1111rem;
-}
-.pause-heading p {
-  margin: 0;
-  font-size: 0.8889rem;
-}
-.pause-presets {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-#app .pause-preset {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 96px;
-  margin: 0;
-  padding: 14px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.9444rem;
-  font-weight: 600;
-  letter-spacing: normal;
-  text-transform: none;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    transform 120ms ease;
-}
-.pause-preset-emoji {
-  font-size: 2rem;
-  line-height: 1;
-}
-@media (hover: hover) {
-  #app .pause-preset:hover:not(:disabled) {
-    background: var(--surface-hover);
-    border-color: var(--taupe);
-  }
-}
-#app .pause-preset:active:not(:disabled) {
-  background: var(--pearl-pale);
-  border-color: var(--pearl);
-  color: var(--pearl-deep);
-  transform: scale(0.97);
-}
-.pause-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-}
-.pause-actions button {
-  min-height: 48px;
-  margin: 0;
-}
-@media (max-width: 419px) {
-  .pause-actions {
-    grid-template-columns: none;
-  }
-}
-.profile-heading {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-.profile-email {
-  max-width: 100%;
-  margin: 0;
-  text-align: left;
-}
-.profile-stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.profile-stat {
-  padding: 16px;
-}
-.profile-footer {
-  align-items: center;
-  gap: 16px;
-}
-.profile-footer .danger-button {
-  width: auto;
-}
-.profile-footer .delete-account-button {
-  margin-right: auto;
-  padding: 4px 0;
-  border-color: transparent;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.6667rem;
-}
-.profile-footer .delete-account-button:hover:not(:disabled) {
-  background: transparent;
-  border-color: transparent;
-  color: inherit;
-}
-.review-stats {
-  gap: 6px;
-}
-.review-stats > div {
-  padding: 12px 8px;
-}
-.review-stats dt {
-  font-size: 0.6111rem;
-}
-.review-stats dd {
-  font-size: 1.3333rem;
-}
-/* A change the server refused: what happened, and the one way forward. */
-.sync-bar {
-  justify-content: space-between;
-  gap: 12px 20px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.7778rem;
-  line-height: 1.45;
-}
-.sync-bar p {
-  flex: 1 1 16rem;
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  margin: 0;
-}
-.sync-bar strong {
-  font-weight: 700;
-}
-.sync-bar p span {
-  color: var(--muted);
-}
-.sync-bar button {
-  flex: none;
-  min-height: 44px;
-  padding: 0 18px;
-  border-color: var(--action);
-  background: var(--action);
-  color: var(--on-accent);
-  font-size: 0.7222rem;
-}
-@media (max-width: 479px) {
-  .sync-bar button {
-    width: 100%;
-  }
-}
-
-@media (min-width: 760px) {
-  #app {
-    padding: 24px 40px 32px;
-  }
-  #app > main {
-    padding-top: 32px;
-  }
-  #app .focus-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 360px);
-    align-items: center;
-    gap: 48px;
-    padding-block: 24px;
-  }
-  #app .focus-details {
-    display: block;
-  }
-  #app .focus-layout .timer {
-    width: 100%;
-    margin: 0;
-  }
-  #app .focus-sounds {
-    margin-top: 24px;
-  }
-  #app .focus-notes {
-    margin-top: 24px;
-  }
-  #app .focus-actions {
-    margin-top: 20px;
-  }
-  .profile-heading {
-    flex-direction: row;
-    align-items: baseline;
-  }
-  .profile-email {
-    margin-left: auto;
-    text-align: right;
-  }
-  .profile-stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .profile-footer .danger-button {
-    width: auto;
-  }
-  #app .task {
-    grid-template-columns: minmax(0, 1fr) 48px auto;
-    gap: 20px;
-  }
-  #app .task:not(:has(> button)) {
-    grid-template-columns: minmax(0, 1fr) 48px;
-  }
-  #app .task > button {
-    grid-column: 3;
-    grid-row: 1;
-    justify-self: end;
-  }
-  #app .task-form {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-  #app .task-form > label {
-    grid-column: 1;
-  }
-  #app .task-form .task-estimate-inline {
-    display: block;
-    grid-column: 2;
-  }
-  #app .task-form .estimate-control {
-    grid-column: 2;
-  }
-}
-#root .unsubscribe-page {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 16px;
-  width: 100%;
-  min-height: 100dvh;
-  padding: 24px 16px;
-  text-align: center;
-}
-.unsubscribe-page h1,
-.unsubscribe-page p {
-  margin: 0;
-}
-.unsubscribe-page h1 {
-  font-size: clamp(1.3333rem, 5vw, 2.6667rem);
-}
-.unsubscribe-page .unsubscribe-confirm {
-  min-height: 48px;
-  padding: 12px 24px;
-  font-weight: 600;
-}
-.unsubscribe-page a {
-  color: var(--muted);
-}
-.email-reminders {
-  margin-top: 28px;
-}
-.email-reminder {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-height: 44px;
-  padding: 12px 16px;
-  margin-top: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  cursor: pointer;
-}
-.email-reminder input {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
-  accent-color: var(--text);
-}
-.email-reminder-label,
-.email-reminder-hint {
-  display: block;
-}
-.email-reminder-label {
-  font-weight: 600;
-}
-.email-reminder-hint {
-  color: var(--muted);
-  font-size: 0.7222rem;
-  line-height: 1.5;
-}
-#app .task-form > label > input {
-  padding-right: 48px;
-}
-#app .task-form > label:has(.quick-entry-chip) > input {
-  padding-right: 96px;
-}
-
-/* Color roles: a black pill marks the one thing to do next on a screen (Start
-   focus, Complete task, Plan tomorrow, a dialog's submit).
-   Everything else is white or grey. Hover only lifts the black. */
-@media (hover: hover) {
-  #app .task > button:not(:disabled):hover,
-  #app .focus-actions > button:not(:disabled):hover {
-    background: var(--action-hover);
-    border-color: var(--action-hover);
-    color: var(--on-accent);
-  }
-}
-
-/* An open slot on Today or Tomorrow with a task suggested for it, as on the
-   landing page: a dashed slot holding one white card to tap. */
-.open-slots {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0 0;
-}
-.open-slot {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-  border: 1px dashed var(--taupe);
-  border-radius: var(--radius-card);
-  text-align: center;
-}
-.open-slot-label {
-  color: var(--muted);
-  font-size: 0.7778rem;
-}
-#app .slot-suggestion {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  min-height: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 1rem;
-  line-height: 1.35;
-  text-align: center;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-#app .slot-suggestion:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-#app .slot-suggestion:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.slot-suggestion small {
-  color: var(--muted);
-  font-size: 0.6111rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.slot-suggestion-minutes {
-  font-variant-numeric: tabular-nums;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .open-slot .slot-suggestion {
-    animation: slot-suggestion-in 600ms var(--ease-out) both;
-  }
-}
-@keyframes slot-suggestion-in {
+@keyframes sheet-rise {
   from {
-    opacity: 0;
-    transform: translateX(-16px);
-  }
-}
-
-/* The logo: the plum mark and the name, on the landing and sign-in pages. */
-.logo {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text);
-}
-.logo-mark {
-  flex: none;
-  border-radius: 10px;
-}
-.logo-name {
-  font-size: 1.3333rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-.landing-logo {
-  margin: 0 auto clamp(8px, 2svh, 20px);
-}
-.landing-logo .logo-name {
-  font-size: 1.1111rem;
-}
-.auth-logo {
-  margin: 0 0 20px;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .landing-logo .logo-mark {
-    animation: logo-hello 900ms var(--ease-out) 200ms both;
-    transform-origin: 50% 90%;
-  }
-}
-@keyframes logo-hello {
-  0% {
-    transform: scale(0.6) rotate(-12deg);
+    transform: translateY(24px);
     opacity: 0;
   }
-  60% {
-    transform: scale(1.08) rotate(4deg);
-    opacity: 1;
-  }
-  100% {
-    transform: none;
-  }
 }
-
-/* Focus time: the one-screen picker, Today's line and the Profile row.
-   Phone first; the picker reuses the stop dialog's frame. */
-.focus-time-dialog .pause-heading h2 {
-  font-size: 1.3333rem;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+.sheet-body {
+  padding: 4px var(--gutter) calc(16px + env(safe-area-inset-bottom));
 }
-.focus-presets {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-#app .focus-preset {
-  display: grid;
-  gap: 2px;
-  justify-items: start;
-  min-height: 72px;
-  margin: 0;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-  text-transform: none;
-  letter-spacing: normal;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease;
-}
-@media (hover: hover) {
-  #app .focus-preset:hover:not(:disabled) {
-    background: var(--surface-hover);
-    border-color: var(--taupe);
-  }
-}
-#app .focus-preset[aria-pressed="true"],
-#app .focus-preset:active:not(:disabled) {
-  background: var(--pearl-pale);
-  border-color: var(--pearl);
-}
-#app .focus-preset.is-other {
-  border-style: dashed;
-}
-#app .focus-preset.is-other .focus-preset-time {
-  color: var(--muted);
-}
-.focus-preset-label {
-  color: var(--muted);
-  font-size: 0.7778rem;
-  font-weight: 600;
-}
-.focus-preset-time {
-  font-family: var(--mono);
-  font-size: 1.3333rem;
-  font-weight: 600;
-}
-.focus-other {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-#app .focus-other input {
-  min-height: 48px;
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
-  font-family: var(--mono);
-}
-#app .focus-time-dialog .primary-button {
-  min-height: 48px;
-  margin: 0;
-  padding-inline: 24px;
-  border-radius: var(--radius-pill);
-  color: var(--on-accent);
-  background: var(--action);
-  border-color: var(--action);
-  font-weight: 600;
-}
-.focus-time-footer {
+.sheet-header {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 16px;
-}
-#app .focus-time-footer .text-button {
-  min-height: 44px;
-  margin: 0;
-}
-@media (min-width: 560px) {
-  .focus-presets {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.focus-time-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  margin: 12px 0 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-}
-.focus-time-line p {
-  flex: 1 1 160px;
-  margin: 0;
-  font-size: 0.9444rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.focus-time-value {
-  font-family: var(--mono);
-}
-.focus-time-days {
-  color: var(--muted);
-  font-weight: 400;
-}
-.focus-time-line strong {
-  margin-right: 10px;
-  color: var(--pearl-deep);
-  font-family: var(--font);
-  font-size: 0.6667rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.focus-time-line.is-ask p {
-  font-family: var(--font);
-  font-weight: 400;
-  font-size: 0.8333rem;
-  color: var(--muted);
-}
-.focus-time-line.is-ask strong {
-  display: block;
-  margin: 0 0 2px;
-  color: var(--text);
-  font-size: 0.9444rem;
-  letter-spacing: normal;
-  text-transform: none;
-}
-#app .focus-time-line button {
-  min-height: 40px;
-  margin: 0;
-}
-#app .focus-time-line .secondary-button {
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-}
-.overview-content .focus-time-line {
-  margin-top: 16px;
-}
-
-.email-reminder.focus-time-setting {
   align-items: center;
   justify-content: space-between;
-}
-#app .focus-time-setting select {
-  flex: none;
-  min-height: 40px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
-  font-family: var(--mono);
+  min-height: 52px;
 }
 
-/* The focus time's second screen: what you get, each turned on explicitly. */
-.focus-ways {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.focus-ways li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-}
-.focus-way-text {
-  display: grid;
-  gap: 2px;
-  flex: 1 1 160px;
-  font-size: 0.8333rem;
-  color: var(--muted);
-  line-height: 1.4;
-}
-.focus-way-text strong {
-  color: var(--text);
-  font-size: 0.9444rem;
-}
-.focus-way-actions {
-  display: flex;
-  gap: 8px;
-}
-#app .focus-way-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  margin: 0;
-  padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.8333rem;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-@media (hover: hover) {
-  #app .focus-way-link:hover {
-    background: var(--surface-hover);
-    border-color: var(--taupe);
-  }
-}
-#app .focus-ways .primary-button {
-  min-height: 40px;
-  padding-inline: 18px;
-}
-.focus-way-done {
+.sheet-close {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--positive);
-  color: #ffffff;
-  font-weight: 700;
+  width: var(--tap);
+  height: var(--tap);
+  margin-right: -12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+.sheet-close svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.sheet-email {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+  overflow-wrap: anywhere;
+}
+.sheet-close {
+  margin-left: auto;
+}
+.sheet-rows {
+  display: grid;
+  margin-bottom: 8px;
+}
+.sheet-row,
+.sheet-rows .privacy-policy-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font-size: var(--text);
+  font-weight: 400;
+  text-align: left;
+}
+.sheet-row.is-danger {
+  color: var(--danger);
+}
+@media (min-width: 640px) {
+  .sheet {
+    width: 24rem;
+    margin: auto;
+    border-radius: 20px;
+  }
+  .sheet-body {
+    padding-bottom: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
 }

@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import solid from "vite-plugin-solid";
-import { PublicConfig } from "./src/planner/config.ts";
+import { PublicConfig } from "./src/cloud/config.ts";
 import { productionCsp } from "./scripts/csp-plugin.ts";
 
 export default defineConfig(({ mode, command }) => {

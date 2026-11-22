@@ -1,8 +1,8 @@
-# Database review — SolidJS refactor
+# Database review
 
 ## Decision
 
-**No table or column has been proven safe to drop. No database migration or hosted database change is part of this refactor.**
+**No table or column has been proven safe to drop.** The task list (2026-11-22) only adds `planner_list_tasks`, `planner_accounts.list_started_at` and the `planner_list` function, and narrows `planner_claim_reminders` to come-back emails; the day planner's tables keep their data until each account is deleted, though the website no longer reads or writes them.
 
 The base schema lives in `../pro/supabase/migrations/`; this repository contains additive website/shared-backend migrations. This review inspected both migration histories, not production user data or the live database catalog. The Mac app that also used this schema is retired, and Clerk is not used. Absence from the web UI is not evidence that persisted data is unused.
 
@@ -11,6 +11,7 @@ The base schema lives in `../pro/supabase/migrations/`; this repository contains
 | Table | Current dependency |
 | --- | --- |
 | `planner_accounts` | Account provisioning, deletion, AI preferences, revision and event-time guards. |
+| `planner_list_tasks` | The task list (since `20261124000100_task_list.sql`): one row per task, reached only through `planner_list`. |
 | `planner_tasks` | Plans, estimates, focus timestamps, task history and completed-task statistics. |
 | `planner_stops` | Pause reasons and the evidence behind weekly review patterns. |
 | `planner_reviews` | Saved weekly reports and report history. |

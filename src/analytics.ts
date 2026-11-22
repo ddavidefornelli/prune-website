@@ -24,7 +24,7 @@ const missingConfiguration = (name: string) =>
 
 export class Analytics {
   private started = false;
-  private identity: { distinctId: string; email: string } | null = null;
+  private identity: { distinctId: string; email: string | null } | null = null;
 
   /** Drops ?query and #fragment, which may carry deep-link or sign-in data. */
   private static stripUrl(value: unknown): unknown {
@@ -92,7 +92,7 @@ export class Analytics {
     });
     if (this.identity)
       posthog.identify(this.identity.distinctId, {
-        email: this.identity.email,
+        ...(this.identity.email ? { email: this.identity.email } : {}),
       });
     posthog.logger.info("optional analytics started", {
       event: "optional_analytics_started",
@@ -102,12 +102,13 @@ export class Analytics {
   }
 
   /** Identifies the authenticated account once, including after a restored session. */
-  identify(distinctId: string, email: string): void {
+  /** `email` is null for a guest. */
+  identify(distinctId: string, email: string | null): void {
     if (this.identity?.distinctId === distinctId) return;
     if (this.started && this.identity) posthog.reset();
     this.identity = { distinctId, email };
     if (!this.started) return;
-    posthog.identify(distinctId, { email });
+    posthog.identify(distinctId, email ? { email } : {});
     posthog.logger.info("authenticated analytics identity attached", {
       event: "analytics_identity_attached",
     });

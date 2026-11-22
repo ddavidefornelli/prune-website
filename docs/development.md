@@ -1,10 +1,12 @@
 # prune web app: development and operations
 
-A mobile-first daily planner and focus timer. Signed-out visitors land on the landing page at `/`, whose **Get started** button opens `/login`, where they continue with Google or an emailed code; a new account then gets its first-task prompt and a short tour.
+The easiest to-do list: one list, nothing else, and nothing to sign up for. `/` opens straight onto the list. Type a task and press Enter; tick it off; tap its words to change them or delete it. Done tasks fold under **Done**. The list lives in the browser first and opens at once, with or without a network. After the first task, the browser gets a **guest id** (a Supabase anonymous user) and the list is copied to Supabase under it, quietly: a missing or unreachable backend never shows an error.
 
-**Launch status:** see [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md) for the security review, test results and remaining hosted launch gates. Passing local tests is not production approval.
+Until 22 November 2026 prune was a day planner (five tasks a day, a focus timer, AI check-ins, streaks, reminders at a focus time, an onboarding tour). The website no longer contains any of it; its backend is still deployed and is described under [Retired with the day planner](#retired-with-the-day-planner).
 
-An idiomatic **SolidJS + TypeScript** application using reactive components, signals/stores and lifecycle-managed effects. The durable local outbox speaks the planner's RPC protocol on the shared Supabase backend (whose base schema lives in `../pro`). This is a browser client for that backend, not a local demo or a new database. There is one Solid render root; screens do not manually build or replace DOM subtrees. No sibling checkout is required to build this website. How the code is organised (classes, constants, what was removed) is described in [the code structure notes](refactoring.md).
+**Launch status:** see [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md) for the security review and the remaining hosted launch gates. Passing local tests is not production approval.
+
+An idiomatic **SolidJS + TypeScript** application with one render root, signals and lifecycle-managed effects. It talks to the shared Supabase backend (whose base schema lives in `../pro`) through two RPCs, `planner_call` for the account and `planner_list` for the list. How the code is organised is described in [the code structure notes](refactoring.md).
 
 ## Configure and run
 
@@ -22,107 +24,82 @@ VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_LEGACY_ANON_KEY
 ```
 
-These are public browser settings, embedded **at build time**. A modern `sb_publishable_…` key or legacy anon key is accepted. Never use a service-role key, `sb_secret_…` key, OpenAI key or other privileged credential. Partial/unsafe configuration fails Vite startup/build; production builds also fail when configuration is entirely missing. An unconfigured development checkout displays a setup error and cannot falsely report successful signup. Do not put real keys into tests.
+These are public browser settings, embedded **at build time**. A modern `sb_publishable_…` key or legacy anon key is accepted. Never use a service-role key, `sb_secret_…` key or other privileged credential. Partial/unsafe configuration fails Vite startup/build; production builds also fail when configuration is entirely missing. An unconfigured development checkout displays a setup error and cannot falsely report successful signup. Do not put real keys into tests.
 
-Signed-out visitors see the landing page at `/`: title, subtitle, `ProductPreview` (an auto-playing frame of the planner whose own navigation bar switches between Today, Focus, Tomorrow and Overview) and one **Get started** link to `/login`. The login page offers **Continue with Google** or an 8-digit emailed code, with the line "By signing up, you agree to our Terms of Service and Privacy Policy." (both links open the combined `PRIVACY.md` document) and Cookie settings. A failed Google return lands on `/login`, the only place that can show the error. The logo (`src/components/Logo.tsx`) is a smiling plum on a lavender tile beside the name, on the landing and sign-in pages; the favicon and touch icon are the same mark. To change them, edit `scripts/brand/prune-mark.svg`, run `node scripts/render-icons.mjs` (it writes `public/prune-icon.png` and `public/prune-touch-icon.png`, which `index.html` links, plus the conventional `favicon.png` and `apple-touch-icon.png`; browsers cache icons by URL, so rename the linked files when the mark changes) and copy the shapes into `Logo.tsx`. There is no guest planner. The preview's screens are HTML mock-ups with demo data (no images, requests or stored data), and its animations stop off screen and under reduced motion. Keep the signed-out page light (about 350 KB cold, checked by `tests/landing.spec.ts`): there is no background artwork, and type is the system font stack, so no webfont is downloaded. Re-encode the WebP if the artwork changes, and check it decodes in Chromium: macOS `sips` AVIF output decodes as solid black there. A returning verified session is restored only after this browser has acknowledged the current privacy notice. Right after sign-in, every account gets the page tour once per device (`prune:tour:v1:<account>`), never over a running timer. On an empty planner it covers the five-task rule, Tomorrow and Overview, and ends at the task form with **Add my first task**; with a planned task it points at that task and its estimate and ends by offering to start it. Behind it, an empty new account shows "What would make today count?" with three starting ideas.
-
-Earlier builds had a guest planner (`prune:guest:v1`), an onboarding survey (`prune:survey:v1`) and anonymous usage counters. They are gone; apply `supabase/migrations/20261105000300_drop_guest_and_survey.sql` after deploying this client to drop their tables and functions (see [Removed guest and survey backend](#removed-guest-and-survey-backend)). Old guest journals left in visitors' browsers are no longer read or transferred.
+There is no landing or sign-in page. A first visit shows the list with one muted line under the field: "By adding a task you agree to the Terms and Privacy Policy." (both links open `PRIVACY.md`). Adding a task records that acceptance; nothing is sent anywhere before it. The page has no images, artwork or webfont. The favicon and touch icon are still the plum mark (`scripts/brand/prune-mark.svg`, rendered by `node scripts/render-icons.mjs`).
 
 ## Features
 
-- Today and Tomorrow: up to five equal tasks per day with editable titles and estimates; start any task in any order. No main-task designation, crowns, or completion animation. Tomorrow is available immediately. Desktop resource metadata is preserved, but the current web UI does not display or edit resources.
-- Focus: one active task, timestamp-based timer, pause/resume, written stop reasons, completion, and an in-memory-only notes scratchpad. Pause before switching views.
-- Overview: completion calendar, the automatic weekly check-in (trends, next week's plan, AI note) and saved check-in history.
-- Profile: all-time/recent stats, streaks, AI preferences, sign-out and confirmed account deletion (soft-delete flag, followed by manual removal after 30 days).
-- Durable local snapshot/outbox: optimistic local saves, ordered automatic retries, idempotent requests, cross-device conflict handling and multi-tab coordination with Web Locks. A failed local save is not reported as success. Only definitively rejected changes can be discarded.
-- Phone-first layouts: touch-sized controls, 16px form inputs, stacked focus screen, bounded dialogs, safe-area padding, and natural vertical scrolling when the viewport or software keyboard is short.
+- **Add:** the field at the top; Enter adds the task on top of the list and keeps the cursor there. On a laptop the page opens ready to type; on a phone it waits for a tap so the keyboard does not cover the list.
+- **Tick:** the circle. A ticked task stays in place for a moment (`LIST_TIMING.settleMs`), then moves under **Done**, which is folded away; open it to untick tasks or **Clear** them all.
+- **Edit and delete:** tap a task's words to edit them (Enter saves, Escape cancels, emptying them deletes). × deletes; it shows on hover, on focus and while editing. Every delete and Clear offers **Undo** for a few seconds.
+- **Menu:** the ••• button opens a sheet with Terms & Privacy, Cookie settings and **Delete everything** (and, for an account from before guests, its email).
+- **Sync:** every change is saved on the device at once and sent to `planner_list` shortly after (a burst goes out together), when the page is shown or back online, and every 30 seconds while visible. Failures retry with growing pauses and are never shown: the device's copy is the one that counts. Each task carries the time of its last edit and the newest edit wins, so retries are harmless. Tabs share one copy in localStorage (`prune:list:v1`, which also records the account it last synced with) and see each other's edits.
+- **Guest ids:** `BrowserCloud.identity` uses the saved session (checked with Auth) or, when there is none and the list has something to keep, `signInAnonymously()`. A guest the server no longer knows, or a saved session that disagrees with its own token, is replaced by a new guest, and the whole list is uploaded to it (`TaskList.adopt`), so nothing is lost. Accounts from before guests (Google or an emailed code) keep syncing in browsers where they are signed in; there is no new sign-in.
+- **Phone-first and accessible:** 44px targets, light and dark themes from the system, reduced motion respected, every control named for screen readers.
 
-### Browser differences and limitations
+### Browser limitations
 
-- **The Mac app is retired.** `20261123000100_drop_mac_only_tables.sql` dropped `planner_resources` and the preview tables. Task API responses may still carry `resources: []` and `isPriority`; the browser ignores them. Retired commands still sitting in an old offline queue (`prioritize_task`, `pause_task`, `add_task_link`, `remove_task_resource`) replay without changing the local plan, and the server settles them. The `/download` page and installer are gone.
-- **Browser sessions are not Keychain sessions.** The Supabase browser client persists access/refresh tokens in a separate localStorage entry, handles token refresh, and coordinates auth across tabs. Tokens never enter the planner snapshot/outbox. This is JavaScript-accessible storage, not HttpOnly cookies; use a trusted device/browser profile. A server-mediated cookie session would be a separate architecture change.
-- Sign-out is local to this browser session. It clears browser credentials, signs out other web tabs, and retains that account's pending planner changes. Remote token revocation is best-effort when offline; already-issued access tokens can remain valid until expiry.
-- Sign-in/session verification requires Auth connectivity on startup. After Auth verifies the immutable identity, a planner-only network outage can restore that account's existing cache; unauthorized responses and confirmed deletion never unlock it. Cached planner actions then work through connection losses. This also means a device disconnected from planner services cannot learn about a remote deletion until it reconnects. The cache is not a full account-history archive. Clearing site data can permanently lose unsynced work.
-- The timer uses timestamps, not interval counts, so background throttling/reload does not reset elapsed focus time. Review scheduling catches up on focus/visibility/next launch; no browser task runs after all tabs are closed.
-- HTTPS and a current browser with Web Locks support are required (localhost is allowed for development). Unencrypted site storage is shared by tabs on this origin but isolated by Supabase project and immutable user ID.
+- **Browser sessions are not Keychain sessions.** The Supabase browser client keeps access/refresh tokens in its own localStorage entry. They never enter the saved list. This is JavaScript-accessible storage, not HttpOnly cookies; use a trusted device/browser profile.
+- A guest's list belongs to its browser: there is no way to open it on another device, and clearing site data loses it (and the guest id with it).
+- Delete everything erases the list in the cloud and here, forgets the guest id and reloads; the next task starts a new guest.
 
 ## Connect the existing backend
 
-Sign-in on this website is Supabase Auth with Google or an emailed code. Clerk is not used; `20261105000200_drop_clerk_bridge.sql` removed its bridge and stays only as migration history.
-
-Apply `supabase/migrations/20261025000100_equal_tasks.sql` after the previous shared and website migrations before deploying this client. It removes the server's most-important-task-first restriction while preserving ownership, today's-task validation, the single-active-task rule, and queue safeguards. This affects all clients on the shared backend. The web UI no longer uses task priority.
-
-Do **not** reset the database or create a parallel account store. The web transport calls the existing endpoints:
+Identity is Supabase Auth: anonymous users (guests), plus the Google and emailed-code accounts made before guests. Do **not** reset the database or create a parallel account store. The web transport calls:
 
 ```text
-/auth/v1/user, /token, /logout, /settings
-/rest/v1/rpc/planner_call
-/functions/v1/weekly-review
-/functions/v1/task-suggestions
+/auth/v1/signup                a new guest (anonymous sign-in)
+/auth/v1/user, /token, /logout checking, refreshing and forgetting the session
+/rest/v1/rpc/planner_list      the list: 'sync', and 'erase' for Delete everything
+/rest/v1/rpc/planner_call      'delete_account', for accounts from before guests
 /functions/v1/email-unsubscribe
 ```
 
-Backend source, RLS, transactional planner rules, idempotent receipts, AI quotas and migrations remain in `../pro/supabase`. Apply any outstanding migrations there, including the local-queue protocol and `20261019000100_tomorrow_available.sql`. This website does not apply migrations or make administrative changes automatically. Provider secrets remain in the Edge Function, never in this repo's frontend configuration.
+Backend source, RLS and the day planner's migrations remain in `../pro/supabase`; this repository adds website migrations. This website does not apply migrations or make administrative changes automatically.
 
-### Suggestions from the previous day
+### Deploy the task list
 
-When Today or Tomorrow has open slots, signed-in users see up to three proposals derived from the **previous day's** tasks (Today from yesterday, Tomorrow from today): unfinished tasks carry over with their remaining estimate, and completed tasks may suggest a clearly implied next step. The `task-suggestions` Edge Function loads both days' tasks server-side (the browser sends only its timezone and `target: "today" | "tomorrow"`) and asks OpenAI (`gpt-4.1-mini`, `store: false`) for structured suggestions, which are clamped and deduplicated before returning. It respects the account's AI preference (`ai_enabled`) and deletion flag, never calls OpenAI when the previous day was empty or the target day is full, and is capped at five attempts per account per target day. Tomorrow's proposals are re-requested when today's tasks change. To deploy:
+1. In the Supabase dashboard, **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins**, and keep **Allow new users to sign up** on (a guest is a sign-up). Supabase limits anonymous sign-ins per IP address (30 an hour by default); CAPTCHA is not implemented in this client, so do not require one.
+2. In the SQL editor (or `supabase db push` from the linked project), apply `supabase/migrations/20261124000100_task_list.sql`, then `20261124000200_comeback_reminders_only.sql`. Both need the earlier website migrations, including `20261121000100_focus_time.sql`. Keep them in the shared backend's deployment history too.
+3. Deploy this website. Until steps 1 and 2 are done, the list still works in each browser; it just doesn't reach the cloud, and nothing says so.
 
-1. Apply `supabase/migrations/20261030000100_task_suggestions.sql` (usage counter + server-only `planner_reserve_suggestion`).
-2. `npx supabase functions deploy task-suggestions` with secrets `OPENAI_API_KEY` and `ALLOWED_ORIGINS` (same values as `weekly-review`). It imports shared code from `server/` and `src/planner/`.
-3. Rebuild this client so the CSP `connect-src` includes the new function path.
+`20261124000100_task_list.sql` adds `planner_list_tasks` (RLS on, no browser grants: only the `planner_list` security-definer function reaches it) and `planner_accounts.list_started_at`. `planner_list` accepts guests (`is_anonymous`) and records nothing about them for reminders; `planner_list('erase')` deletes the caller's whole list. `planner_list('sync', {save, remove})` applies removals, then saves where the newest `updatedAt` wins (client clocks are capped at the server's plus a minute), keeps at most 1,000 tasks (the oldest done task makes room; a full list of open tasks refuses new ones and reports them in `rejected`), and returns the whole list. Like `planner_call`, it records the visit and time zone for reminder emails at most once an hour. The first sync of an account copies its unfinished `planner_tasks` for that day and later into the list, once; a failure there is logged and retried, never blocking the list. `20261124000200_comeback_reminders_only.sql` redefines `planner_claim_reminders` to claim only come-back emails (see below).
 
-If the function is missing or fails, the plan simply shows no suggestions.
+### Retired with the day planner
+
+The website no longer calls `planner_schedule`, `planner_track`, the `weekly-review` or `task-suggestions` Edge Functions, or the task actions of `planner_call`; the CSP no longer allows them. They stay deployed until they are retired on purpose, together with their source here (`server/weekly-review`, `server/task-suggestions`, `server/planner-contract.ts`) and their tests. The old tables keep their data until each account is deleted; `PRIVACY.md` says so. Retiring them means: undeploying those functions, dropping their AI secrets, and a reviewed migration for the tables, after checking that nothing else reads them (see [the database review](database-review.md)). `public/sw.js` stays so browsers that turned notifications on keep showing the come-back reminder.
 
 ### Reminder emails
 
-Two emails, both on by default and both switchable in Profile → Emails or from the link in each email:
+Since `20261124000200_comeback_reminders_only.sql` only one email is sent:
 
-- **Daily reminder** — one per local day, only when tasks planned for today are still `planned` or `active`. Lists the task titles above a red **START WORKING** button.
-- **Come-back** — at most once a week after 7 days without a signed-in planner request; stops after four in a row and resets when the owner returns.
+- **Come-back** — at most once a week after 7 days without a signed-in request (a list sync counts), in the owner's morning window (three hours from 09:00, or from the focus time chosen in the day planner); stops after four in a row and resets when the owner returns. No task content.
+
+The daily focus-time reminder (today's planned tasks, or "what's the one thing?") is no longer claimed: the list has no days. Preferences and focus times are kept. The account sheet's **Reminder emails** switch sets both `daily` and `comeback`; the link in each email still turns that email off without signing in.
 
 `pg_cron` calls the `daily-reminders` Edge Function at minute 5 of every hour. `planner_claim_reminders` picks accounts where it is 09:00–11:59 in the last timezone a client reported (so a missed run is caught up the next hour) and marks them as sent in the same statement, so overlapping or retried runs cannot email anyone twice. A claim is released for retry only when Brevo may accept it later (network error, 429, 5xx). If Brevo refuses the account itself (401, 402 or 403: a wrong key, an IP blocked by Brevo's **Authorised IPs** setting, or no credits), the run stops, releases every unsent claim and answers 502, so a misconfiguration never uses up a reminder. Supabase functions have no fixed outbound IP, so leave Authorised IPs off for this key.
 
 Setup, once:
 
 1. Apply `supabase/migrations/20261112000200_email_reminders.sql`, then `20261112000300_email_reminders_cron.sql`. Keep the first in the shared backend's deployment history: it redefines `planner_call`.
-2. In Brevo, create an **API key** (SMTP & API → API Keys; this is not the SMTP key used for sign-in codes) and switch off open/click tracking for transactional email.
+2. In Brevo, create an **API key** (SMTP & API → API Keys; this is not the SMTP key Supabase uses for its own emails) and switch off open/click tracking for transactional email.
 3. Set the function secrets (never commit them):
    `npx supabase secrets set BREVO_API_KEY=… REMINDER_FROM_EMAIL=… REMINDER_CRON_SECRET=…`
-   `REMINDER_FROM_EMAIL` must be a sender verified in Brevo; `REMINDER_CRON_SECRET` is any long random string. Optional: `SITE_URL`, `REMINDER_BATCH_LIMIT` (emails per hourly run, default 100 — Brevo's free plan allows 300 a day, shared with sign-in codes).
+   `REMINDER_FROM_EMAIL` must be a sender verified in Brevo; `REMINDER_CRON_SECRET` is any long random string. Optional: `SITE_URL`, `REMINDER_BATCH_LIMIT` (emails per hourly run, default 100 — Brevo's free plan allows 300 a day).
 4. `npx supabase functions deploy daily-reminders email-unsubscribe` (`supabase/config.toml` turns JWT verification off for both; each checks its own secret or token).
 5. Create two Vault secrets so the cron job can call the function: `reminders_function_url` = `https://<project-ref>.supabase.co/functions/v1/daily-reminders` and `reminders_cron_secret` = the same value as `REMINDER_CRON_SECRET`.
 6. Rebuild this client so the CSP `connect-src` includes `/functions/v1/email-unsubscribe`.
 
 Until steps 3 and 5 are done the job runs but claims and sends nothing. To test by hand: `curl -X POST -H "Authorization: Bearer $REMINDER_CRON_SECRET" https://<project-ref>.supabase.co/functions/v1/daily-reminders` returns `{"sent":…,"retry":…,"rejected":…,"released":…}`.
 
-### Focus time and browser notifications
-
-Many new accounts added a placeholder task ("hello") and left: sign-up is often not when people want to work. So prune asks one question, **when do you want to focus each day?**, and reminds them then.
-
-- **Onboarding** (new, empty accounts only, 6 steps): a three-step tour of the real screens (five tasks a day, Tomorrow, Overview), then one card for the first task (a box and estimate chips, with **Later** so nobody types a placeholder to get in). Then the focus-time picker (Morning 09:00, Afternoon 14:00, Evening 19:00 or Other, plus "Start now instead" after a first task), and a last screen to add a repeating calendar block (Google link or an `.ics` file made in the browser). Finishing it (**Start now** or **Done**) asks the browser for notifications (the tap is the gesture browsers require), so onboarding has no separate notification button; Profile and the Overview card still have one. Accounts that already have tasks or history get no tour.
-- **Today** is just the plan. **Overview** holds the streak, the weekly check-in and the focus time (`Focus time 09:00 · every day · Change`, or "Set your focus time").
-- **Profile → Reminders**: focus time, weekdays only, email reminder, come-back email, notifications on this device.
-- **Reminder links** go to `/?start=next`, which starts the timer on the next planned task (`src/planner/deep-link.ts`).
-
-`planner_claim_reminders` (as of `20261121000100_focus_time.sql`) sends one **daily** reminder at the focus time (09:00 when unset), within three hours, skipping weekends if asked: today's unfinished tasks, or, when a focus time is set and nothing is planned, "What will you get done today?" (at most twice until the owner visits again). The **come-back** email is unchanged and arrives in the same window. The scheduling RPC is `planner_schedule` (its own route, so `planner_call` is unchanged). The job runs every ten minutes. `20261120000100_start_times_and_push.sql` introduced one-off start times and getting-started emails; the focus-time migration replaced them, and their columns stay unused.
-
-Browser push uses Web Push with VAPID; `server/reminders/web-push.ts` signs and encrypts with WebCrypto (no dependency). After each email is settled (not released), the same reminder goes to every browser the account turned on; endpoints that answer 404/410, or fail five times in a row, are deleted. `public/sw.js` only shows notifications (no fetch handler, no cache), and the CSP allows `worker-src` and `manifest-src` by exact path. iOS needs prune added to the Home Screen (`public/manifest.webmanifest`). Signing out removes the browser's subscription first.
-
-Setup, once (after the reminder emails above):
-
-1. Deploy `daily-reminders` from this commit **before** applying `20261121000100_focus_time.sql` (the older function would render "nothing planned" as "0 tasks are waiting").
-2. Apply `20261120000100_start_times_and_push.sql`, `20261120000200_reminders_every_ten_minutes.sql` (needs `pg_cron` 1.4+) and `20261121000100_focus_time.sql`, in that order.
-3. `npm run push:keys`, then `npx supabase secrets set VAPID_PUBLIC_KEY=… VAPID_PRIVATE_KEY=… VAPID_SUBJECT=mailto:you@yourdomain` and redeploy `daily-reminders`. Keep the pair: every browser subscription is tied to it.
-4. Set `VITE_VAPID_PUBLIC_KEY` (the same public key) for the website build, locally in `.env` and in Vercel, then rebuild. Without it the notification option is hidden and only email is used.
-
 ### Removed guest and survey backend
 
 `supabase/migrations/20261105000300_drop_guest_and_survey.sql` drops `guest_record_usage` and `guest_usage_daily` (anonymous totals and the survey funnel), `planner_import_guest` and `planner_guest_imports` (guest import receipts; imported tasks stay in the planner tables), and `planner_week_goal` and `planner_onboarding` (survey answers). It permanently deletes that data, so export anything you want first. Apply it after this client is live, since older open tabs may still call those endpoints until they reload. A hosted `weekly-review` function that still passes `loadWeekGoal` keeps working: the failed lookup reviews the week without a goal. Remove that wiring from `../pro` when convenient. Delete the `VITE_SURVEY_FLOW` variable from Vercel; nothing reads it.
 
-### Account deletion
+### Delete everything and account deletion
 
-Apply `supabase/migrations/20261024000200_soft_delete_accounts.sql` after the shared backend migrations and this repo's automatic-weekly-reviews migration **before deploying this client**. It adds `planner_accounts."isDeleted"` (default `false`) and `deleted_at`. Deletion is authenticated, immediate, idempotent and never queued offline. It disables weekly AI and blocks planner RPCs/direct planner-data reads. Auth identity and cloud data remain until manual removal; signing in again does not reactivate the account. Other devices may retain offline caches.
+**Delete everything** (in the menu) erases the list with `planner_list('erase')`, forgets the session and the device's copy, and reloads; nothing new is created until the next task. A browser that never synced just clears its copy. For an account from before guests it also calls `planner_call('delete_account')`, which marks `planner_accounts."isDeleted"` and `deleted_at`; other browsers signed in to that account get `PT403` on their next sync and clear their copy, quietly. Since `20261124000100_task_list.sql`, a session that signed in after a deletion would restore the account (`amr` timestamps, else `iat`), though the website no longer offers a sign-in.
 
 After at least 30 days, list accounts ready for manual removal in the Supabase SQL editor:
 
@@ -133,21 +110,18 @@ where "isDeleted" and deleted_at <= now() - interval '30 days'
 order by deleted_at;
 ```
 
-Review this list and permanently delete the corresponding **Auth users** via Supabase's administrative tools; deleting only `planner_accounts` does not remove all user data and may allow reprovisioning. No purge scheduler or automatic hard deletion is installed. Keep this migration in the shared backend's deployment history too so later backend deployments preserve the guard.
+Review this list and permanently delete the corresponding **Auth users** via Supabase's administrative tools; deleting only `planner_accounts` does not remove all user data and may allow reprovisioning. Every list row goes with the Auth user (`on delete cascade`). No purge scheduler or automatic hard deletion is installed.
 
-### Email sign-in
+Guests: `PRIVACY.md` says unused guest ids may be removed after 12 months. Before public release, schedule that clean-up, for example (review it first; it deletes Auth users and, by cascade, their lists):
 
-In the Supabase dashboard, enable **Authentication → Providers → Email**, and make the **Magic Link** email template include `{{ .Token }}` so it delivers the code the login page asks for. Keep the OTP length at 8 digits, matching `CODE_LENGTH` in `src/auth/Login.tsx`. Configure a custom SMTP provider before release, and name it in `PRIVACY.md`.
+```sql
+delete from auth.users
+where is_anonymous and coalesce(last_sign_in_at, created_at) < now() - interval '12 months';
+```
 
-### Google sign-in
+The Google and emailed-code sign-in providers can stay enabled for the accounts made before guests (their sessions still refresh), but nothing on the website starts a new sign-in.
 
-In the Supabase dashboard, enable **Authentication → Providers → Google** with a Google Cloud OAuth client whose authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Add every served origin's callback, e.g. `https://www.prune.win/?oauth=google`, to **Authentication → URL Configuration → Redirect URLs**. The button first reads the public `/auth/v1/settings`; if Google is disabled it shows "Google sign-in isn't available right now. Please try again later." rather than sending visitors to a Supabase error page.
-
-Sign-in uses `sign_in_with_google` (PKCE, `redirectTo` `<origin>/?oauth=google`). The Supabase transport completes `/?oauth=google` callbacks, removes callback parameters from the URL, and verifies identity before opening an account cache. Supabase links a Google sign-in to an existing account with the same verified email, so accounts created earlier with email codes keep their data when they use the matching Google account.
-
-Keep the Supabase email provider enabled: the login page signs in with emailed codes. Unconfirmed email-only users that never signed in can be listed in **Authentication → Users** and removed by hand if you want a clean list.
-
-### Weekly AI CORS
+### Weekly AI CORS (retired functions)
 
 The Edge Functions' `ALLOWED_ORIGINS` must include the exact website origin; without it they allow only `https://www.prune.win`. Do not assume a custom domain or preview origin is also allowed. Setting this secret **replaces** the default, so list every origin you need (`EXTRA_ALLOWED_ORIGINS` adds to it instead):
 
@@ -197,7 +171,7 @@ npx vercel link &&
   npm run check:production -- --url https://www.prune.win --website-only
 ```
 
-Confirm the domain points at this new deployment. The last command must pass on `/`, `/login`, `/login/` and `/index.html`. Do not publish `dist/` alone or manually copy a CSP hash from a different build. Then run the full release checks (including `--require-invite-only` for the closed beta) and complete the manual backend/privacy gates in [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md).
+Confirm the domain points at this new deployment. The last command must pass on `/`, `/login`, `/login/` and `/index.html`. Do not publish `dist/` alone or manually copy a CSP hash from a different build. Then run the full release checks and complete the manual backend/privacy gates in [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md).
 
 ### Content Security Policy (CSP)
 
@@ -206,9 +180,9 @@ CSP is a browser-enforced allowlist, delivered in the `Content-Security-Policy` 
 Our production policy is **hash-locked and generated from the final build**:
 
 - Denies resources by default (`default-src 'none'`). Application JavaScript is authorized by SHA-384 hashes of the emitted bytes, with matching Subresource Integrity (`integrity`) on every entry script. The only managed-script exception is `/_vercel/insights/script.js` on `https://www.prune.win` and `https://prune.win`; this script is trusted without SRI and can change independently of the build. There is no broad `'self'` fallback or `strict-dynamic` delegation. A newly injected same-origin script is blocked too. Modified script bytes fail integrity verification.
-- Adds stylesheet integrity checks. Stylesheets and images stay same-origin; inline styles/style attributes, data images, fonts, manifests, media, plugins, frames and workers are denied. Existing property-level CSSOM updates for the calendar, progress bars and animations still work.
+- Adds stylesheet integrity checks. Stylesheets and images stay same-origin; inline styles/style attributes, data images, fonts, manifests, media, plugins, frames and workers are denied. Property-level CSSOM updates (the task editor grows with its text this way) still work.
 - Blocks inline scripts, event handlers, `eval()`/string compilation, base-URL overrides and embedding this website in another site's frame. **All native form submissions are denied**, including same-origin ones: app forms use prevented submit events and the authenticated API transport.
-- Allows connections only to the exact configured backend's six used Auth endpoints (including the public `/auth/v1/settings` read before Google sign-in), `planner_call` RPC and `weekly-review` Edge Function. Also allows Vercel Web Analytics connections under `/_vercel/insights/` on the two production origins. No broad same-origin fetch allowance, Supabase wildcard, Storage, arbitrary RPCs/Functions or Realtime. CSP path restrictions are not an authorization boundary (redirects can relax CSP path matching); the API transport also rejects redirects, and backend Auth/RLS remain mandatory.
+- Allows connections only to the exact configured backend's four used Auth endpoints (anonymous sign-up, user, token, logout), the `planner_call` and `planner_list` RPCs and the `email-unsubscribe` Edge Function. Also allows Vercel Web Analytics connections under `/_vercel/insights/` on the two production origins. No broad same-origin fetch allowance, Supabase wildcard, Storage, arbitrary RPCs/Functions or Realtime. CSP path restrictions are not an authorization boundary (redirects can relax CSP path matching); the API transport also rejects redirects, and backend Auth/RLS remain mandatory.
 - Upgrades insecure requests in deployed HTTPS responses. Adjacent headers enforce MIME checks, referrer suppression, framing denial, opener/resource isolation and disabled DNS prefetch. HTML is served `no-store` to avoid stale document/hash-policy combinations.
 
 The Vite plugin in `scripts/csp-plugin.ts` hashes the finished bundle, adds integrity attributes and a restrictive meta fallback, and emits `security-headers.json`. `scripts/build-vercel.ts` revalidates the complete HTML and script/stylesheet bytes before packaging those exact headers with the static files, so the real HTTP policy—not just a meta tag—pins scripts and API endpoints. Meta cannot enforce `frame-ancestors`; do not omit the HTTP headers. Builds fail on inline executable content, ambiguous asset attributes, missing assets, known marketing integrations or module/code-splitting dependencies rather than silently weakening the allowlist. The source, build and hosted scans share `scripts/tracking-policy.ts`; this recognized-tracker denylist is not an exhaustive network audit. Introducing dynamic imports requires a deliberate integrity/CSP design review.
@@ -221,41 +195,9 @@ After deployment, run `npm run check:production` with the matching public config
 
 ### Privacy before public release
 
-`PRIVACY.md` combines plain-language terms for the free service with the privacy notice, browser storage details and automatic weekly AI disclosures. Choosing **Continue with Google** or **Email me a code**, next to "By signing up, you agree to our Terms of Service and Privacy Policy.", records terms acceptance and privacy acknowledgement before any account request (`privacy-web-v23` asks for browser notifications when onboarding is finished; `privacy-web-v21` added a per-account history of task changes and planner steps for finding problems; `privacy-web-v20` added the daily focus time and its reminders, browser notifications through push services and calendar entries; `privacy-web-v19` replaced task-count reviews with a weekly check-in on a chosen day and stores the accepted plan; `privacy-web-v16` moved AI reviews from every Sunday to every 10 completed tasks; `privacy-web-v15` added reminder emails and their delivery through Brevo; `privacy-web-v13` added emailed-code sign-in and its email delivery back, so returning browsers acknowledge it again; v12 removed the guest planner, survey and usage counters; v11 made weekly reviews impossible to turn off in the app, v10 added the survey, its funnel totals and Google sign-in) on this browser profile; the same version is not requested again unless site storage is cleared or another browser is used. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including the legitimate-interest assessment for always-on AI with no in-app opt-out, hosting/log retention and processor arrangements. Notice acknowledgement is not AI consent.
+`PRIVACY.md` combines plain-language terms for the free service with the privacy notice and browser storage details. Adding a task, next to "By adding a task you agree to the Terms and Privacy Policy.", records terms acceptance and privacy acknowledgement on that browser before anything is sent (`privacy-web-v24` describes the list: no sign-up, guest ids, no AI, Delete everything, come-back emails only for accounts from before guests, and their earlier planner data kept until deletion; `privacy-web-v23` asked for browser notifications when onboarding finished; `privacy-web-v21` added a per-account history of task changes; `privacy-web-v20` added the daily focus time, browser notifications and calendar entries; `privacy-web-v19` introduced the weekly check-in; `privacy-web-v15` added reminder emails through Brevo; `privacy-web-v13` added emailed-code sign-in; v12 removed the guest planner; v10 added Google sign-in). When the version changes, the line shows again and the list stays local until the next task. This is not an account-wide legal acceptance register. **It remains Draft and requires operator/legal review before public release**, including hosting/log retention, processor arrangements and the guest clean-up.
 
-Apply `supabase/migrations/20261024000100_automatic_weekly_reviews.sql` after the shared backend migrations before deploying this client. It enables reviews for newly provisioned planner accounts and preserves all existing account preferences (including disabled reviews). It affects all clients using this shared backend. Legacy backend `consent_*` fields remain protocol compatibility gates, not evidence of affirmative consent. Do not automatically enable existing disabled accounts from the browser.
-
-Then apply `supabase/migrations/20261103000100_weekly_reviews_always_on.sql` (after the soft-delete migration) before deploying this client, and keep it in the shared backend's deployment history too. It re-creates the `planner_call` guard so `set_weekly_ai_enabled` accepts only `enabled: true`: no client can turn weekly reviews, or the task suggestions that share `ai_enabled`, off any more. Accounts that were already off stay off until they choose **Turn on weekly reviews** in Overview. Profile has no review settings. Account deletion still disables AI. To honour an objection, the operator can still run `update public.planner_accounts set ai_enabled = false, ai_revision = ai_revision + 1 where user_id = '…'` directly.
-
-Then apply `supabase/migrations/20261106000100_month_stats.sql` before deploying this client, and keep it in the shared backend's deployment history too. It re-creates the same `planner_call` guard with one extra read-only action, `month_stats`, which the Overview calendar uses to show the share of a month's tasks that were finished and the time focused. It reads only the caller's own `planner_tasks` rows through a private `planner_month_stats` function; nothing new is stored or sent anywhere. Until it is applied the call fails and Overview simply leaves those stats out.
-
-### AI reviews every 10 completed tasks
-
-Reviews no longer run on Sundays. A review is due each time an owner completes 10 tasks that no earlier review covered (oldest completion first, counting from `ai_controls.task_reviews_since`, set to the Monday of the week the migration runs). It covers those 10 tasks and the written stop reasons on them; `planner_review_tasks` records which tasks each review covered so every task counts once. Saved reports keep their shape: `weekStart`/`weekEnd` are the batch's first and last dates. `weekly_overview` gains `progress: { completed, target }`, which Overview shows as 10 steps; without it (an older backend) the client falls back to the Sunday countdown.
-
-### Weekly check-in
-
-`20261116000100_weekly_check_in.sql` replaces the task-count reviews with a weekly check-in modelled on adaptive nutrition apps: smoothed trends, an estimate of real capacity, and a plan for next week that the owner accepts or keeps. Apply it after `20261112000500` and keep it in the shared backend's history; it redefines `planner_call`, the loader, the reservation, the finish step and the overview, and drops the silver/golden objects of an earlier draft if a database has them. The Edge Function needs no change of contract (redeploy it for the new prompt wording).
-
-- **Schedule**: one weekday (0 Sunday … 6 Saturday; see the fixed-day note below). On that day D, the check-in covers D-7 to D-1 in the owner's time zone: every task planned or completed in those days, and the written stop reasons. Its identity (`week_start` in `planner_reviews` / `ai_review_requests`) is D-1. A week that overlaps a review saved in the previous seven days is skipped, so moving the day or the switch from batch reviews never sends the same days twice. An empty week makes no AI request.
-- **Overview payload**: no `progress` any more; `week.nextUpdate`/`nextUpdateAt` point at the next check-in, and `checkIn: { day, plan }` carries the day and `planner_accounts.check_in_plan` (`{ estimateFactor, dailyTarget, decidedFor }`). New action: `set_check_in_plan { estimateFactor (0.5–3, 2 decimals), dailyTarget (1–5), decidedFor }` returning the overview.
-- **Client** (`src/reviews/check-in.ts`, `CheckIn.tsx`): trends are computed in the browser from saved reports (exponential smoothing, α 0.5): estimates (recorded time ÷ estimate on finished tasks), tasks finished per day worked, and capacity (focus minutes per day worked). The suggested estimate factor is the current factor times the smoothed ratio (needs 3 timed tasks; changes under 0.1 are ignored), the suggested daily target is the smoothed pace. **Accept plan** or **Keep current** records the answer for that week. The plan sets where new tasks' estimates start (`plannedEstimate`) and the soft daily target on Today and Tomorrow (slots past it are dimmed; the hard cap stays at five). Today shows `CheckInMeter` (the day and a seven-cell week) and announces a check-in that lands while the planner is open.
-
-**Since `20261117000100_check_in_day_after_start.sql` the day is fixed:** the check-in is on the weekday after the account started (`auth.users.created_at` in the owner's time zone, plus one day); `set_check_in_day` is refused and Overview has no picker (`check_in_day` stays in the table, unused). It also fixes repeated check-ins: a week used to be skipped only when a saved review ended inside it, so moving the day back pointed at an earlier unreviewed week and each change paid for another check-in. A week is now skipped when any saved review ends on or after its first day. Apply it after `20261116000100`.
-
-**Since `20261118000100_first_check_in_after_three_days.sql`:** the first check-in is due three days after the account started (S+3, with S the start day in the owner's time zone), then every seven days (S+10, S+17, …); the weekday in `checkIn.day` is the weekday of S+3. Before S+3 the window counts as covered, so nothing is sent and `week.nextUpdate` is S+3. Overlap skipping is unchanged, so accounts moving off the old weekday never re-send days. Apply it after `20261117000100`.
-
-**Five tasks a day (`20261119000100_five_tasks_per_day.sql`):** the shared backend kept three slots per day (`planner_tasks_slot_check` and the slot search in `planner_execute`) after the website moved to five, so a fourth task was rejected on sync. This migration widens the check to 1–5 and patches only the slot range and its message in `planner_execute`, refusing to run if that function's text has changed.
-
-**Deploy order:** apply the migration, redeploy `weekly-review`, then ship the client. An older client against the new backend falls back to the countdown it already had and simply ignores `checkIn`.
-
-### Insight drops and the streak
-
-A task finished on a device may drop an insight (below) about 40% of the time when the data supports one; otherwise nothing appears. The streak card on Today (`src/planner/streak.ts`, `StreakCounter`) counts days in a row with at least one finished task as a lit flame, with an hourglass while today still needs a task to keep it, and shows Monday to Sunday of this week as embers; it is computed in the browser from the dashboard's completion history. The weekly check-in meter (`CheckInMeter`) sits under it. There is no background artwork.
-
-### Insight drops
-
-About 40% of the tasks finished on a device drop one fact about the owner's habits onto Today (`src/planner/insights.ts`, `InsightDrop`). Everything is computed in the browser and nothing is sent anywhere. Time-of-day and estimate-accuracy insights come from `prune:insights:v1:<account>`, a device-only log of the last 200 completions (`[hour, estimated minutes, focused seconds]`, no task text); weekday, streak, week-over-week and full-day insights come from the dashboard's completion history. Each insight needs a minimum amount of data, so new accounts see none, and the same one never drops twice in a row. The log is disclosed in `PRIVACY.md` (since v17).
+The day planner's AI and review migrations (`20261024000100` to `20261119000100`) stay in the history for the shared backend; the website no longer depends on them.
 
 ## Tests
 
@@ -267,9 +209,9 @@ npm run test:unit
 npm run test:e2e
 ```
 
-Unit tests cover the durable queue, retry identities, ambiguous failures, storage failures, account isolation, timer projection, public-key validation, privacy records, HTTP error classification, profile statistics, onboarding and review timing. `test:reactivity` additionally runs real Solid browser reactivity under Node's `browser` export condition to check keyed reconciliation, memory-only notes, preference races, late responses and lifecycle cleanup. Playwright runs Chromium and WebKit, including real touch/mobile contexts, email-code sign-in/invalid codes, refresh/restoration, task/focus workflows, previews, conflicts, multi-tab sign-out and phone/landscape layouts.
+Unit tests cover `TaskList` (ordering, change times, batches, merging the cloud's answer, Undo, adopting a new owner), `TaskStorage` (tabs, full or blocked storage, retired keys), public-key validation, privacy records and HTTP error classification; SQL tests run the migrations in PGlite (`tests/task-list-sql.test.mjs`: newest edit wins, isolation, guests, erase, the one-time copy, the 1,000-task limit, clock caps, deletion and restore; `tests/comeback-reminders.test.mjs`). `test:reactivity` runs real Solid reactivity under Node's `browser` export condition with mock timers: debounced syncs, offline back-off, refused batches, edits made while a sync is out, guests made only when needed, a new owner, other tabs, settling, Undo, Delete everything, disposal. Playwright runs Chromium and WebKit, including real touch/mobile contexts: the first visit (no requests before the first task, the acceptance line, a quietly made guest id, guests switched off, outdated acceptance), returning guests and accounts from before guests, adding, ticking, editing, deleting and clearing, offline and other-device edits, two tabs, a full list, safe rendering, Delete everything and phone layouts.
 
-Browser tests build production output into ignored `.playwright-dist/` (never overwriting production `dist/`) and exercise the real Supabase SDK, browser storage/Web Locks and HTTP transport against **intercepted Auth/RPC/AI fixtures**. They include stored-HTML injection, tampered/rejected session identities, browser-back after sign-out and scratchpad/token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. The safe-rendering tests also assert that no injected HTML nodes exist, so CSP cannot conceal an unsafe-rendering regression. They do not reach Google, connect to a hosted database, call paid AI, or prove concurrent hosted database behavior. Test-only public configuration is set by `playwright.config.ts`, never production code. Mobile screenshots are written to the ignored `test-results/` directory. Before release, verify a real Google sign-in round trip, multi-device sync, timer conflicts, real review generation and sign-out against the actual hosted project.
+Browser tests build production output into ignored `.playwright-dist/` (never overwriting production `dist/`) and exercise the real Supabase SDK, browser storage and HTTP transport against **intercepted Auth/RPC fixtures** (`tests/helpers/browser.ts` applies list syncs the way `planner_list` does). They include stored-HTML injection, a saved session that disagrees with its token, Back after Delete everything and token separation. Security regressions cover GET/HEAD headers on document aliases and query strings, actual same-origin frame rejection and modified stylesheet SRI, plus unit tests of the packaged deployment's headers/routes, public-file tracker scan and stale-output cleanup. Vite preview installs the production security headers, and explicit CSP/SRI probes verify blocked inline code/styles, same-origin/third-party script injection, modified bundles, frames, workers, native form submissions, base overrides and connections outside the exact API endpoint allowlist. They do not connect to a hosted database. Before release, verify a real anonymous sign-in, a first task reaching the hosted list, and Delete everything against the actual hosted project.
 
 ### Hosted release checks (non-destructive)
 
@@ -278,8 +220,6 @@ Browser tests build production output into ignored `.playwright-dist/` (never ov
 npm run check:production
 # Explicit target (PRUNE_SITE_URL still works); safe HTTPS redirects are followed:
 npm run check:production -- --url https://www.prune.win
-# Enforce the closed-beta signup policy:
-npm run check:production -- --require-invite-only
 # Inspect just the website, or explicitly exclude optional AI checks:
 npm run check:production -- --website-only
 npm run check:production -- --skip-ai
@@ -290,7 +230,7 @@ npm run check:production -- --help
 npm run test:e2e -- --repeat-each=3 --workers=10
 ```
 
-`check:production` checks the **live deployment**, not your local source: editing/building the app does not change its result until that build is deployed. It checks headers using the actual HTML GET response (not potentially different HEAD responses), known tracker integrations in HTML and fetched assets, actual script/stylesheet integrity, anonymous SQL denial, Auth public settings, and AI authentication/CORS. It creates no accounts, sends no email, requests zero table rows and makes no paid AI calls. Public signup is a **WARN** by default because it is a product/abuse-control decision; use **`--require-invite-only` for the 5–10-person closed-beta release gate**.
+`check:production` checks the **live deployment**, not your local source: editing/building the app does not change its result until that build is deployed. It checks headers using the actual HTML GET response (not potentially different HEAD responses), known tracker integrations in HTML and fetched assets, actual script/stylesheet integrity, anonymous SQL denial, Auth public settings, and AI authentication/CORS. It creates no accounts, sends no email, requests zero table rows and makes no paid AI calls. Guests need sign-ups and anonymous sign-ins enabled: the check fails if either is off, and verifies that `planner_call` and `planner_list` refuse requests without a user.
 
 Results distinguish **PASS**, **WARN** (review required), **FAIL** (confirmed mismatch), **ERROR** (unverified due to configuration/network/response problems), and **SKIP** (dependent or explicitly excluded checks). Exit **0** means no failures/errors in the selected scope, **1** means confirmed failures, and **2** means the run is incomplete. Warnings/skips never mean full production approval. Missing CSP produces one CSP failure per page rather than cascading meta-comparison failures. Request deadlines include streamed bodies; script assets are size-bounded and downloaded once, and API credentials are never forwarded to website redirects/assets. Fix suggestions are grouped at the end. `--timeout-ms 30000` adjusts per-request deadlines. Run `node --experimental-strip-types --test tests/production-check.test.mjs` for the checker's credential-free regression tests.
 
@@ -303,32 +243,29 @@ src/
   App.tsx                       Error boundary; the unsubscribe page or the session
   index.tsx                     The single Solid render root and private analytics URLs
   analytics.ts                  Analytics: optional PostHog, started only after consent
-  auth/                         SessionState, the landing page and the login page
-  components/                   Native dialog, privacy policy, unsubscribe page and preview
-  planner/
-    Planner.tsx                 Feature composition and navigation/onboarding state
-    planner-state.ts            PlannerState: reactive dashboard, mutations, clock, lifecycle
-    components/                 Plans, task editor, estimate dial, focus, calendar and tour
-    api.ts                      PlanningClient: typed queries, mutations and account access
-    browser.ts                  BrowserCloud: Supabase authentication and requests
+  cloud/
+    account.ts                  AccountClient: the guest id or saved account, terms acceptance, list calls, Delete everything
+    browser.ts                  BrowserCloud: the session or a new guest (anonymous sign-in), RPC requests
     api-fetch.ts                BoundedFetch: deadlines, cancellation and response limits
-    cloud-error.ts              CloudError: failure codes the outbox relies on
-    account-queue.ts            AccountQueue: locks, sync listeners, protocol negotiation
-    local-queue.ts              LocalQueue: versioned snapshots, atomic storage, retries
-    planner-snapshot.ts         PlannerSnapshot: command replay and day rollover
-    day-plan.ts                 DayPlan and TaskTimer: a day's load and one task's timer
-    completion-history.ts       CompletionHistory: streaks and totals in one pass
-    commands.ts / types.ts      The RPC contract and the plain records it exchanges
-    constants.ts / messages.ts  Planner bounds, rules and timings; shared error copy
-  profile/                      Profile components and ProfileStats
-  reviews/                      WeeklyReviewState, CheckInSummary, reports and countdown
-  shared/                       CalendarDay, Duration, storage keys, routes and time constants
-  styles/                       Base component styles and mobile-first web layout
+    cloud-error.ts              CloudError: failure codes the list's sync relies on
+    privacy-state.ts            PrivacyNotice: the versioned terms/privacy acknowledgement
+    constants.ts / messages.ts  Account bounds, media queries, OAuth parameters; shared copy
+  tasks/
+    TaskApp.tsx                 The app: the list, the acceptance line and the menu
+    components/                 Add field, task row, Done, Undo bar and the menu sheet
+    task-list.ts                TaskList: the list and its unsaved changes, immutable
+    task-storage.ts             TaskStorage: one account's list in localStorage, shared by tabs
+    list-sync.ts                ListSync: when and how changes go to planner_list
+    list-state.ts               ListState: the reactive list, its actions, acceptance and Delete everything
+    constants.ts / types.ts     Limits and timings; the plain records
+  components/                   Native dialog, privacy policy, cookie banner, unsubscribe page
+  shared/                       Storage keys, routes, site and time constants
+  styles/                       base.css (tokens, light and dark) and app.css (the screens)
 server/
   http.ts                       Shared bounded reads and explicitly safe API errors
-  weekly-review/                Review validation, provider requests and quota orchestration
-  task-suggestions/             Previous-day task proposals: handler, OpenAI request, output validation
-  reminders/                    Reminder emails: HTML, Brevo request, cron and unsubscribe handlers
+  reminders/                    Reminder emails and push: HTML, Brevo request, cron and unsubscribe
+  weekly-review/, task-suggestions/, planner-contract.ts
+                                The retired day planner's AI functions, still deployed
 ```
 
 See [refactoring notes](refactoring.md) for the cleanup boundaries and compatibility guarantees.
@@ -347,10 +284,9 @@ CI runs the same quality gates before testing and packaging. Supabase CLI, PGlit
 ### Component and data boundaries
 
 - Render with JSX and `Show`/`For`/`Switch`; use effects only for external effects, subscriptions and measurements. No manual `replaceChildren` rendering, nested render roots, unsafe HTML sinks or global DOM-based state synchronization.
-- `PlannerState` owns one session's reactive UI state. Store reconciliation preserves task identities, drafts and focused controls during background refresh. Components own local form drafts; focus notes remain memory-only and reset when the active task changes.
-- Controllers, dialogs, the canvas and navigation/tour measurements register cleanup with their Solid owner. Session disposal also stops the outbox, auth refresh and browser subscriptions; late startup/read responses cannot initialize a disposed client.
-- `PlanningClient` coordinates account access, typed queries and task mutations; `LocalQueue` and the transport own their respective storage/network details. Persisted snapshot versions, storage keys, idempotency identities and the shared RPC contract are deliberately unchanged.
-- Weekly AI state is independent of task mutation state. Preference writes invalidate older reads, and pending-review polling stops when its screen is hidden or its owner is disposed.
-- Backend/schema cleanup must consider **all** clients. See [the database review](database-review.md): no table or column was safe to drop, and no hosted schema or user data was changed.
+- `ListState` owns the signed-in screen's state. Rows are keyed by task id and `TaskList.reuse` keeps unchanged task objects across syncs, so an edit in progress survives a sync. `TaskStorage` reads the stored copy before every change, so tabs never overwrite each other.
+- `ListSync` runs one sync at a time; a refused batch (`PT400`) is dropped with its reason instead of retried forever; network and server failures keep the changes and back off.
+- Session disposal stops the sync, its timers and listeners; late responses cannot update a disposed screen.
+- Backend/schema cleanup must consider **all** clients. See [the database review](database-review.md).
 
-When the desktop changes, deliberately review its timing, queue and RPC contract changes while preserving browser auth, file restrictions, mobile behavior and multi-tab handling. There is no automatic cross-repository source sync. Database deployment still requires the shared backend checkout; website deployment does not.
+Database deployment still requires the shared backend checkout; website deployment does not.

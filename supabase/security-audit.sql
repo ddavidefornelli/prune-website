@@ -6,7 +6,7 @@
 with expected(name) as (values
   ('planner_accounts'), ('planner_tasks'), ('planner_stops'),
   ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests')
+  ('ai_review_requests'), ('planner_list_tasks')
 )
 select e.name, c.oid is not null as table_exists,
   coalesce(c.relrowsecurity, false) as rls_enabled
@@ -15,11 +15,12 @@ left join pg_catalog.pg_class c on c.oid = to_regclass('public.' || e.name)
 order by e.name;
 
 -- 2. No anon or authenticated direct INSERT/UPDATE/DELETE privileges.
--- authenticated SELECT should be true only for the five owner-readable tables.
+-- authenticated SELECT should be true only for the five owner-readable tables
+-- (never for planner_list_tasks, which only planner_list reaches).
 with expected(name) as (values
   ('planner_accounts'), ('planner_tasks'), ('planner_stops'),
   ('planner_reviews'), ('planner_receipts'), ('ai_controls'), ('ai_usage'),
-  ('ai_review_requests')
+  ('ai_review_requests'), ('planner_list_tasks')
 ), roles(name) as (values ('anon'), ('authenticated'))
 select e.name as table_name, r.name as role_name,
   has_table_privilege(r.name, c.oid, 'SELECT') as can_select,
@@ -42,7 +43,8 @@ where schemaname = 'public' and tablename in (
 order by tablename, policyname;
 
 -- 4. All security-definer functions require an empty search_path.
--- No anon execute; authenticated execute ONLY on planner_call(text,jsonb,text).
+-- No anon execute; authenticated execute ONLY on planner_call(text,jsonb,text),
+-- planner_list(text,jsonb,text) and the day planner's planner_schedule/planner_track.
 -- PUBLIC execute must be false. All other listed functions are server-only.
 select p.oid::regprocedure::text as function_name, p.prosecdef as security_definer,
   p.proconfig as function_settings,

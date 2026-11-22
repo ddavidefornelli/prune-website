@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { loadEnv } from "vite";
-import { PublicConfig } from "../src/planner/config.ts";
+import { PublicConfig } from "../src/cloud/config.ts";
 import { ANALYTICS_SCRIPTS, DOCUMENT_ROUTES, POSTHOG_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 
@@ -13,7 +13,6 @@ const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const HELP = `Usage: npm run check:production -- [options]
 
   --url https://www.prune.win   Website origin (or PRUNE_SITE_URL)
-  --require-invite-only        Fail if public signup is enabled; otherwise warn
   --website-only              Inspect the website without contacting Supabase
   --skip-ai                   Explicitly skip optional AI authentication/CORS
   --timeout-ms 15000           Per-request timeout, including body/redirects
@@ -148,7 +147,7 @@ export function summarize(results) {
   return { counts, exitCode: counts.ERROR ? 2 : counts.FAIL ? 1 : 0 };
 }
 
-export async function runProductionChecks({ site = "https://www.prune.win", config = null, configError = null, requireInviteOnly = false, websiteOnly = false, skipAi = false, timeoutMs = 15000, fetcher = fetch } = {}, onResult = () => {}) {
+export async function runProductionChecks({ site = "https://www.prune.win", config = null, configError = null, websiteOnly = false, skipAi = false, timeoutMs = 15000, fetcher = fetch } = {}, onResult = () => {}) {
   const origin = websiteOrigin(site);
   const results = [];
   const add = (status, id, label, detail = "", fix = "") => {
@@ -278,14 +277,14 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
     else {
       for (const [id, value, expected, label] of [
         ["email", auth.external?.email, true, "Email authentication enabled"],
-        ["anonymous", auth.external?.anonymous_users, false, "Anonymous sign-in disabled"],
+        ["anonymous", auth.external?.anonymous_users, true, "Anonymous sign-in enabled (every visitor starts as a guest)"],
         ["confirmation", auth.mailer_autoconfirm, false, "Email confirmation enabled"],
       ]) {
         if (typeof value !== "boolean") add("ERROR", `auth:${id}`, label, "Setting was absent/unrecognized in the public response; verify in the Supabase dashboard.");
         else check(value === expected, `auth:${id}`, label, `Expected ${expected}; observed ${value}.`, "Review the hosted Supabase Authentication settings.");
       }
       if (typeof auth.disable_signup !== "boolean") add("ERROR", "auth:signup", "Signup policy", "Public signup setting could not be verified.");
-      else add(auth.disable_signup ? "PASS" : requireInviteOnly ? "FAIL" : "WARN", "auth:signup", "Signup policy", auth.disable_signup ? "New public registrations are disabled." : "Public registrations are enabled. This is a product/abuse-control choice, not proof of cross-account data exposure.", auth.disable_signup ? "" : "For a closed beta, provision tester accounts and disable public signup. Use --require-invite-only to make this a release failure.");
+      else add(auth.disable_signup ? "FAIL" : "PASS", "auth:signup", "New guests can start", auth.disable_signup ? "New registrations are disabled, so no new guest id can be created: new visitors' lists would never sync." : "New registrations are enabled, as guests need. Abuse control is Supabase's per-IP limit on anonymous sign-ins.", auth.disable_signup ? "Enable sign-ups and anonymous sign-ins in the Supabase Authentication settings." : "");
       for (const table of TABLES) await safely(`db:${table}:request`, `Anonymous table check: ${table}`, async () => {
         const response = await request(`${config.url}/rest/v1/${table}?select=*&limit=0`, { headers });
         const body = jsonBody(response);
@@ -295,6 +294,11 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
         const response = await request(`${config.url}/rest/v1/rpc/planner_call`, { headers, method: "POST", body: JSON.stringify({ p_action: "dashboard", p_args: {}, p_timezone: "UTC" }) });
         const body = jsonBody(response);
         check([401, 403].includes(response.status) && ["42501", "PT401"].includes(body?.code), "planner:anonymous", "Planner rejects anonymous access", codeDetail(response, body), "Review planner RPC grants and its server-side authentication guard.");
+      });
+      await safely("list:request", "List RPC without a user", async () => {
+        const response = await request(`${config.url}/rest/v1/rpc/planner_list`, { headers, method: "POST", body: JSON.stringify({ p_action: "sync", p_args: {}, p_timezone: "UTC" }) });
+        const body = jsonBody(response);
+        check([401, 403].includes(response.status) && ["42501", "PT401"].includes(body?.code), "list:anonymous", "The list rejects requests without a signed-in user or guest", codeDetail(response, body), "Review planner_list grants (authenticated only) and its auth.uid() guard.");
       });
       if (skipAi) add("SKIP", "ai:disabled", "AI authentication and CORS", "Explicit --skip-ai mode; optional AI was not verified.");
       else {
@@ -311,13 +315,13 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
       }
     }
   }
-  return { site: canonical, scope: { websiteOnly, skipAi, requireInviteOnly }, results, ...summarize(results), limitations: "Does not prove authenticated cross-account RLS, SMTP/OTP delivery or limits, migration parity, hosted load capacity, backups, retention, admin security or absence of vulnerabilities. Complete PRODUCTION_READINESS.md." };
+  return { site: canonical, scope: { websiteOnly, skipAi }, results, ...summarize(results), limitations: "Does not prove authenticated cross-account RLS, SMTP/OTP delivery or limits, migration parity, hosted load capacity, backups, retention, admin security or absence of vulnerabilities. Complete PRODUCTION_READINESS.md." };
 }
 
 export async function main(args = process.argv.slice(2)) {
   let options;
   try {
-    options = parseArgs({ args, options: { url: { type: "string" }, "require-invite-only": { type: "boolean" }, "website-only": { type: "boolean" }, "skip-ai": { type: "boolean" }, "timeout-ms": { type: "string", default: "15000" }, json: { type: "boolean" }, help: { type: "boolean", short: "h" } } }).values;
+    options = parseArgs({ args, options: { url: { type: "string" }, "website-only": { type: "boolean" }, "skip-ai": { type: "boolean" }, "timeout-ms": { type: "string", default: "15000" }, json: { type: "boolean" }, help: { type: "boolean", short: "h" } } }).values;
   } catch { console.error("Invalid arguments. Run npm run check:production -- --help."); return 2; }
   if (options.help) { console.log(HELP); return 0; }
   const timeoutMs = Number(options["timeout-ms"]);
@@ -336,7 +340,7 @@ export async function main(args = process.argv.slice(2)) {
     if (!options["website-only"] || env.VITE_SUPABASE_URL || env.VITE_SUPABASE_ANON_KEY) config = PublicConfig.parse(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
   } catch { configError = true; }
   if (!options.json) console.log(`Production checks: ${site}\nRead-only public probes; no credentials or response bodies will be printed.\n`);
-  const report = await runProductionChecks({ site, config, configError, timeoutMs, requireInviteOnly: !!options["require-invite-only"], websiteOnly: !!options["website-only"], skipAi: !!options["skip-ai"] }, options.json ? undefined : (item) => {
+  const report = await runProductionChecks({ site, config, configError, timeoutMs, websiteOnly: !!options["website-only"], skipAi: !!options["skip-ai"] }, options.json ? undefined : (item) => {
     console.log(`[${item.status}] ${item.label}${item.detail ? ` — ${item.detail}` : ""}`);
   });
   if (options.json) console.log(JSON.stringify(report, null, 2));

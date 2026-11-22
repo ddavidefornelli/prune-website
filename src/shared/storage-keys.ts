@@ -6,21 +6,29 @@
 export const STORAGE_KEYS = {
   privacyAcknowledgement: "prune:privacy:acknowledgement",
   cookieChoice: "prune:cookies:v1",
-  focusSoundVolume: "prune:focus-sound-volume:v1",
-  /** Supabase's saved session for one project. */
+  /** Supabase's saved session (a guest's or an account's) for one project. */
   auth: (projectUrl: string) => `prune:auth:${projectUrl}`,
-  /** The acknowledged snapshot and its outbox (the prefix predates "prune"). */
-  plannerQueue: (version: number, accountKey: string) =>
-    `pro:planner:v${version}:${accountKey}`,
-  onboarding: (accountKey: string) => `prune:onboarding:v1:${accountKey}`,
-  tour: (accountKey: string) => `prune:tour:v1:${accountKey}`,
-  hint: (accountKey: string, hint: string) =>
-    `prune:hint:v1:${accountKey}:${hint}`,
-  visits: (accountKey: string) => `prune:visits:v1:${accountKey}`,
-  insights: (accountKey: string) => `prune:insights:v1:${accountKey}`,
-  suggestions: (accountKey: string, target: string) =>
-    `prune:suggestions:v1:${accountKey}:${target}`,
+  /** This browser's list, the changes not yet in the cloud, and whose it is. */
+  list: "prune:list:v1",
 } as const;
+
+/**
+ * What earlier versions kept in the browser: the day planner's snapshot and
+ * outbox, tour, hints, visits, insights, suggestions and focus sound volume,
+ * and the per-account lists of the first list build. Nothing reads them, so
+ * they are removed on the next visit.
+ */
+export const RETIRED_STORAGE_PREFIXES = [
+  "pro:planner:",
+  "prune:tasks:",
+  "prune:onboarding:",
+  "prune:tour:",
+  "prune:hint:",
+  "prune:visits:",
+  "prune:insights:",
+  "prune:suggestions:",
+  "prune:focus-sound-volume:",
+] as const;
 
 /** Window events the app dispatches to itself. */
 export const APP_EVENTS = {

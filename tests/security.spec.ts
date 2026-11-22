@@ -1,46 +1,27 @@
 import { test as cspTest } from "@playwright/test";
 import { integrity, securityHeaders } from "../scripts/security-policy.ts";
-import { test, expect, openPlanner, visitProfile, addTask, synced, AUTH_KEY, QUEUE_KEY, USER_ID, PROJECT, dashboard, review } from "./helpers/browser";
-
-test.use({ signedIn: true });
+import { test, expect, openList, openMenu, addTask, newTask, synced, savedList, AUTH_KEY, LIST_KEY, PROJECT } from "./helpers/browser";
 
 // Check the DOM as well as execution: CSP must not conceal unsafe rendering.
-test("stored task titles and AI output render as text, never executable HTML", async ({ page, backend }) => {
+test("stored task titles render as text, never executable HTML", async ({ page }) => {
   const payload = '<img src="/xss-probe" onerror="globalThis.__pruneXss = true">';
-  await openPlanner(page);
+  await openList(page);
   await addTask(page, payload);
   await synced(page);
   await page.reload();
-  await expect(page.getByRole("button", { name: `Edit task title: ${payload}`, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Edit ${payload}`, exact: true })).toBeVisible();
   await expect(page.locator(".task img, .task [onerror]")).toHaveCount(0);
-
-  const saved = review();
-  saved.analysis.improvements = [payload];
-  saved.analysis.mainReasons = [{ reason: payload, evidenceStopIds: [1] }];
-  saved.activity.tasks = [{ id: "evidence-task", outcome: payload, plannedFor: saved.weekStart, completedOn: null, status: "planned", estimatedMinutes: 30, actualSeconds: 0 }];
-  saved.activity.stops = [{ id: 1, taskId: "evidence-task", reason: payload, stoppedOn: saved.weekStart }];
-  saved.activity.totalStops = 1;
-  backend.weekly.reviews = [saved];
-  await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
-  await expect(page.locator(".weekly-improvements")).toContainText(payload);
-  // Stop evidence sits inside the collapsed breakdown under the check-in.
-  await page.getByText("Full breakdown", { exact: true }).click();
-  await page.getByText("View 1 supporting stop entry", { exact: true }).click();
-  await expect(page.locator(".review-evidence")).toContainText(payload);
-  await expect(page.locator(".weekly-report img, .weekly-report [onerror]")).toHaveCount(0);
   expect(await page.evaluate(() => "__pruneXss" in globalThis)).toBe(false);
 });
 
-test("normal planner, calendar and profile workflows do not violate CSP", async ({ page }) => {
+test("everyday list and menu workflows do not violate CSP", async ({ page }) => {
   const violations: string[] = [];
   await page.exposeFunction("__reportCsp", (directive: string, blocked: string) => {
-    // The production CSP allows the live site's /sounds/ folder and
-    // /manifest.webmanifest, not this preview origin
-    // (tests/security-policy.test.mjs covers those entries), so the streak
-    // party's sound and WebKit's manifest fetch are the expected blocks here.
+    // The production CSP allows the live site's /manifest.webmanifest, not this
+    // preview origin (tests/security-policy.test.mjs covers that entry), so
+    // WebKit's manifest fetch is the expected block here.
     const url = URL.canParse(blocked) ? new URL(blocked) : null;
     const local = url?.origin === new URL(page.url()).origin;
-    if (local && directive === "connect-src" && url!.pathname.startsWith("/sounds/")) return;
     if (local && directive === "manifest-src" && url!.pathname === "/manifest.webmanifest") return;
     violations.push(directive);
   });
@@ -49,16 +30,17 @@ test("normal planner, calendar and profile workflows do not violate CSP", async 
       void (globalThis as typeof globalThis & { __reportCsp: (directive: string, blocked: string) => Promise<void> }).__reportCsp(event.effectiveDirective, event.blockedURI);
     });
   });
-  await openPlanner(page);
-  await addTask(page, "Hash-locked planner workflow");
+  await openList(page);
+  await addTask(page, "Hash-locked list workflow");
+  await page.getByRole("button", { name: "Edit Hash-locked list workflow" }).click();
+  await page.getByRole("textbox", { name: "Task", exact: true }).fill("Renamed under CSP");
+  await page.keyboard.press("Enter");
+  await page.getByRole("checkbox", { name: "Renamed under CSP" }).check();
+  await page.getByRole("button", { name: "Done 1" }).click();
   await synced(page);
-  await page.locator(".task").first().getByRole("button", { name: "Start focus", exact: true }).click();
-  await page.getByRole("button", { name: "Complete task", exact: true }).click();
-  await synced(page);
-  await page.getByRole("navigation").getByRole("button", { name: "Overview", exact: true }).click();
-  await expect(page.locator(".activity-calendar")).toBeVisible();
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
-  await expect(page.locator(".profile-page")).toBeVisible();
+  await openMenu(page);
+  await page.getByRole("button", { name: "Terms & Privacy", exact: true }).click();
+  await page.getByRole("button", { name: "Close privacy policy" }).click();
   expect(violations).toEqual([]);
 });
 
@@ -243,73 +225,55 @@ cspTest("hash-approved code still cannot use eval, Function or string timers", a
   expect(await page.evaluate(() => "__cspExecuted" in globalThis)).toBe(false);
 });
 
-test("a tampered local session identity cannot unlock another account's cached planner", async ({ page, backend }) => {
+test("a saved session that disagrees with its own token is dropped, not trusted or looped on", async ({ page, backend }) => {
   const otherId = "22222222-2222-4222-8222-222222222222";
-  const privateTitle = "Never expose this cached outcome";
-  const cached = dashboard();
-  cached.todayTasks.push({ id: "private-task", outcome: privateTitle, plannedFor: cached.today, estimatedMinutes: 30, actualSeconds: 0, status: "planned", startedAt: null, completedOn: null, createdAt: cached.serverNow });
-  await page.addInitScript(({ authKey, queueKey, otherId, cached }) => {
+  await page.addInitScript(({ authKey, otherId }) => {
+    if (sessionStorage.getItem("tampered")) return;
+    sessionStorage.setItem("tampered", "1");
     const session = JSON.parse(localStorage.getItem(authKey)!);
-    session.user.id = otherId; // The fixture Auth server still verifies USER_ID.
+    session.user.id = otherId; // The token itself still belongs to the guest.
     localStorage.setItem(authKey, JSON.stringify(session));
-    localStorage.setItem(queueKey, JSON.stringify({ version: 1, base: cached, savedAt: Date.now() / 1000, pending: [], blocked: null }));
-  }, { authKey: AUTH_KEY, queueKey: QUEUE_KEY.replace(USER_ID, otherId), otherId, cached });
+  }, { authKey: AUTH_KEY, otherId });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(privateTitle);
-  expect(backend.requests.some((request) => request.path === "/auth/v1/user")).toBe(true);
-  expect(backend.requests.some((request) => request.path.includes("/rpc/"))).toBe(false);
-});
-
-test("a server-rejected saved session never displays the account cache", async ({ page, context, backend }) => {
-  await openPlanner(page);
-  await addTask(page, "A private cached outcome");
+  await addTask(page, "Still mine");
   await synced(page);
-  await context.route(`${PROJECT}/auth/v1/user`, (route) => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ msg: "Sensitive upstream diagnostic", code: "bad_jwt" }) }));
-  backend.requests.length = 0;
-  await page.reload();
-  await expect(page.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("A private cached outcome");
-  await expect(page.locator("body")).not.toContainText("Sensitive upstream diagnostic");
-  expect(backend.requests.some((request) => request.path.includes("/rpc/"))).toBe(false);
-  expect(await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY)).toBeNull();
+  // A new guest took over this browser's list; nothing ran under the other id.
+  expect(backend.guests).toHaveLength(1);
+  expect((await savedList(page))?.owner).toBe(`${PROJECT}:${backend.guests[0]}`);
+  expect((await savedList(page))?.owner).not.toContain(otherId);
+  expect(backend.requests.filter((request) => request.path.includes("/rpc/")).every((request) => !request.authorization?.includes(otherId))).toBe(true);
 });
 
-test("sign-out and browser back do not restore the planner or credentials", async ({ page }) => {
-  await openPlanner(page);
-  await addTask(page, "A private signed-out task");
+test("after Delete everything, Back brings back neither the list nor the session", async ({ page }) => {
+  await openList(page);
+  await addTask(page, "A private task");
   await synced(page);
   await page.goto("/?history=1");
-  await expect(page.getByRole("navigation")).toBeVisible();
-  await visitProfile(page);
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
+  await expect(newTask(page)).toBeVisible();
+  await openMenu(page);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete everything", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "A private task" })).toHaveCount(0);
   await page.goBack();
-  await expect(page.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("A private signed-out task");
+  await expect(newTask(page)).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("A private task");
   expect(await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY)).toBeNull();
-  // This is intentional recovery behavior, not encryption/erasure of site data.
-  expect(await page.evaluate((key) => localStorage.getItem(key), QUEUE_KEY)).toContain("A private signed-out task");
+  expect(await page.evaluate((key) => localStorage.getItem(key), LIST_KEY)).toBeNull();
 });
 
-test("focus scratchpad stays in memory and planner credentials stay out of the outbox", async ({ page, backend }) => {
-  await openPlanner(page);
-  await addTask(page, "Keep notes local");
+test("credentials stay out of the saved list, and every list call carries the session", async ({ page, backend }) => {
+  await openList(page);
+  await addTask(page, "Keep credentials apart");
   await synced(page);
-  await page.locator(".task").first().getByRole("button", { name: "Start focus", exact: true }).click();
-  await page.getByRole("textbox", { name: "Notes", exact: true }).fill("Highly private scratchpad marker");
-  await page.getByRole("button", { name: "Complete task", exact: true }).click();
-  await synced(page);
-  expect(JSON.stringify(backend.requests)).not.toContain("Highly private scratchpad marker");
-  const persisted = await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
-  expect(JSON.stringify(persisted)).not.toContain("Highly private scratchpad marker");
-  const outbox = persisted[QUEUE_KEY]!;
-  expect(outbox).not.toContain("access_token");
-  expect(outbox).not.toContain("refresh_token");
-  for (const request of backend.requests.filter((request) => request.path.includes("/rpc/") || request.path.includes("/functions/"))) {
+  const saved = await page.evaluate((key) => localStorage.getItem(key)!, LIST_KEY);
+  expect(saved).not.toContain("access_token");
+  expect(saved).not.toContain("refresh_token");
+  const calls = backend.requests.filter((request) => request.path.includes("/rpc/"));
+  expect(calls.length).toBeGreaterThan(0);
+  for (const request of calls) {
     expect(request.authorization).toMatch(/^Bearer /);
     expect(JSON.stringify(request.body)).not.toContain("fixture-refresh");
-    expect(request.body).not.toHaveProperty("code");
-    expect(request.body).not.toHaveProperty("token");
+    // The expected account stays in the browser.
+    expect(request.body.p_args).not.toHaveProperty("_accountKey");
   }
 });

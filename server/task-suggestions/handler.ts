@@ -1,5 +1,5 @@
 import { HTTP_STATUS } from "../../src/shared/api-routes.ts";
-import type { SuggestionTarget } from "../../src/planner/types.ts";
+import type { SuggestionTarget } from "../planner-contract.ts";
 import { REQUEST_LIMITS } from "../constants.ts";
 import { ApiError, JsonEndpoint } from "../http.ts";
 import {

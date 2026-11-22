@@ -1,5 +1,5 @@
 import { createSignal, Match, Switch } from "solid-js";
-import { PublicConfig } from "../planner/config";
+import { PublicConfig } from "../cloud/config";
 import { SUPABASE_ROUTES } from "../shared/api-routes";
 
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -78,7 +78,7 @@ export function Unsubscribe(props: { request: UnsubscribeRequest }) {
             You will not get {props.request.name} emails from prune any more.
           </p>
           <p class="muted">
-            You can turn them back on in your profile at any time.
+            You can turn them back on from your account in prune.
           </p>
           <a href="/">Open prune</a>
         </Match>

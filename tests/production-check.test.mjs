@@ -11,7 +11,7 @@ const script = "console.log('Google Ads and GoatCounter are not loaded');";
 const built = hardenHtml('<html><head><script type="module" src="/assets/app.js"></script></head><body></body></html>', new Map([["assets/app.js", script]]), api);
 const documentHeaders = { ...built.headers, "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-function fixture({ signupDisabled = true, override } = {}) {
+function fixture({ signupDisabled = false, override } = {}) {
   const requests = [];
   const fetcher = async (input, init) => {
     const url = new URL(input);
@@ -23,7 +23,7 @@ function fixture({ signupDisabled = true, override } = {}) {
       if (url.pathname === "/assets/app.js") return new Response(script, { headers: { "Content-Type": "text/javascript; charset=utf-8" } });
     }
     if (url.origin === api) {
-      if (url.pathname === "/auth/v1/settings") return json({ external: { email: true, anonymous_users: false }, mailer_autoconfirm: false, disable_signup: signupDisabled });
+      if (url.pathname === "/auth/v1/settings") return json({ external: { email: true, anonymous_users: true }, mailer_autoconfirm: false, disable_signup: signupDisabled });
       if (url.pathname.startsWith("/rest/v1/")) return json({ code: "42501" }, 401);
       if (url.pathname === "/functions/v1/weekly-review") {
         if (init.method !== "OPTIONS") return json({ error: { code: "unauthorized" } }, 401);
@@ -52,9 +52,10 @@ test("checker accepts a correctly deployed artifact and makes only non-destructi
     if (url.origin === site) assert.ok(!new Headers(init.headers).has("apikey"));
     if (url.pathname.startsWith("/rest/v1/") && !url.pathname.includes("/rpc/")) assert.equal(url.searchParams.get("limit"), "0");
     if (init.method === "POST") {
-      assert.ok(["/rest/v1/rpc/planner_call", "/functions/v1/weekly-review"].includes(url.pathname));
+      assert.ok(["/rest/v1/rpc/planner_call", "/rest/v1/rpc/planner_list", "/functions/v1/weekly-review"].includes(url.pathname));
       const body = JSON.parse(init.body);
-      assert.ok(body.p_action === "dashboard" || Object.keys(body).join() === "timezone");
+      // Read-only probes: the list probe sends no changes, without a user.
+      assert.ok(body.p_action === "dashboard" || (body.p_action === "sync" && Object.keys(body.p_args).length === 0) || Object.keys(body).join() === "timezone");
     }
   }
   assert.ok(!JSON.stringify(report).includes(config.publicKey));
@@ -67,12 +68,13 @@ test("CSP comparison accepts equivalent directive ordering, whitespace and HTML 
   assert.equal((await g.run()).exitCode, 0);
 });
 
-test("public signup is a warning by default and a failure only when invite-only is required", async () => {
-  const f = fixture({ signupDisabled: false });
-  const normal = await f.run();
-  assert.equal(result(normal, "auth:signup").status, "WARN");
-  assert.equal(normal.exitCode, 0);
-  const closed = await f.run({ requireInviteOnly: true });
+test("guests need sign-ups: enabled passes, disabled fails", async () => {
+  const open = await fixture().run();
+  assert.equal(result(open, "auth:signup").status, "PASS");
+  assert.equal(result(open, "auth:anonymous").status, "PASS");
+  assert.equal(result(open, "list:anonymous").status, "PASS");
+  assert.equal(open.exitCode, 0);
+  const closed = await fixture({ signupDisabled: true }).run();
   assert.equal(result(closed, "auth:signup").status, "FAIL");
   assert.equal(closed.exitCode, 1);
 });
@@ -234,7 +236,8 @@ test("CLI help works without configuration; malformed options produce a useful e
   const command = ["--experimental-strip-types", "scripts/check-production.mjs"];
   const help = spawnSync(process.execPath, [...command, "--help"], { encoding: "utf8", env: { ...process.env, VITE_SUPABASE_URL: "", VITE_SUPABASE_ANON_KEY: "" } });
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /--require-invite-only/);
+  assert.match(help.stdout, /--website-only/);
+  assert.doesNotMatch(help.stdout, /--require-invite-only/);
   const invalid = spawnSync(process.execPath, [...command, "--json", "--url", "http://insecure.test"], { encoding: "utf8" });
   assert.equal(invalid.status, 2);
   assert.equal(JSON.parse(invalid.stdout).exitCode, 2);

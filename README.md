@@ -1,15 +1,13 @@
 # prune
 
-**Do less. Achieve more.**
+**A to-do list. Nothing else.**
 
-prune is a simple daily planner. Each day you pick up to five tasks, focus on them one at a time with a timer, and get a free weekly check-in: how your estimates held up, what you really finish, and a plan for next week.
-
-It works on your phone and in the browser.
+prune is the easiest to-do list there is. Open it and type a task: there is nothing to sign up for. Press Enter to add it, tick it off when it's done, tap it to change it or delete it. Your list is saved as you go.
 
 <p align="center">
-  <img src="screenshots/welcome.png" width="250" alt="Welcome screen">
-  <img src="screenshots/today.png" width="250" alt="Today's tasks">
-  <img src="screenshots/focus.png" width="250" alt="Focus timer">
+  <img src="screenshots/first.png" width="250" alt="A first visit: the list, ready to type">
+  <img src="screenshots/list.png" width="250" alt="A list of tasks">
+  <img src="screenshots/done.png" width="250" alt="Done tasks, unfolded">
 </p>
 
 Try it at [prune.win](https://www.prune.win).

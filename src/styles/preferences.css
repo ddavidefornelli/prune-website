@@ -5,50 +5,54 @@
   right: max(16px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
   display: grid;
-  gap: 0.5rem;
-  width: min(16rem, calc(100vw - 32px));
+  gap: 10px;
+  width: min(18rem, calc(100vw - 32px));
   max-height: 80svh;
-  padding: 0.6667rem;
+  padding: 14px;
   overflow-y: auto;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 16px;
-  box-shadow: var(--shadow-float);
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: var(--shadow);
 }
 .cookie-copy p {
-  margin: 0 0 0.25rem;
-  font-size: 0.6667rem;
-  line-height: 1.4;
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+  line-height: 1.45;
 }
 .cookie-copy .privacy-policy-button {
-  font-size: 0.6667rem;
+  min-height: 32px;
+  padding: 0;
+  color: var(--ink);
+  font-size: var(--text-tiny);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
 }
 .cookie-actions {
   display: flex;
-  gap: 0.3333rem;
+  gap: 6px;
 }
 .cookie-actions button {
   flex: 1;
-  min-height: 34px;
-  padding: 4px 0.3333rem;
-  color: var(--text);
-  font-size: 0.6667rem;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+  font-size: var(--text-tiny);
+  font-weight: 500;
   white-space: nowrap;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
 }
-.cookie-actions button:hover {
-  background: var(--surface-hover);
-}
-.cookie-banner button:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 3px;
+@media (hover: hover) {
+  .cookie-actions button:hover {
+    background: var(--hover);
+  }
 }
 @media (pointer: coarse), (max-width: 1023px) {
   .cookie-actions button {
-    min-height: 44px;
+    min-height: var(--tap);
   }
 }

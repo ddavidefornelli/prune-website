@@ -1,6 +1,6 @@
 import { ErrorBoundary, Show } from "solid-js";
-import { Session } from "./auth/Session";
 import { Unsubscribe, UnsubscribeRequest } from "./components/Unsubscribe";
+import { TaskApp } from "./tasks/TaskApp";
 
 export default function App() {
   const unsubscribe = UnsubscribeRequest.fromSearch(location.search);
@@ -10,12 +10,12 @@ export default function App() {
     <ErrorBoundary
       fallback={
         <p class="error" role="alert">
-          prune could not start. Reload to try again. Do not clear browser
-          storage if you have unsynced changes.
+          prune could not start. Reload to try again. Your tasks are still saved
+          in this browser.
         </p>
       }
     >
-      <Show when={unsubscribe} fallback={<Session />}>
+      <Show when={unsubscribe} fallback={<TaskApp />}>
         {(request) => <Unsubscribe request={request()} />}
       </Show>
     </ErrorBoundary>

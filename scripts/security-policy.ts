@@ -29,11 +29,6 @@ export const ANALYTICS_CONNECTIONS = ANALYTICS_ORIGINS.map(
 export const ERROR_LOG_CONNECTIONS = PRODUCTION_ORIGINS.map(
   (origin) => `${origin}${ERROR_LOG_PATH}`,
 );
-// Focus sounds are fetched (not streamed) so they loop without a gap; only
-// that folder, never 'self', which would include /api/.
-export const SOUND_CONNECTIONS = PRODUCTION_ORIGINS.map(
-  (origin) => `${origin}/sounds/`,
-);
 // PostHog (EU cloud) is bundled and starts only after cookie consent. The
 // API host receives events; the assets host serves remote config and the
 // lazily loaded recorder, by fetch and by script. Exact origins, no wildcard.
@@ -78,7 +73,7 @@ export function securityHeaders(
     "script-src-attr 'none'",
     "style-src 'self'",
     "style-src-attr 'none'",
-    `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), ...ERROR_LOG_CONNECTIONS, ...SOUND_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" ")}`,
+    `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), ...ERROR_LOG_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" ")}`,
     "img-src 'self'",
     "font-src 'self'",
     `manifest-src ${MANIFEST_SOURCES.join(" ")}`,

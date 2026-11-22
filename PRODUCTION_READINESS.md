@@ -8,6 +8,14 @@ Reviewed: **24 October 2026**. Scope: this web checkout, the shared backend sour
 
 No deployment, remote SQL changes, real email delivery, account creation/deletion, production planner mutations or paid AI requests were performed during this review. Existing work-in-progress UI changes were preserved.
 
+## Task list and guests follow-up (22 November 2026, local only)
+
+The website became one plain list with no sign-up. The day planner's screens, outbox, timer, AI check-ins and suggestions, streaks and onboarding, and then the sign-in pages, were removed from the client; the old backend stays deployed but is no longer called, so no task data is sent to OpenAI any more. Every browser starts as a guest: after its first task (which records acceptance of the terms), Supabase's anonymous sign-in gives it a guest id and the list syncs under it. The list lives on the device first, so backend failures are never shown. New backend surface: `planner_list` (security definer, `authenticated` only, guests included, no direct table grants on `planner_list_tasks`), `planner_claim_reminders` narrowed to come-back emails. Accounts from before guests keep working where they are signed in; Delete everything erases a list (and marks such an account for removal).
+
+The closed-beta "invite-only" gates below no longer fit: guests are public sign-ups. Abuse control is Supabase's per-IP limit on anonymous sign-ins (30 an hour by default) and the 1,000-task limit per list; CAPTCHA is not implemented.
+
+Before inviting testers: enable **anonymous sign-ins** (keep sign-ups on); apply `20261124000100_task_list.sql` and `20261124000200_comeback_reminders_only.sql`; deploy the website; run `supabase/security-audit.sql` and `npm run check:production`; schedule the clean-up of guest ids unused for 12 months that `PRIVACY.md` promises; and check a first task reaching the hosted list and Delete everything against the hosted project. `PRIVACY.md` moved to `privacy-web-v24`, so every browser accepts it once more (by adding a task).
+
 ## SolidJS refactor follow-up (local only)
 
 The imperative planner UI has been replaced with Solid components and lifecycle-managed reactive controllers. TypeScript, the shared RPC/storage protocol, account isolation and CSP/SRI enforcement are retained. The unused Clerk transport and its bridge were later removed; authentication is Supabase only.

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildSync } from "esbuild";
 import { loadEnv } from "vite";
-import { PublicConfig } from "../src/planner/config.ts";
+import { PublicConfig } from "../src/cloud/config.ts";
 
 /** Package the /api/error-log Edge Function into Vercel Build Output. */
 export function buildFunctions(destination = ".vercel/output", mode = "production"): void {

@@ -2,8 +2,9 @@ import {
   ESTIMATE,
   PLANNER_LIMITS,
   WEEKLY_AI_VERSION,
-} from "../../src/planner/constants.ts";
-import type { TaskStatus, WeeklyReview } from "../../src/planner/types.ts";
+  type TaskStatus,
+  type WeeklyReview,
+} from "../planner-contract.ts";
 import { HTTP_STATUS } from "../../src/shared/api-routes.ts";
 import { TIME } from "../../src/shared/time-constants.ts";
 import { ApiError } from "../http.ts";

@@ -1,6 +1,10 @@
-import { ESTIMATE, PLANNER_LIMITS } from "../../src/planner/constants.ts";
-import { Estimate } from "../../src/planner/estimate.ts";
-import type { TaskStatus, TaskSuggestion } from "../../src/planner/types.ts";
+import {
+  ESTIMATE,
+  Estimate,
+  PLANNER_LIMITS,
+  type TaskStatus,
+  type TaskSuggestion,
+} from "../planner-contract.ts";
 import { HTTP_STATUS } from "../../src/shared/api-routes.ts";
 import { OPENAI, SUGGESTION_AI } from "../constants.ts";
 import { ApiError } from "../http.ts";

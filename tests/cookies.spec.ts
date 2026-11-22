@@ -17,22 +17,24 @@ test("optional recorder waits for consent, remembers it and stops after withdraw
       await route.fulfill({ response: await request.get(`http://127.0.0.1:4173${url.pathname}`) });
     }
   });
-  await page.goto(`${origin}/login`);
+  await page.goto(`${origin}/`);
   const banner = page.getByRole("region", { name: "Cookie preferences" });
   await expect(banner).toBeVisible();
   expect(recorderRequests).toEqual([]);
-  // The login page keeps Cookie settings reachable for signed-out visitors.
-  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  // The list opens at once; Cookie settings stays in the menu.
+  await expect(page.getByRole("textbox", { name: "New task", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await page.reload();
   await expect(banner).toHaveCount(0);
   expect(recorderRequests).toEqual([]);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Cookie settings", exact: true }).click();
   await page.getByRole("button", { name: "Accept optional", exact: true }).click();
   await expect.poll(() => recorderRequests.length).toBeGreaterThan(0);
   const afterAccept = recorderRequests.length;
   await page.reload();
   await expect.poll(() => recorderRequests.length).toBeGreaterThan(afterAccept);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Cookie settings", exact: true }).click();
   await page.getByRole("button", { name: "Reject optional", exact: true }).click();
   await expect(banner).toHaveCount(0);

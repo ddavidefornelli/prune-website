@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { boundedFetch } from "../src/planner/api-fetch.ts";
+import { boundedFetch } from "../src/cloud/api-fetch.ts";
 
 const apiFetch = (input, init, timeoutMs) =>
   boundedFetch.request(input, init, timeoutMs);

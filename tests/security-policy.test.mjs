@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ANALYTICS_SCRIPTS, ANALYTICS_CONNECTIONS, ERROR_LOG_CONNECTIONS, SOUND_CONNECTIONS, POSTHOG_SCRIPTS, POSTHOG_CONNECTIONS, API_PATHS, hardenHtml, integrity, securityHeaders } from "../scripts/security-policy.ts";
+import { ANALYTICS_SCRIPTS, ANALYTICS_CONNECTIONS, ERROR_LOG_CONNECTIONS, POSTHOG_SCRIPTS, POSTHOG_CONNECTIONS, API_PATHS, hardenHtml, integrity, securityHeaders } from "../scripts/security-policy.ts";
 import { productionCsp } from "../scripts/csp-plugin.ts";
 import { buildVercel } from "../scripts/build-vercel.ts";
 
@@ -26,12 +26,12 @@ test("CSP and SRI use hashes of exact emitted bytes, with explicit managed analy
   assert.ok(built.html.includes(`<script integrity="${expected}"`));
   assert.ok(built.html.includes(`<link integrity="${integrity(css)}"`));
   assert.ok(built.html.indexOf("http-equiv=") < built.html.indexOf("<script"));
-  assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ERROR_LOG_CONNECTIONS, ...SOUND_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" "));
+  assert.equal(csp["connect-src"], [...API_PATHS.map((path) => `${origin}${path}`), ...ERROR_LOG_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" "));
   // Optional analytics reaches PostHog's EU hosts only, by exact origin.
   assert.ok([...POSTHOG_SCRIPTS, ...POSTHOG_CONNECTIONS].every((source) => /^https:\/\/eu(?:-assets)?\.i\.posthog\.com$/.test(source)));
   assert.ok(!csp["connect-src"].split(" ").includes("'self'"));
-  // Focus sounds may only come from their own folder on the site.
-  assert.deepEqual(SOUND_CONNECTIONS, ["https://www.prune.win/sounds/", "https://prune.win/sounds/"]);
+  // Nothing else on the site itself is reachable by fetch: no /sounds/, no 'self'.
+  assert.ok(!csp["connect-src"].includes("/sounds/"));
   assert.equal(csp["img-src"], "'self'");
   for (const sources of Object.values(csp)) {
     for (const source of sources.split(" ")) assert.ok(!source.includes("*"), `wildcard source: ${source}`);

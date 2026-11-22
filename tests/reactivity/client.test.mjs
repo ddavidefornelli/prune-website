@@ -1,130 +1,84 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PlanningClient } from "../../src/planner/api.ts";
-import { PlannerSnapshot } from "../../src/planner/planner-snapshot.ts";
-
-const applyCommand = (data, command, result) =>
-  PlannerSnapshot.own(data).apply(command, result);
-import { dashboard, persistence } from "../helpers/queue.mjs";
+import { AccountClient } from "../../src/cloud/account.ts";
+import { PRIVACY_ACKNOWLEDGEMENT_KEY, PrivacyNotice } from "../../src/cloud/privacy-state.ts";
 import { environment } from "../helpers/reactivity.mjs";
 
-const account = {
-  configured: true,
-  email: "fixture@example.test",
-  accountKey: "fixture:account",
-};
-function fixture(t, overrides = {}) {
-  let client;
-  t.after(() => client?.dispose());
+const guest = { accountKey: "project:guest", email: null, guest: true };
+const account = { accountKey: "project:alice", email: "alice@example.test", guest: false };
+
+/** `session`: the browser already has a saved session (else a guest is made only on request). */
+function fixture(t, { identity = guest, session = true, execute, accepted = true } = {}) {
   const env = environment(t);
-  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
-  const { lock } = persistence();
-  Object.defineProperty(globalThis, "navigator", {
-    configurable: true,
-    value: {
-      locks: { request: lock },
-    },
-  });
-  t.after(() => {
-    if (original) Object.defineProperty(globalThis, "navigator", original);
-    else delete globalThis.navigator;
-  });
-  const data = dashboard();
+  if (accepted) new PrivacyNotice(env.storage).acknowledge();
   const calls = [];
   const cloud = {
     onAccountChange() {},
     async dispose() {},
     async execute(command, args) {
       calls.push({ command, args });
-      if (overrides.execute) return overrides.execute(command, args);
-      if (command === "auth_status") return account;
-      if (command === "sign_out") return null;
-      switch (args.action) {
-        case "account_status":
-          return { isDeleted: false };
-        case "dashboard":
-          return structuredClone(data);
-        case "queue_protocol":
-          return { version: overrides.protocol ?? 1 };
-        case "delete_account":
-          return { isDeleted: true };
-        default:
-          return applyCommand(data, {
-            action: args.action,
-            timezone: args.timezone,
-            args: args.args,
-            requestId: args.args._requestId,
-            at: args.args._at,
-            revision: args.args._revision,
-          });
-      }
+      const answer = execute?.(command, args);
+      if (answer !== undefined) return answer;
+      if (command === "identity") return session || args.create ? identity : null;
+      if (command === "planner_list") return { tasks: [], rejected: [] };
+      if (args?.action === "delete_account") return { isDeleted: true };
+      return null;
     },
   };
-  client = new PlanningClient({ cloud });
-  return { ...env, client, cloud, calls, data };
+  const client = new AccountClient({ cloud, storage: env.storage });
+  t.after(() => client.dispose());
+  return { client, calls, env };
 }
 
-test("account sync checks its protocol before sending writes and retries without discarding", async (t) => {
-  const options = { protocol: 0 };
-  const f = fixture(t, options);
-  await f.client.authStatus();
-  const data = await f.client.dashboard();
-  await f.client.create("Keep this change", data.today, 15);
-  await f.client.sync();
-  assert.equal(f.client.pendingCount, 1);
-  assert.equal(f.client.syncBlocked, false);
-  assert.equal(
-    f.calls.filter(({ args }) => args?.action === "create_task").length,
-    0,
-  );
-  options.protocol = 1;
-  await f.client.sync();
-  assert.equal(f.client.pendingCount, 0);
-  assert.equal(f.data.todayTasks[0].outcome, "Keep this change");
-  const write = f.calls.find(({ args }) => args?.action === "create_task");
-  assert.equal(write.args.args._accountKey, account.accountKey);
-  assert.equal(write.args.args._requestId, f.data.todayTasks[0].id);
+test("nothing reaches the cloud before the terms are accepted", async (t) => {
+  const f = fixture(t, { accepted: false });
+  assert.equal(f.client.accepted, false);
+  await assert.rejects(f.client.ensureAccount(), (error) => error.code === "privacy");
+  assert.deepEqual(f.calls, []);
+  assert.equal(f.client.accept(), true);
+  assert.equal(f.client.accepted, true);
+  assert.ok(f.env.storage.getItem(PRIVACY_ACKNOWLEDGEMENT_KEY));
 });
 
-test("confirmed deletion never resumes the outbox when local sign-out fails", async (t) => {
+test("a guest is made only when there is something to keep, then remembered", async (t) => {
+  const f = fixture(t, { session: false });
+  assert.equal(await f.client.ensureAccount(false), null);
+  assert.deepEqual(await f.client.ensureAccount(true), guest);
+  assert.deepEqual(await f.client.ensureAccount(true), guest);
+  assert.deepEqual(f.calls.map(({ command, args }) => [command, args.create]), [["identity", false], ["identity", true]]);
+  assert.equal(f.client.current, guest);
+});
+
+test("list syncs name the account they expect, with the browser's time zone", async (t) => {
   const f = fixture(t);
-  await f.client.authStatus();
-  await f.client.dashboard();
-  const execute = f.cloud.execute.bind(f.cloud);
-  f.cloud.execute = async (command, args) => {
-    if (command === "sign_out") throw new Error("Storage unavailable");
-    return execute(command, args);
-  };
-  await assert.rejects(f.client.deleteAccount(), /Storage unavailable/);
-  const reads = f.calls.length;
-  await f.client.sync();
-  assert.equal(f.calls.length, reads);
+  await f.client.ensureAccount();
+  await f.client.syncList({ save: [], remove: ["x"] });
+  const sync = f.calls.find(({ command, args }) => command === "planner_list" && args.action === "sync");
+  assert.deepEqual(sync.args.args, { save: [], remove: ["x"], _accountKey: guest.accountKey });
+  assert.equal(sync.args.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
 });
 
-test("a failed deletion resumes syncing, rather than silently disabling account saves", async (t) => {
-  const f = fixture(t);
-  await f.client.authStatus();
-  await f.client.dashboard();
-  const execute = f.cloud.execute.bind(f.cloud);
-  f.cloud.execute = async (command, args) => {
-    if (args?.action === "delete_account") throw new Error("Offline");
-    return execute(command, args);
-  };
-  await assert.rejects(f.client.deleteAccount(), /Offline/);
-  await f.client.create("Still usable", f.data.today, 15);
-  await f.client.sync();
-  // A resume-triggered dashboard read may already be finishing when we enqueue.
-  await f.client.sync();
-  assert.equal(f.client.pendingCount, 0);
-  assert.equal(f.data.todayTasks[0].outcome, "Still usable");
+test("erasing a guest erases its list and forgets the session; an older account is also marked for removal", async (t) => {
+  const g = fixture(t);
+  await g.client.eraseEverything();
+  assert.deepEqual(g.calls.map(({ command, args }) => [command, args?.action ?? null]), [["identity", null], ["planner_list", "erase"], ["sign_out", null]]);
+  assert.equal(g.client.current, null);
+  const a = fixture(t, { identity: account });
+  await a.client.eraseEverything();
+  assert.deepEqual(a.calls.map(({ command, args }) => [command, args?.action ?? null]), [["identity", null], ["planner_list", "erase"], ["planner_call", "delete_account"], ["sign_out", null]]);
 });
 
-test("Google sign-in goes through the transport", async (t) => {
-  const f = fixture(t, { execute: () => null });
-  await f.client.signInWithGoogle();
-  assert.deepEqual(
-    f.calls.map(({ command }) => command),
-    ["sign_in_with_google"],
-  );
+test("erasing never makes a guest just to erase it, and does nothing before acceptance", async (t) => {
+  const noSession = fixture(t, { execute: (command) => (command === "identity" ? null : undefined) });
+  await noSession.client.eraseEverything();
+  assert.deepEqual(noSession.calls.map(({ command, args }) => [command, args.create]), [["identity", false]]);
+  const notAccepted = fixture(t, { accepted: false });
+  await notAccepted.client.eraseEverything();
+  assert.deepEqual(notAccepted.calls, []);
 });
 
+test("an unconfirmed deletion of an older account fails before forgetting the session", async (t) => {
+  const f = fixture(t, { identity: account, execute: (_command, args) => (args?.action === "delete_account" ? { isDeleted: false } : undefined) });
+  await assert.rejects(f.client.eraseEverything(), /not confirmed/);
+  assert.equal(f.calls.some(({ command }) => command === "sign_out"), false);
+});

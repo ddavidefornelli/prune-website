@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import viteConfig from "../vite.config.ts";
-import { PRIVACY_POLICY_VERSION } from "../src/planner/privacy-state.ts";
+import { PRIVACY_POLICY_VERSION } from "../src/cloud/privacy-state.ts";
 
 const deployment = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
 test("Vercel uses generated build output, not a static wildcard CSP", () => {
@@ -52,18 +52,18 @@ test("production installs the final-artifact CSP plugin", () => {
   assert.equal(typeof plugin.configurePreviewServer, "function");
 });
 
-test("the displayed privacy version matches its gate and describes both sign-in methods", () => {
+test("the displayed privacy version matches its gate and describes guests, without any sign-in", () => {
   const policy = readFileSync(new URL("../PRIVACY.md", import.meta.url), "utf8");
   assert.ok(policy.includes(`Version: ${PRIVACY_POLICY_VERSION}`));
-  assert.ok(policy.includes("Supabase handles sign-in with an emailed code and with Google"));
-  assert.ok(!policy.includes("Google is the only way to sign in"));
-  assert.ok(!policy.includes("magic-link"));
-  assert.ok(!policy.includes("Supabase handles email-and-password"));
-  assert.ok(!/guest|start-up questions|prune:survey/i.test(policy));
+  assert.ok(policy.includes("There is no sign-up. By adding a task, you accept these terms"));
+  assert.ok(policy.includes("Supabase Auth creates a guest (an anonymous user) for this browser"));
+  assert.ok(policy.includes("before your first task, prune sends nothing anywhere"));
+  assert.ok(!/Continue with Google|Email me a code|magic-link|email-and-password/.test(policy));
+  assert.ok(!/start-up questions|prune:survey|prune:tasks:v1/i.test(policy));
 });
 
 test("public support surfaces do not publish a personal email or email contact link", () => {
-  for (const path of ["../src/reviews/WeeklyReview.tsx", "../src/App.tsx", "../PRIVACY.md"]) {
+  for (const path of ["../src/tasks/components/MenuSheet.tsx", "../src/App.tsx", "../PRIVACY.md"]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.doesNotMatch(source, /mailto:|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i, path);
   }

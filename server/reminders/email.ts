@@ -1,4 +1,4 @@
-import { START_LINK } from "../../src/planner/constants.ts";
+import { START_LINK } from "../planner-contract.ts";
 import { REMINDERS } from "../constants.ts";
 import type { PushPayload } from "./web-push.ts";
 
