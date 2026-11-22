@@ -1,14 +1,16 @@
 // Supabase Edge Function (Deno). "Do it for me": sorts tasks, asks
-// this-or-that questions and writes answers with Claude in the background
+// this-or-that questions and writes answers with a language model in the background
 // (see server/helper/endpoint.ts). Deploy with JWT verification off: it
 // checks each caller's access token itself, and browsers' CORS preflights
 // carry no token.
-// Secrets: ANTHROPIC_API_KEY; optional ALLOWED_ORIGINS (default
+// Secrets: HELPER_API_KEY (an OpenRouter key by default); optional
+// HELPER_API_URL and HELPER_MODEL (any OpenAI-compatible chat completions
+// host and model; default OpenRouter and DeepSeek V4.1 Flash); optional ALLOWED_ORIGINS (default
 // https://www.prune.win) and EXTRA_ALLOWED_ORIGINS, the website origins that
 // may call it. SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY come from the platform.
-import Anthropic from "npm:@anthropic-ai/sdk@1.12.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { HelperEndpoint, type StoredRun } from "../../../server/helper/endpoint.ts";
+import { HELPER } from "../../../server/constants.ts";
 import { HelperModel } from "../../../server/helper/model.ts";
 import { AllowedOrigins } from "../../../server/reminders/handler.ts";
 
@@ -23,6 +25,7 @@ const db = createClient(env("SUPABASE_URL")!, env("SUPABASE_SERVICE_ROLE_KEY")!,
   auth: { persistSession: false, autoRefreshToken: false },
 });
 const RUNS = "planner_helper_runs";
+const modelUrl = env("HELPER_API_URL") || HELPER.defaultUrl;
 
 interface RunRow {
   task_id: string;
@@ -58,7 +61,12 @@ const fromRow = (row: RunRow): StoredRun => ({
 
 const endpoint = new HelperEndpoint({
   allowedOrigins: AllowedOrigins.fromEnvironment(env("ALLOWED_ORIGINS"), env("EXTRA_ALLOWED_ORIGINS")),
-  brain: new HelperModel(new Anthropic({ apiKey: env("ANTHROPIC_API_KEY") })),
+  brain: new HelperModel({
+    url: modelUrl,
+    apiKey: env("HELPER_API_KEY") ?? "",
+    model: env("HELPER_MODEL") || HELPER.defaultModel,
+    extra: new URL(modelUrl).hostname === "openrouter.ai" ? { provider: HELPER.openRouterProvider } : undefined,
+  }),
   background: (work) => EdgeRuntime.waitUntil(work),
   async authenticate(token) {
     const { data, error } = await db.auth.getUser(token);

@@ -3,7 +3,7 @@
 --
 -- The task helper (2026-11-22): for tasks it can do (write, list, plan,
 -- research), the person taps "Do it for me", picks a few this-or-that
--- options, and Claude writes the result in the background. The task-helper
+-- options, and a language model writes the result in the background. The task-helper
 -- Edge Function (service role) is the only reader and writer: the browser
 -- never reaches these tables.
 --

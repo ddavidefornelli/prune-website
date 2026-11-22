@@ -48,7 +48,7 @@ export interface HelperStore {
   erase(userId: string): Promise<void>;
 }
 
-/** The model calls, behind an interface so tests can stand in for Claude. */
+/** The model calls, behind an interface so tests can stand in for the model. */
 export interface HelperBrain {
   classify(
     tasks: { id: string; title: string }[],

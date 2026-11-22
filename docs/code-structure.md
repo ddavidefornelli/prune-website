@@ -6,7 +6,7 @@
 - **Services and reactive state are classes.** `AccountClient`, `BrowserCloud`, `SupabaseAuth`, `BoundedFetch`, `ListSync`, `Analytics`, `ErrorReporter`. `ListState` holds Solid signals: create it inside a Solid owner (a component), and its timers and listeners end with it. Accessors are fields, so they can be passed around unbound; actions are methods.
 - **Components stay functions.** Solid has no class components; they render, collect input and call the classes above.
 - **No hardcoded values.** Limits, timings, storage keys, routes and HTTP statuses live in constants: `src/shared/` (`time-constants.ts`, `storage-keys.ts` — persisted names, never renamed — `api-routes.ts`, `site.ts`), `src/cloud/messages.ts`, `src/tasks/constants.ts` (mirrors `planner_list`'s limits), `server/constants.ts`. Copy written once inside a component stays in the JSX.
-- **Small and fast.** No runtime dependency beyond Solid and Vercel Analytics (`@anthropic-ai/sdk` is a dev dependency, for the Edge Function's types); Auth is plain HTTP; PostHog loads from its CDN only after consent. One self-contained entry script.
+- **Small and fast.** No runtime dependency beyond Solid and Vercel Analytics; Auth is plain HTTP; PostHog loads from its CDN only after consent. One self-contained entry script.
 - **Code Node runs directly stays erasable.** Tests and scripts run TypeScript through Node's type stripping, so `tsconfig.json` sets `erasableSyntaxOnly`: no constructor parameter properties, enums or namespaces.
 
 ## Layout
@@ -40,7 +40,7 @@ src/
   styles/                   base.css (tokens, light and dark), app.css, preferences.css
 server/                     Code the Edge Functions and the error relay run (Deno and Vercel Edge)
   reminders/                Come-back email, Brevo, Web Push, the reminder job and unsubscribe
-  helper/                   "Do it for me": HelperEndpoint (the task-helper function) and HelperModel (Claude)
+  helper/                   "Do it for me": HelperEndpoint (the task-helper function) and HelperModel (the model calls)
   error-log.ts, error-log-entry.ts, constants.ts
 supabase/                   Migrations, Edge Function entries, config, read-only security audit
 scripts/                    Build, CSP, Vercel packaging, hosted checks, icons, test email

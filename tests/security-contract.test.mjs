@@ -56,7 +56,8 @@ test("the displayed privacy version matches its gate and describes guests, Do it
   const policy = readFileSync(new URL("../PRIVACY.md", import.meta.url), "utf8");
   assert.ok(policy.includes(`Version: ${PRIVACY_POLICY_VERSION}`));
   assert.ok(policy.includes("There is no sign-up for the list. By adding a task, you accept these terms"));
-  assert.ok(policy.includes("Anthropic (Anthropic PBC, United States)"));
+  assert.ok(policy.includes("OpenRouter (OpenRouter, Inc., United States)"));
+  assert.ok(!/Anthropic|Claude/.test(policy));
   assert.ok(policy.includes("after a guest's three free answers, you can sign in with Google or with a six-digit code"));
   assert.ok(!/prune does not use AI/.test(policy));
   assert.ok(policy.includes("Supabase Auth creates a guest (an anonymous user) for this browser"));
