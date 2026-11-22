@@ -1,14 +1,28 @@
-import { createMemo, createSignal, onCleanup, Show } from "solid-js";
+import {
+  createMemo,
+  createSignal,
+  Match,
+  onCleanup,
+  Show,
+  Switch,
+} from "solid-js";
 import { LIST_TIMING, TASK_LIMITS } from "../constants";
+import type { HelperState } from "../helper-state";
 import type { ListState } from "../list-state";
 import type { Task } from "../types";
+import { preview } from "./AnswerText";
 
 /**
  * One task: tick the circle, tap the words to change them, × to delete.
  * Emptying the words deletes it too; Undo brings it back either way. Rows are
  * keyed by id, so a sync or a rename never rebuilds the row being edited.
  */
-export function TaskItem(props: { id: string; state: ListState }) {
+export function TaskItem(props: {
+  id: string;
+  state: ListState;
+  /** Absent for done tasks: the helper only works on open ones. */
+  helper?: HelperState;
+}) {
   // The last version seen: the row may outlive its task by a frame when deleted.
   const task = createMemo<Task | undefined>(
     (last) => props.state.task(props.id) ?? last,
@@ -18,6 +32,8 @@ export function TaskItem(props: { id: string; state: ListState }) {
   let title: HTMLButtonElement | undefined;
   let leaving: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => clearTimeout(leaving));
+  const run = () => props.helper?.run(props.id);
+  const working = () => run()?.status === "working";
 
   const fit = () => {
     if (!editor) return;
@@ -56,19 +72,32 @@ export function TaskItem(props: { id: string; state: ListState }) {
           class="task"
           classList={{ "is-done": current().done, "is-editing": editing() }}
         >
-          <label class="check">
-            <input
-              type="checkbox"
-              checked={current().done}
-              aria-label={current().title}
-              onChange={() => props.state.toggle(props.id)}
-            />
-            <span class="check-mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M6.5 12.5l3.5 3.5 7.5-8" />
-              </svg>
-            </span>
-          </label>
+          <Show
+            when={!working()}
+            fallback={
+              <span
+                class="check is-working"
+                role="img"
+                aria-label={`Working on ${current().title}`}
+              >
+                <span class="helper-spinner" />
+              </span>
+            }
+          >
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={current().done}
+                aria-label={current().title}
+                onChange={() => props.state.toggle(props.id)}
+              />
+              <span class="check-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M6.5 12.5l3.5 3.5 7.5-8" />
+                </svg>
+              </span>
+            </label>
+          </Show>
           <Show
             when={editing()}
             fallback={
@@ -129,6 +158,67 @@ export function TaskItem(props: { id: string; state: ListState }) {
               <path d="M7 7l10 10M17 7L7 17" />
             </svg>
           </button>
+          <Show when={editing() && props.helper?.kind(props.id) && !working()}>
+            <div class="task-extra">
+              <button
+                type="button"
+                class="do-it"
+                onClick={() => {
+                  // Saves the edit first; a tap here moved focus off the editor.
+                  finish(true, false);
+                  void props.helper?.open(props.id);
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v5M12 16v5M3 12h5M16 12h5M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5L15 9M9 15l-2.5 2.5" />
+                </svg>
+                Do it for me
+              </button>
+            </div>
+          </Show>
+          <Show when={!editing() && !current().done && run()}>
+            {(answer) => (
+              <div class="task-extra">
+                <Switch>
+                  <Match when={answer().status === "working"}>
+                    <button
+                      type="button"
+                      class="task-answer is-working"
+                      onClick={() => props.helper?.show(props.id)}
+                    >
+                      {answer().answer === null
+                        ? "Working on it…"
+                        : "Changing it…"}
+                    </button>
+                  </Match>
+                  <Match when={answer().status === "failed"}>
+                    <button
+                      type="button"
+                      class="task-answer is-failed"
+                      onClick={() => props.helper?.show(props.id)}
+                    >
+                      Didn't finish. Try again
+                    </button>
+                  </Match>
+                  <Match when={answer().answer}>
+                    {(text) => (
+                      <button
+                        type="button"
+                        class="task-answer"
+                        aria-label={`Open the answer for ${current().title}`}
+                        onClick={() => props.helper?.show(props.id)}
+                      >
+                        <span class="task-answer-text">{preview(text())}</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M9 6l6 6-6 6" />
+                        </svg>
+                      </button>
+                    )}
+                  </Match>
+                </Switch>
+              </div>
+            )}
+          </Show>
         </li>
       )}
     </Show>

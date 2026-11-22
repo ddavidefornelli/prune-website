@@ -17,6 +17,12 @@ export const MESSAGES = {
   signOutStorage: "Could not clear this browser's session.",
   sessionNotSaved: "Could not save this browser's session.",
 
+  // Signing in
+  emailInvalid: "Enter a valid email address.",
+  codeNotSent: "Couldn't send the code. Check the address and try again.",
+  codeWrong: "That code didn't work. Check it, or send a new one.",
+  googleFailed: "Couldn't sign in with Google. Try again.",
+
   // Requests
   unreachable: "Could not reach prune.",
   incompleteResponse: "The server returned an incomplete response.",
@@ -30,6 +36,9 @@ export const MESSAGES = {
     "Delete everything? All your tasks are erased, on this device and in the cloud. This can't be undone.",
   eraseFailed:
     "Couldn't delete right now. Check your connection and try again.",
+
+  // The helper
+  helperUnavailable: "The helper isn't available right now. Try again.",
 
   // Configuration
   configMissing:

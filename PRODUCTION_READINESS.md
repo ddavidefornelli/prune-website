@@ -10,7 +10,7 @@ Last reviewed: **22 November 2026**, for the list (no sign-up, guest ids). The o
 
 One plain list. Every browser starts as a guest: after its first task (which records acceptance of the terms on that browser), Supabase's anonymous sign-in gives it a guest id and the list syncs under it. The list lives on the device first, so backend failures are never shown. Accounts from before guests keep working where they are signed in. Nothing is sent to OpenAI or any AI provider.
 
-Backend surface reachable from a browser: Auth (anonymous sign-up, session check, refresh, sign-out), `planner_list` (security definer, `authenticated` only, guests included; no direct grants on `planner_list_tasks`), `planner_call` (`delete_account` only, not guests), the `email-unsubscribe` function (token only) and `/api/error-log` (three short names). Abuse control is Supabase's per-IP limit on anonymous sign-ins (30 an hour by default) and the 1,000-task limit per list; there is no CAPTCHA.
+Backend surface reachable from a browser: Auth (anonymous sign-up, session check, refresh, sign-out), `planner_list` (security definer, `authenticated` only, guests included; no direct grants on `planner_list_tasks`), `planner_call` (`delete_account` only, not guests), the `email-unsubscribe` function (token only), the `task-helper` function (the caller's own token; a guest's three answers, then 30 answers and 300 calls a day per account, counted by `planner_helper_claim`), emailed-code and Google sign-in, and `/api/error-log` (three short names). Abuse control is Supabase's per-IP limit on anonymous sign-ins (30 an hour by default) and the 1,000-task limit per list; there is no CAPTCHA.
 
 ## Local results (22 November 2026)
 

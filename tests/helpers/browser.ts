@@ -65,6 +65,14 @@ export interface Backend {
   refreshes: string[];
   /** Refresh tokens are refused, as for a revoked session. */
   refreshRevoked: boolean;
+  /** task-helper calls received, in order (the request body). */
+  helperCalls: Record<string, any>[];
+  /** Helper answers by task id; a working one is finished by the next "get". */
+  helperRuns: Map<string, Record<string, any>>;
+  /** Answers each user started. */
+  helperStarts: Record<string, number>;
+  /** Emails a sign-in code was sent to. */
+  codesSent: string[];
 }
 
 /** planner_list's merge: removals, then saves where the newest edit wins. */
@@ -95,7 +103,7 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
   /** The cloud's list when the test starts (wrapped: test.use reads a bare array as [value, options]). */
   seed: [{ tasks: [] }, { option: true }],
   backend: async ({ context, visitor, seed }, use) => {
-    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false };
+    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [] };
     const initial = visitor === "account" ? session(ACCOUNT_ID, false) : visitor === "guest" ? session(GUEST_ID, true) : null;
     // Seed once per browser context, not on reload or each new tab.
     await context.addInitScript(({ initialSession, authKey, privacyKey, version }) => {
@@ -140,6 +148,49 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
         return;
       }
       if (url.pathname === "/auth/v1/logout") { await route.fulfill({ status: 204, headers }); return; }
+      if (url.pathname === "/auth/v1/otp") { state.codesSent.push(body.email); await send({}); return; }
+      // The code 123456 signs in to the account from before guests.
+      if (url.pathname === "/auth/v1/verify") {
+        if (body.token !== "123456") { await send({ code: 403, error_code: "otp_expired", msg: "Token has expired or is invalid" }, 403); return; }
+        await send(session(ACCOUNT_ID, false));
+        return;
+      }
+      if (url.pathname === "/functions/v1/task-helper") {
+        state.helperCalls.push(body);
+        if (!caller) { await send({ code: "unauthorized", message: "Open prune again to continue." }, 401); return; }
+        if (body.action === "classify") {
+          // Errands get no help; everything else is something to write.
+          await send({ kinds: Object.fromEntries(body.tasks.map((task: { id: string; title: string }) => [task.id, /milk|gym/i.test(task.title) ? null : "draft"])) });
+          return;
+        }
+        if (body.action === "choices") { await send({ choices: [{ question: "How should it sound?", options: ["Warm", "Formal"] }] }); return; }
+        if (body.action === "start") {
+          const started = state.helperStarts[caller] ?? 0;
+          if (caller !== ACCOUNT_ID && started >= 3) { await send({ code: "sign_in", message: "Sign in to keep going." }, 402); return; }
+          state.helperStarts[caller] = started + 1;
+          const run = { taskId: body.taskId, status: "working", answer: null, sources: [], turns: [], error: null, updatedAt: Date.now(), title: body.title };
+          state.helperRuns.set(body.taskId, run);
+          await send({ run });
+          return;
+        }
+        if (body.action === "get") {
+          const found = body.taskIds.map((id: string) => state.helperRuns.get(id)).filter(Boolean);
+          for (const run of found)
+            if (run.status === "working") Object.assign(run, { status: "done", answer: run.answer ? `${run.answer}\nShorter.` : `Hi Marco,\n- Friday works\n- See https://example.com/notes`, sources: [{ title: "Notes", url: "https://example.com/notes" }], updatedAt: Date.now() });
+          await send({ runs: found });
+          return;
+        }
+        if (body.action === "refine") {
+          const run = state.helperRuns.get(body.taskId)!;
+          Object.assign(run, { status: "working", turns: [...run.turns, { role: "user", text: body.message }] });
+          await send({ run });
+          return;
+        }
+        if (body.action === "discard") state.helperRuns.delete(body.taskId);
+        if (body.action === "erase") state.helperRuns.clear();
+        await send({});
+        return;
+      }
       const args = body.p_args ?? {};
       if (url.pathname === "/rest/v1/rpc/planner_list") {
         if (caller === ACCOUNT_ID && state.isDeleted) {

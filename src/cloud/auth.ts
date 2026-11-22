@@ -43,6 +43,8 @@ const AUTH = {
   refreshMarginMs: 90 * TIME.msPerSecond,
   /** New-format keys are not JWTs: they go in the apikey header only. */
   publishableKeyPrefix: "sb_publishable_",
+  /** Random bytes in a PKCE verifier: 43 characters once encoded, the minimum. */
+  verifierBytes: 32,
 } as const;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -168,6 +170,87 @@ export class SupabaseAuth {
     return session;
   }
 
+  /** Emails a sign-in code; a new address gets an account. */
+  async sendCode(email: string): Promise<void> {
+    const response = await this.send(SUPABASE_ROUTES.otp, {
+      method: "POST",
+      body: { email, create_user: true },
+      context: "email_code",
+    });
+    if (response.status === HTTP_STATUS.tooManyRequests)
+      throw new CloudError("rate_limited", MESSAGES.rateLimited);
+    if (!response.ok) throw new CloudError("auth", MESSAGES.codeNotSent);
+  }
+
+  /** Signs in with an emailed code, saving the session; false when the code is wrong or expired. */
+  async verifyCode(email: string, code: string): Promise<boolean> {
+    const response = await this.send(SUPABASE_ROUTES.verify, {
+      method: "POST",
+      body: { type: "email", email, token: code },
+      context: "email_code",
+    });
+    if (
+      response.status >= HTTP_STATUS.badRequest &&
+      response.status < HTTP_STATUS.serverError &&
+      response.status !== HTTP_STATUS.tooManyRequests
+    )
+      return false;
+    if (!response.ok) throw SupabaseAuth.failure(response.status);
+    const session = SupabaseAuth.parse(await SupabaseAuth.json(response));
+    if (!session) throw new CloudError("server", MESSAGES.incompleteResponse);
+    this.save(session);
+    return true;
+  }
+
+  /**
+   * Where Google sign-in starts. Its PKCE verifier waits in this browser for
+   * the page Google sends the person back to (see `exchange`).
+   */
+  async googleUrl(redirectTo: string): Promise<string> {
+    const bytes = crypto.getRandomValues(new Uint8Array(AUTH.verifierBytes));
+    const verifier = SupabaseAuth.base64Url(bytes);
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(verifier),
+    );
+    try {
+      this.storage.setItem(this.verifierKey, verifier);
+    } catch {
+      throw new CloudError("storage", MESSAGES.sessionNotSaved);
+    }
+    const query = new URLSearchParams({
+      provider: "google",
+      redirect_to: redirectTo,
+      code_challenge: SupabaseAuth.base64Url(new Uint8Array(digest)),
+      code_challenge_method: "s256",
+    });
+    return `${this.config.url}${SUPABASE_ROUTES.authorize}?${query}`;
+  }
+
+  /** True when this browser started a Google sign-in that has not come back yet. */
+  get awaitingGoogle(): boolean {
+    return this.storage.getItem(this.verifierKey) !== null;
+  }
+
+  /** Finishes Google sign-in with the code it sent back, saving the session. */
+  async exchange(code: string): Promise<void> {
+    const verifier = this.storage.getItem(this.verifierKey);
+    this.storage.removeItem(this.verifierKey);
+    if (!verifier) throw new CloudError("auth", MESSAGES.googleFailed);
+    const response = await this.send(
+      `${SUPABASE_ROUTES.token}?grant_type=pkce`,
+      {
+        method: "POST",
+        body: { auth_code: code, code_verifier: verifier },
+        context: "google",
+      },
+    );
+    if (!response.ok) throw new CloudError("auth", MESSAGES.googleFailed);
+    const session = SupabaseAuth.parse(await SupabaseAuth.json(response));
+    if (!session) throw new CloudError("auth", MESSAGES.googleFailed);
+    this.save(session);
+  }
+
   /** Forgets this browser's session, telling the server when it can. */
   async signOut(): Promise<void> {
     const saved = this.saved();
@@ -184,8 +267,21 @@ export class SupabaseAuth {
   /** Removes the saved session from this browser only. */
   forget(): void {
     this.storage.removeItem(this.storageKey);
-    // supabase-js kept Google sign-in's PKCE verifier beside the session.
-    this.storage.removeItem(`${this.storageKey}-code-verifier`);
+    // Google sign-in's PKCE verifier waits beside the session, as in supabase-js.
+    this.storage.removeItem(this.verifierKey);
+  }
+
+  private get verifierKey(): string {
+    return `${this.storageKey}-code-verifier`;
+  }
+
+  private static base64Url(bytes: Uint8Array): string {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
   }
 
   private static expiring(session: Session): boolean {

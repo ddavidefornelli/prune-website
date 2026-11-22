@@ -1,4 +1,5 @@
-import { SUPABASE_ROUTES } from "../shared/api-routes.ts";
+import { HTTP_STATUS, SUPABASE_ROUTES } from "../shared/api-routes.ts";
+import type { HelperRequest } from "../shared/helper-contract.ts";
 import { boundedFetch } from "./api-fetch.ts";
 import { SupabaseAuth, type Session } from "./auth.ts";
 import { CloudError } from "./cloud-error.ts";
@@ -71,54 +72,103 @@ export class BrowserCloud implements CloudTransport {
   }
 
   async call<T>(rpc: Rpc, accountKey: string, request: RpcRequest): Promise<T> {
+    return this.post<T>(
+      RPC_ROUTES[rpc],
+      accountKey,
+      {
+        p_action: request.action,
+        p_args: request.args,
+        p_timezone: request.timezone,
+      },
+      CloudError.fromResponse,
+    );
+  }
+
+  async helper<T>(accountKey: string, request: HelperRequest): Promise<T> {
+    return this.post<T>(
+      SUPABASE_ROUTES.helper,
+      accountKey,
+      request,
+      (status, value) => {
+        const body = (value ?? {}) as { code?: unknown; message?: unknown };
+        if (status === HTTP_STATUS.unauthorized)
+          return new CloudError("unauthorized", MESSAGES.sessionExpired);
+        return typeof body.code === "string" && typeof body.message === "string"
+          ? new CloudError(body.code, body.message)
+          : new CloudError("server", MESSAGES.helperUnavailable);
+      },
+    );
+  }
+
+  async sendCode(email: string): Promise<void> {
+    await this.client().sendCode(email);
+  }
+
+  async verifyCode(email: string, code: string): Promise<boolean> {
+    return this.client().verifyCode(email, code);
+  }
+
+  async startGoogle(redirectTo: string): Promise<string> {
+    return this.client().googleUrl(redirectTo);
+  }
+
+  async finishGoogle(code: string): Promise<boolean> {
+    const auth = this.client();
+    if (!auth.awaitingGoogle) return false;
+    await auth.exchange(code);
+    return true;
+  }
+
+  /** Posts as `accountKey`, once more with a fresh token if the first is refused. */
+  private async post<T>(
+    route: string,
+    accountKey: string,
+    payload: unknown,
+    failure: (status: number, value: unknown) => CloudError,
+  ): Promise<T> {
     const session = await this.client().session();
     try {
-      return await this.send<T>(rpc, accountKey, request, session);
+      return await this.send<T>(route, accountKey, payload, session, failure);
     } catch (error) {
       if (CloudError.codeOf(error) !== "unauthorized" || !session) throw error;
       // The token was refused: once, with a fresh one, before giving up.
       return this.send<T>(
-        rpc,
+        route,
         accountKey,
-        request,
+        payload,
         await this.client().renew(session),
+        failure,
       );
     }
   }
 
   private async send<T>(
-    rpc: Rpc,
+    route: string,
     accountKey: string,
-    request: RpcRequest,
+    payload: unknown,
     session: Session | null,
+    failure: (status: number, value: unknown) => CloudError,
   ): Promise<T> {
     // Identity and bearer token are read together: a request can never carry
     // one account's changes under another account's token.
     if (!session) throw new CloudError("unauthorized", MESSAGES.sessionExpired);
     if (this.key(session.user.id) !== accountKey)
       throw new CloudError("account_changed", MESSAGES.accountChanged);
-    const body = JSON.stringify({
-      p_action: request.action,
-      p_args: request.args,
-      p_timezone: request.timezone,
-    });
+    const body = JSON.stringify(payload);
     let response: Response;
     try {
-      response = await boundedFetch.request(
-        `${this.config!.url}${RPC_ROUTES[rpc]}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: this.config!.publicKey,
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body,
-          // Finishes even when the page is closed mid-request (browsers cap
-          // such bodies at 64 KB; a larger one goes as a plain request).
-          keepalive: new TextEncoder().encode(body).length < KEEPALIVE_BYTES,
+      response = await boundedFetch.request(`${this.config!.url}${route}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: this.config!.publicKey,
+          Authorization: `Bearer ${session.access_token}`,
         },
-      );
+        body,
+        // Finishes even when the page is closed mid-request (browsers cap
+        // such bodies at 64 KB; a larger one goes as a plain request).
+        keepalive: new TextEncoder().encode(body).length < KEEPALIVE_BYTES,
+      });
     } catch (error) {
       if (error instanceof CloudError) throw error;
       throw new CloudError("network", MESSAGES.unreachable);
@@ -130,7 +180,7 @@ export class BrowserCloud implements CloudTransport {
       if (response.ok)
         throw new CloudError("server", MESSAGES.incompleteResponse);
     }
-    if (!response.ok) throw CloudError.fromResponse(response.status, value);
+    if (!response.ok) throw failure(response.status, value);
     return value as T;
   }
 

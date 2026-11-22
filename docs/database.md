@@ -10,6 +10,8 @@ The hosted Supabase project, after `20261125000100_retire_day_planner.sql`. The 
 | `planner_list_tasks` | The list: one row per task (title, done, created, last edited, finished), at most 1,000 per account. | Only `planner_list` (no browser grants). |
 | `planner_email_reminders` | Come-back emails for accounts from before guests: time zone, last visit, the switch, send count, unsubscribe token, and the focus time and weekdays-only choice that set the morning window. | The reminder functions (service role); `planner_list` records visits. |
 | `planner_push_subscriptions` | Browsers that turned notifications on in the day planner. | The reminder functions (service role). |
+| `planner_helper_runs` | "Do it for me": one answer per task (the question it was asked with, the latest answer, its sources and the refine conversation). Deleting the task deletes it (trigger). | The `task-helper` Edge Function (service role). |
+| `planner_helper_usage` | Answers a guest started, and each account's answers and calls today, for the limits. | `planner_helper_claim` (service role). |
 | `error_log` | Connection error reports from `/api/error-log`, 90 days. | `log_client_error` (anon); service role. |
 
 Every row goes with its Auth user (`on delete cascade`).
@@ -22,6 +24,7 @@ Every row goes with its Auth user (`on delete cascade`).
 | `planner_call(action, args, timezone)` | The browser (`authenticated`, not guests): only `'delete_account'`. |
 | `planner_claim_reminders`, `planner_release_reminder`, `planner_push_targets`, `planner_push_result` | The `daily-reminders` Edge Function. |
 | `planner_unsubscribe` | The `email-unsubscribe` Edge Function. |
+| `planner_helper_claim(user, guest, kind)` | The `task-helper` Edge Function: counts one use or says which limit stops it. |
 | `log_client_error` | The `/api/error-log` relay (anon). |
 
 ## Retired with the day planner

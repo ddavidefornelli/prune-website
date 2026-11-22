@@ -1,3 +1,4 @@
+import type { HelperRequest } from "../shared/helper-contract.ts";
 import { BrowserCloud } from "./browser.ts";
 import { CloudError } from "./cloud-error.ts";
 import { MESSAGES } from "./messages.ts";
@@ -83,8 +84,39 @@ export class AccountClient {
     return this.call("planner_list", "sync", { ...changes });
   }
 
+  /** Calls the task helper as this browser's account (a guest is made if needed). */
+  async helper<T>(request: HelperRequest): Promise<T> {
+    const account = await this.ensureAccount(true);
+    this.assertOpen();
+    return this.cloud.helper<T>(account!.accountKey, request);
+  }
+
+  /** Emails a sign-in code. */
+  sendCode(email: string): Promise<void> {
+    this.requireAccepted();
+    return this.cloud.sendCode(email);
+  }
+
+  /** Signs this browser in with an emailed code; false when the code is wrong. */
+  verifyCode(email: string, code: string): Promise<boolean> {
+    this.requireAccepted();
+    return this.cloud.verifyCode(email, code);
+  }
+
+  /** Where to send the browser to sign in with Google; it comes back to `redirectTo`. */
+  startGoogle(redirectTo: string): Promise<string> {
+    this.requireAccepted();
+    return this.cloud.startGoogle(redirectTo);
+  }
+
+  /** Finishes a Google sign-in this browser started; false when there was none. */
+  finishGoogle(code: string): Promise<boolean> {
+    if (!this.accepted) return Promise.resolve(false);
+    return this.cloud.finishGoogle(code);
+  }
+
   /**
-   * Erases this browser's account in the cloud: a guest's list, or an older
+   * Erases this browser's account in the cloud: its helper answers, a guest's list, or an older
    * account (marked for removal after its list is erased). Then forgets the
    * session, so the next task starts a new guest.
    */
@@ -93,6 +125,7 @@ export class AccountClient {
     // Never make a guest just to erase it: no session, nothing in the cloud.
     const account = await this.ensureAccount(false);
     if (!account) return;
+    await this.cloud.helper(account.accountKey, { action: "erase" });
     await this.call("planner_list", "erase", {});
     if (!account.guest) {
       const result = await this.call<{ isDeleted: boolean }>(
@@ -110,6 +143,12 @@ export class AccountClient {
   async forget(): Promise<void> {
     if (this.accepted) await this.cloud.signOut().catch(() => {});
     this.account = null;
+  }
+
+  private requireAccepted(): void {
+    this.assertOpen();
+    if (!this.accepted)
+      throw new CloudError("privacy", MESSAGES.privacyRequired);
   }
 
   private assertOpen(): void {

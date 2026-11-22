@@ -2,9 +2,11 @@ import { createSignal, For, onCleanup, Show } from "solid-js";
 import { AccountClient } from "../cloud/account";
 import { AddTask } from "./components/AddTask";
 import { DoneTasks } from "./components/DoneTasks";
+import { HelperSheet } from "./components/HelperSheet";
 import { MenuSheet } from "./components/MenuSheet";
 import { TaskItem } from "./components/TaskItem";
 import { UndoBar } from "./components/UndoBar";
+import { HelperState } from "./helper-state";
 import { ListState } from "./list-state";
 import { browserStorage } from "./task-storage";
 
@@ -14,6 +16,7 @@ export function TaskApp() {
   const client = new AccountClient({ storage });
   onCleanup(() => void client.dispose());
   const state = new ListState(client, storage);
+  const helper = new HelperState(client, state, storage);
   const [menuOpen, setMenuOpen] = createSignal(false);
 
   return (
@@ -44,12 +47,13 @@ export function TaskApp() {
         </Show>
         <ul class="tasks" aria-label="To do">
           <For each={state.openIds()}>
-            {(id) => <TaskItem id={id} state={state} />}
+            {(id) => <TaskItem id={id} state={state} helper={helper} />}
           </For>
         </ul>
         <DoneTasks state={state} />
       </main>
       <UndoBar state={state} />
+      <HelperSheet helper={helper} list={state} />
       <Show when={menuOpen()}>
         <MenuSheet state={state} onClose={() => setMenuOpen(false)} />
       </Show>

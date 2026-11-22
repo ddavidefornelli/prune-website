@@ -10,6 +10,10 @@ export const STORAGE_KEYS = {
   auth: (projectUrl: string) => `prune:auth:${projectUrl}`,
   /** This browser's list, the changes not yet in the cloud, and whose it is. */
   list: "prune:list:v1",
+  /** Which tasks the helper can do, and its answers, for this browser's account. */
+  helper: "prune:helper:v1",
+  /** A "Do it for me" waiting for sign-in to finish (sessionStorage). */
+  helperResume: "prune:helper:resume",
 } as const;
 
 /**

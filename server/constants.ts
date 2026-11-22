@@ -37,3 +37,23 @@ export const ERROR_LOG = {
   maxBodyBytes: 512,
   forwardTimeoutMs: 5000,
 } as const;
+
+/** The task helper (see helper/). Limits the browser also knows are in src/shared/helper-contract.ts. */
+export const HELPER = {
+  model: "claude-opus-5-5",
+  /** For the answer; sorting tasks and writing questions run at low effort. */
+  effort: "medium",
+  /** Refusals are retried on another model inside the same call. */
+  fallbackBeta: "server-side-fallback-2026-07-01",
+  classifyTokens: 4000,
+  choicesTokens: 4000,
+  answerTokens: 32_000,
+  /** Web searches in one answer. */
+  maxSearches: 5,
+  /** Times a paused answer (long web search) is picked up again. */
+  maxContinuations: 4,
+  maxSources: 8,
+  /** A run still "working" after this long has died with its worker. */
+  staleMs: 10 * 60 * 1000,
+  maxBodyBytes: 32 * 1024,
+} as const;

@@ -52,10 +52,13 @@ test("production installs the final-artifact CSP plugin", () => {
   assert.equal(typeof plugin.configurePreviewServer, "function");
 });
 
-test("the displayed privacy version matches its gate and describes guests, without any sign-in", () => {
+test("the displayed privacy version matches its gate and describes guests, Do it for me and its sign-in", () => {
   const policy = readFileSync(new URL("../PRIVACY.md", import.meta.url), "utf8");
   assert.ok(policy.includes(`Version: ${PRIVACY_POLICY_VERSION}`));
-  assert.ok(policy.includes("There is no sign-up. By adding a task, you accept these terms"));
+  assert.ok(policy.includes("There is no sign-up for the list. By adding a task, you accept these terms"));
+  assert.ok(policy.includes("Anthropic (Anthropic PBC, United States)"));
+  assert.ok(policy.includes("after a guest's three free answers, you can sign in with Google or with a six-digit code"));
+  assert.ok(!/prune does not use AI/.test(policy));
   assert.ok(policy.includes("Supabase Auth creates a guest (an anonymous user) for this browser"));
   assert.ok(policy.includes("before your first task, prune sends nothing anywhere"));
   assert.ok(!/Continue with Google|Email me a code|magic-link|email-and-password/.test(policy));

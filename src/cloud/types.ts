@@ -1,3 +1,5 @@
+import type { HelperRequest } from "../shared/helper-contract.ts";
+
 /** Records exchanged with the backend. They stay plain JSON objects. */
 
 /**
@@ -35,6 +37,16 @@ export interface CloudTransport {
   identity(create: boolean): Promise<Account | null>;
   /** Calls `rpc` as `accountKey`, refused if this browser's session is now someone else's. */
   call<T>(rpc: Rpc, accountKey: string, request: RpcRequest): Promise<T>;
+  /** Calls the task-helper Edge Function as `accountKey`; failures carry its error code. */
+  helper<T>(accountKey: string, request: HelperRequest): Promise<T>;
+  /** Emails a sign-in code. */
+  sendCode(email: string): Promise<void>;
+  /** Signs this browser in with an emailed code; false when the code is wrong. */
+  verifyCode(email: string, code: string): Promise<boolean>;
+  /** Where to send the browser to sign in with Google. */
+  startGoogle(redirectTo: string): Promise<string>;
+  /** Finishes a Google sign-in this browser started; false when it started none. */
+  finishGoogle(code: string): Promise<boolean>;
   /** Forgets this browser's session. */
   signOut(): Promise<void>;
   dispose(): Promise<void>;

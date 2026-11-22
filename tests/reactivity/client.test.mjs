@@ -30,6 +30,10 @@ function fixture(t, { identity = guest, session = true, answer, accepted = true 
       calls.push({ command: rpc, accountKey, ...request });
       return reply(rpc, request, rpc === "planner_list" ? { tasks: [], rejected: [] } : request.action === "delete_account" ? { isDeleted: true } : null);
     },
+    async helper(accountKey, request) {
+      calls.push({ command: "task_helper", accountKey, ...request });
+      return reply("task_helper", request, {});
+    },
     async signOut() {
       calls.push({ command: "sign_out" });
     },
@@ -68,14 +72,27 @@ test("list syncs name the account they expect, with the browser's time zone", as
   assert.equal(sync.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
 });
 
-test("erasing a guest erases its list and forgets the session; an older account is also marked for removal", async (t) => {
+test("erasing a guest erases its helper answers and list and forgets the session; an older account is also marked for removal", async (t) => {
   const g = fixture(t);
   await g.client.eraseEverything();
-  assert.deepEqual(g.calls.map(({ command, action }) => [command, action ?? null]), [["identity", null], ["planner_list", "erase"], ["sign_out", null]]);
+  assert.deepEqual(g.calls.map(({ command, action }) => [command, action ?? null]), [["identity", null], ["task_helper", "erase"], ["planner_list", "erase"], ["sign_out", null]]);
   assert.equal(g.client.current, null);
   const a = fixture(t, { identity: account });
   await a.client.eraseEverything();
-  assert.deepEqual(a.calls.map(({ command, action }) => [command, action ?? null]), [["identity", null], ["planner_list", "erase"], ["planner_call", "delete_account"], ["sign_out", null]]);
+  assert.deepEqual(a.calls.map(({ command, action }) => [command, action ?? null]), [["identity", null], ["task_helper", "erase"], ["planner_list", "erase"], ["planner_call", "delete_account"], ["sign_out", null]]);
+});
+
+test("the helper is called as this browser's account, made on demand", async (t) => {
+  const f = fixture(t, { session: false });
+  await f.client.helper({ action: "get", taskIds: [] });
+  assert.deepEqual(f.calls.map(({ command, create, accountKey }) => [command, create ?? accountKey]), [["identity", true], ["task_helper", guest.accountKey]]);
+});
+
+test("signing in needs the terms accepted first", async (t) => {
+  const f = fixture(t, { accepted: false });
+  assert.throws(() => f.client.sendCode("a@example.test"), (error) => error.code === "privacy");
+  assert.equal(await f.client.finishGoogle("code"), false);
+  assert.deepEqual(f.calls, []);
 });
 
 test("erasing never makes a guest just to erase it, and does nothing before acceptance", async (t) => {

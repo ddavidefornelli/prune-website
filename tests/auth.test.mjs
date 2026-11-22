@@ -145,3 +145,41 @@ test("signing out tells the server, then forgets the session even when the serve
   await offline.auth.signOut();
   assert.equal(offline.stored(), null);
 });
+
+test("an emailed code signs in: the code is sent, a wrong one is refused, the right one saves the session", async () => {
+  const signedIn = { ...session(3600, "alice"), user: user("alice", { is_anonymous: false, email: "alice@example.test" }) };
+  const f = fixture({
+    reply: ({ path, body }) => (path === "/auth/v1/verify" ? (body.token === "123456" ? json(signedIn) : json({ msg: "Token has expired or is invalid" }, 403)) : json({})),
+  });
+  await f.auth.sendCode("alice@example.test");
+  assert.deepEqual(f.requests[0], { ...f.requests[0], method: "POST", path: "/auth/v1/otp", body: { email: "alice@example.test", create_user: true } });
+  assert.equal(await f.auth.verifyCode("alice@example.test", "000000"), false);
+  assert.equal(f.stored(), null);
+  assert.equal(await f.auth.verifyCode("alice@example.test", "123456"), true);
+  assert.equal(f.stored().user.id, "alice");
+  assert.deepEqual(f.requests.at(-1).body, { type: "email", email: "alice@example.test", token: "123456" });
+});
+
+test("sending a code reports a rate limit and a refused address", async () => {
+  await assert.rejects(fixture({ reply: () => json({}, 429) }).auth.sendCode("a@example.test"), (error) => error.code === "rate_limited");
+  await assert.rejects(fixture({ reply: () => json({}, 422) }).auth.sendCode("a@example.test"), (error) => error.code === "auth");
+});
+
+test("Google sign-in uses PKCE: the verifier waits in the browser and is spent on the way back", async () => {
+  const f = fixture({ reply: ({ path }) => (path.startsWith("/auth/v1/token?grant_type=pkce") ? json(session(3600, "bob")) : json({})) });
+  const url = new URL(await f.auth.googleUrl("https://www.prune.win/"));
+  assert.equal(url.origin + url.pathname, `${PROJECT}/auth/v1/authorize`);
+  assert.equal(url.searchParams.get("provider"), "google");
+  assert.equal(url.searchParams.get("redirect_to"), "https://www.prune.win/");
+  assert.equal(url.searchParams.get("code_challenge_method"), "s256");
+  const verifier = f.values.get(`${KEY}-code-verifier`);
+  assert.match(verifier, /^[A-Za-z0-9_-]{43}$/);
+  const digest = Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))).toString("base64url");
+  assert.equal(url.searchParams.get("code_challenge"), digest);
+  assert.equal(f.auth.awaitingGoogle, true);
+  await f.auth.exchange("auth-code");
+  assert.deepEqual(f.requests.at(-1).body, { auth_code: "auth-code", code_verifier: verifier });
+  assert.equal(f.stored().user.id, "bob");
+  assert.equal(f.auth.awaitingGoogle, false);
+  await assert.rejects(f.auth.exchange("again"), (error) => error.code === "auth");
+});

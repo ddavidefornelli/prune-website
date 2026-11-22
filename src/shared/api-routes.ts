@@ -8,9 +8,16 @@ export const SUPABASE_ROUTES = {
   user: "/auth/v1/user",
   token: "/auth/v1/token",
   signOut: "/auth/v1/logout",
+  /** Emails a six-digit sign-in code. */
+  otp: "/auth/v1/otp",
+  verify: "/auth/v1/verify",
+  /** Google sign-in starts here (a page load, not a fetch). */
+  authorize: "/auth/v1/authorize",
   planner: "/rest/v1/rpc/planner_call",
   list: "/rest/v1/rpc/planner_list",
   emailUnsubscribe: "/functions/v1/email-unsubscribe",
+  /** "Do it for me" (see server/helper/endpoint.ts). */
+  helper: "/functions/v1/task-helper",
 } as const;
 
 /** Same-domain relay for client error reports (see server/error-log.ts). */

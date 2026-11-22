@@ -38,3 +38,13 @@ export const LIST_TIMING = {
    */
   blurGraceMs: 250,
 } as const;
+
+/** When "Do it for me" talks to the helper. */
+export const HELPER_TIMING = {
+  /** New tasks are sorted in a batch this long after the last change. */
+  classifyDebounceMs: 1500,
+  /** After a failed sort, wait this long before trying again. */
+  classifyRetryMs: TIME.minuteMs,
+  /** How often an answer being written is checked on. */
+  pollMs: 3 * TIME.msPerSecond,
+} as const;

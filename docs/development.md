@@ -53,9 +53,12 @@ The browser calls exactly these paths (`SUPABASE_ROUTES`; the CSP allows nothing
 ```text
 /auth/v1/signup                a new guest (anonymous sign-up)
 /auth/v1/user, /token, /logout checking, refreshing and forgetting the session
+/auth/v1/otp, /verify          signing in with an emailed six-digit code
+/auth/v1/authorize             Google sign-in (a page load; /token?grant_type=pkce finishes it)
 /rest/v1/rpc/planner_list      the list: 'sync', and 'erase' for Delete everything
 /rest/v1/rpc/planner_call      'delete_account', for accounts from before guests
 /functions/v1/email-unsubscribe
+/functions/v1/task-helper      "Do it for me"
 ```
 
 The shared backend's base schema came from `../pro/supabase`; this repository's migrations are applied on top of it, in order. Nothing here applies migrations or changes the hosted project by itself.
@@ -65,6 +68,20 @@ The shared backend's base schema came from `../pro/supabase`; this repository's 
 1. In the Supabase dashboard, **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins**, and keep **Allow new users to sign up** on (a guest is a sign-up). Supabase limits anonymous sign-ins per IP address (30 an hour by default); CAPTCHA is not implemented, so do not require one.
 2. Apply `20261124000100_task_list.sql`, then `20261124000200_comeback_reminders_only.sql` (SQL editor, or `supabase db push` from the linked project).
 3. Deploy this website. Until steps 1 and 2 are done, the list still works in each browser; it just doesn't reach the cloud, and nothing says so.
+
+### Deploy "Do it for me"
+
+Open tasks are sorted quietly (`classify`) as they are added; a task that fits (something to write, a list, a plan, research) shows **Do it for me** while it is being edited. Tapping it asks up to three this-or-that questions (`choices`), then `start` saves a working run and returns at once while Claude writes the answer in the background (`EdgeRuntime.waitUntil`); the browser checks back every 3 seconds (`get`). The answer shows under its task; its sheet offers changes (`refine`, five at most), Copy, Keep and Discard. A guest gets three answers, then signs in with Google or an emailed code; the page reloads as that account, the list is copied to it, and the waiting task starts. Code: `server/helper/` (endpoint and Claude calls), `src/tasks/helper-state.ts`, `src/tasks/components/HelperSheet.tsx`; limits in `src/shared/helper-contract.ts` and `planner_helper_claim`.
+
+1. In the Supabase dashboard, **Authentication**:
+   - **Sign In / Providers → Email**: on, with **Confirm email** on. In **Emails → Magic Link**, the template must show the code: `{{ .Token }}` (prune asks for the six digits, not a link).
+   - **Sign In / Providers → Google**: on, with the Google Cloud OAuth client. Google's authorised redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
+   - **URL Configuration → Redirect URLs**: add `https://www.prune.win/` (and any preview origin you test from). Google sign-in comes back to the site's root.
+2. Apply `20261126000100_task_helper.sql`.
+3. `npx supabase secrets set ANTHROPIC_API_KEY=…` (an Anthropic API key; `ALLOWED_ORIGINS` is shared with the unsubscribe function), then `npx supabase functions deploy task-helper` (`supabase/config.toml` turns JWT verification off: it checks each caller's token itself, and CORS preflights carry none).
+4. Deploy this website. Before step 3, tasks get no button (sorting fails quietly) and Delete everything fails, so deploy the function first.
+
+The model is Claude Opus 5.5 (`HELPER.model` in `server/constants.ts`) with server-side refusal fallback; answers use web search (5 searches at most) at medium effort, sorting and questions at low effort. A guest's three answers, the daily 30 answers and refines and the daily 300 sorting and question calls are counted by `planner_helper_claim`.
 
 ### Retire the day planner
 
