@@ -99,6 +99,32 @@
   outline: none;
 }
 
+/* Phones: the field sits at the bottom, under the thumb, and rides above the
+   on-screen keyboard (--keyboard is set from the visual viewport). */
+@media (max-width: 639px) {
+  .add-task {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: var(--keyboard, 0px);
+    left: 0;
+    z-index: 3;
+    padding: 0 max(var(--gutter), env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(var(--gutter), env(safe-area-inset-left));
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+  }
+  /* The keyboard covers the home indicator: no inset needed above it. */
+  .add-task:focus-within {
+    padding-bottom: 4px;
+    border-top-color: var(--ink);
+  }
+  .undo-region {
+    bottom: calc(68px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
+  }
+}
+
 .notice {
   margin: 12px 0 0 36px;
   color: var(--danger);

@@ -1,7 +1,35 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onCleanup, onMount } from "solid-js";
 import { FINE_POINTER, TASK_LIMITS } from "../constants";
 
-/** The one way to add a task: type it, press Enter. The list grows from the top. */
+/**
+ * How much of the layout viewport the on-screen keyboard covers, as
+ * --keyboard, so the field pinned to the bottom on phones stays above it.
+ */
+function trackKeyboard(): () => void {
+  const viewport = window.visualViewport;
+  if (!viewport) return () => {};
+  const root = document.documentElement;
+  const update = () => {
+    const covered = window.innerHeight - viewport.height - viewport.offsetTop;
+    root.style.setProperty(
+      "--keyboard",
+      `${Math.max(0, Math.round(covered))}px`,
+    );
+  };
+  viewport.addEventListener("resize", update);
+  viewport.addEventListener("scroll", update);
+  update();
+  return () => {
+    viewport.removeEventListener("resize", update);
+    viewport.removeEventListener("scroll", update);
+    root.style.removeProperty("--keyboard");
+  };
+}
+
+/**
+ * The one way to add a task: type it, press Enter. The list grows from the
+ * top; on phones the field sits at the bottom of the screen.
+ */
 export function AddTask(props: { onAdd: (title: string) => boolean }) {
   const [title, setTitle] = createSignal("");
   let input!: HTMLInputElement;
@@ -10,6 +38,7 @@ export function AddTask(props: { onAdd: (title: string) => boolean }) {
   // the keyboard does not cover the list on arrival.
   onMount(() => {
     if (window.matchMedia(FINE_POINTER).matches) input.focus();
+    onCleanup(trackKeyboard());
   });
 
   function submit(event: SubmitEvent): void {
