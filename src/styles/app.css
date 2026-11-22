@@ -1011,6 +1011,9 @@
   display: none;
 }
 @media (min-width: 1024px) {
+  :root {
+    --sidebar: 248px;
+  }
   .space-sidebar {
     position: fixed;
     top: 0;
@@ -1019,7 +1022,7 @@
     display: grid;
     align-content: start;
     gap: 16px;
-    width: 248px;
+    width: var(--sidebar);
     padding: 18px 12px;
     border-right: 1px solid var(--line);
     background: var(--bg);
@@ -1029,7 +1032,10 @@
     padding: 0 12px;
   }
   .app.has-spaces {
-    margin-left: max(280px, calc((100vw - var(--column)) / 2));
+    /* Centred in the room beside the sidebar, not in the whole window. */
+    margin-left: calc(
+      var(--sidebar) + max(0px, (100% - var(--sidebar) - var(--column)) / 2)
+    );
   }
   /* The sidebar lists the spaces: the header just names the open one. */
   .app.has-spaces .space-button {
@@ -1058,4 +1064,109 @@
 .share-name input:focus {
   outline: none;
   border-color: var(--ink);
+}
+.spaces-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1;
+  padding-left: 12px;
+}
+.sheet-header .spaces-heading {
+  padding-left: 0;
+}
+.space-sidebar .spaces-heading .sheet-title {
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 500;
+}
+.space-add {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+}
+.space-add svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+@media (hover: hover) {
+  .space-add:hover {
+    background: var(--hover);
+  }
+}
+.share-people {
+  display: grid;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+.share-people-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+}
+.share-people ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+}
+.person-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--hover);
+  color: var(--ink);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+.person-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.person-name,
+.person-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person-name {
+  font-size: var(--text-small);
+}
+.person-email {
+  color: var(--muted);
+  font-size: var(--text-tiny);
+}
+.person-role {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+}
+.share-people + .share-status {
+  justify-content: flex-end;
+  padding-top: 0;
+  border-top: 0;
 }

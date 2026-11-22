@@ -14,7 +14,7 @@ import { DoneTasks } from "./components/DoneTasks";
 import { HelperSheet } from "./components/HelperSheet";
 import { MenuSheet } from "./components/MenuSheet";
 import { ShareSheet } from "./components/ShareSheet";
-import { SpaceList, SpaceSheet } from "./components/SpaceList";
+import { SpaceList, SpaceSheet, SpacesHeading } from "./components/SpaceList";
 import { TaskItem } from "./components/TaskItem";
 import { UndoBar } from "./components/UndoBar";
 import { HelperState } from "./helper-state";
@@ -39,7 +39,6 @@ export function TaskApp() {
   const share = new ShareState(client, spaces, list);
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
-  const many = () => spaces.spaces().length > 1;
   const people = () => spaces.open()?.people ?? 1;
 
   // Spaces with other people: their changes arrive the moment they are saved.
@@ -54,27 +53,24 @@ export function TaskApp() {
   });
 
   return (
-    <div class="app" classList={{ "has-spaces": many() }}>
-      <Show when={many()}>
-        <aside class="space-sidebar">
-          <span class="wordmark">prune</span>
-          <SpaceList spaces={spaces} />
-        </aside>
-      </Show>
+    <div class="app has-spaces">
+      <aside class="space-sidebar">
+        <span class="wordmark">prune</span>
+        <SpacesHeading onCreate={() => void share.startCreate()} />
+        <SpaceList spaces={spaces} />
+      </aside>
       <header class="app-header">
-        <Show when={many()} fallback={<span class="wordmark">prune</span>}>
-          <button
-            type="button"
-            class="space-button"
-            aria-haspopup="dialog"
-            onClick={() => setSwitcherOpen(true)}
-          >
-            <span>{SpaceState.label(spaces.open())}</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 10l5 5 5-5" />
-            </svg>
-          </button>
-        </Show>
+        <button
+          type="button"
+          class="space-button"
+          aria-haspopup="dialog"
+          onClick={() => setSwitcherOpen(true)}
+        >
+          <span>{SpaceState.label(spaces.open())}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 10l5 5 5-5" />
+          </svg>
+        </button>
         {/* Sharing is the point: always in sight, never behind the menu. */}
         <button
           type="button"
@@ -124,7 +120,11 @@ export function TaskApp() {
       </Show>
       <ShareSheet share={share} spaces={spaces} />
       <Show when={switcherOpen()}>
-        <SpaceSheet spaces={spaces} onClose={() => setSwitcherOpen(false)} />
+        <SpaceSheet
+          spaces={spaces}
+          onCreate={() => void share.startCreate()}
+          onClose={() => setSwitcherOpen(false)}
+        />
       </Show>
       <Show when={menuOpen() && list()}>
         {(state) => (

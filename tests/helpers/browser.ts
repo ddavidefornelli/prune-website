@@ -220,7 +220,7 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
         const anonymous = Boolean(claims(authorization).is_anonymous);
         const group = (id: unknown) => state.groups.find((g) => g.id === id);
         const missing = () => send({ code: "PT404", message: "This space isn't available any more." }, 404);
-        if (["share", "join"].includes(body.p_action) && anonymous) { await send({ code: "PT400", message: "Sign in to share a list." }, 400); return; }
+        if (["share", "join", "create"].includes(body.p_action) && anonymous) { await send({ code: "PT400", message: "Sign in to share a list." }, 400); return; }
         if (body.p_action === "join") {
           const found = state.groups.find((g) => g.token === args.token);
           if (!found) { await send({ code: "PT404", message: "This link doesn't work any more. Ask for a new one." }, 404); return; }
@@ -236,6 +236,17 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
           state.groups.push(made);
           state.tasks = [];
           await send({ space: made.id, token: made.token });
+          return;
+        }
+        if (body.p_action === "create") {
+          const made: GroupSpace = { id: GROUP_ID, name: args.name?.trim() || "Shared list", token: TOKEN, owner: caller, members: [caller], tasks: [] };
+          state.groups.push(made);
+          await send({ space: made.id, token: made.token });
+          return;
+        }
+        if (body.p_action === "people") {
+          const members = space ? space.members : [caller];
+          await send({ people: members.map((member) => ({ name: member === ACCOUNT_ID ? "Alice" : null, email: `${member.slice(0, 4)}@example.test`, owner: space ? space.owner === member : true, you: member === caller })) });
           return;
         }
         if (body.p_action === "rename" && space) { space.name = args.name.trim(); await send({ space: space.id, name: space.name }); return; }

@@ -22,7 +22,7 @@ Every row goes with its Auth user (`on delete cascade`).
 
 | Function | Caller |
 | --- | --- |
-| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` (a space, Personal by default; also lists the caller's spaces) and `'erase'` (deletes the spaces the caller owns, leaves the rest); signed-in accounts also `'share'` (Personal becomes a group space; a group space gives its link), `'join'`, `'rename'` and `'leave'` (the owner deletes the space). |
+| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` (a space, Personal by default; also lists the caller's spaces) and `'erase'` (deletes the spaces the caller owns, leaves the rest); signed-in accounts also `'share'` (Personal becomes a group space; a group space gives its link), `'create'` (an empty group space, the + beside Spaces), `'join'`, `'people'` (names and emails of everyone in a space, for its members only), `'rename'` and `'leave'` (the owner deletes the space). |
 | `planner_call(action, args, timezone)` | The browser (`authenticated`, not guests): only `'delete_account'`. |
 | `planner_claim_reminders`, `planner_release_reminder`, `planner_push_targets`, `planner_push_result` | The `daily-reminders` Edge Function. |
 | `planner_unsubscribe` | The `email-unsubscribe` Edge Function. |

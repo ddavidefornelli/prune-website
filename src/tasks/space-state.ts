@@ -56,9 +56,16 @@ export class SpaceState {
     this.saved = saved;
     this.setSaved = setSaved;
     this.current = createMemo(() => saved().current);
-    this.spaces = createMemo(() => saved().spaces, [], {
-      equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-    });
+    this.spaces = createMemo(
+      () =>
+        saved().spaces.some((space) => space.kind === "personal")
+          ? saved().spaces
+          : [SpaceState.personal, ...saved().spaces],
+      [],
+      {
+        equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+      },
+    );
     this.groups = createMemo(() =>
       this.spaces().filter((space) => space.kind === "group"),
     );
@@ -74,6 +81,15 @@ export class SpaceState {
       this.spaces().some((space) => space.people > 1),
     );
   }
+
+  /** Personal before the first sync lists it (a guest, or offline). */
+  private static readonly personal: Space = {
+    id: "",
+    kind: "personal",
+    name: "",
+    people: 1,
+    owner: true,
+  };
 
   /** What to call a space on screen. */
   static label(space: Space | null): string {

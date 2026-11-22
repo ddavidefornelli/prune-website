@@ -54,8 +54,36 @@ export function SpaceList(props: {
   );
 }
 
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+/** "Spaces", and the + that makes a new one. */
+export function SpacesHeading(props: { onCreate: () => void }) {
+  return (
+    <div class="spaces-heading">
+      <h2 class="sheet-title">Spaces</h2>
+      <button
+        type="button"
+        class="space-add"
+        aria-label="New space"
+        aria-haspopup="dialog"
+        onClick={() => props.onCreate()}
+      >
+        <PlusIcon />
+      </button>
+    </div>
+  );
+}
+
 /** The space list on phones, from the space name in the header. */
-export function SpaceSheet(props: { spaces: SpaceState; onClose: () => void }) {
+export function SpaceSheet(props: {
+  spaces: SpaceState;
+  onCreate: () => void;
+  onClose: () => void;
+}) {
   return (
     <Dialog
       class="sheet"
@@ -70,7 +98,12 @@ export function SpaceSheet(props: { spaces: SpaceState; onClose: () => void }) {
     >
       <div class="sheet-body">
         <header class="sheet-header">
-          <h2 class="sheet-title">Spaces</h2>
+          <SpacesHeading
+            onCreate={() => {
+              props.onClose();
+              props.onCreate();
+            }}
+          />
           <button
             type="button"
             class="sheet-close"

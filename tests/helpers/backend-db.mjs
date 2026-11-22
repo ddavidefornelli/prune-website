@@ -19,7 +19,7 @@ export const migrations = () => readdirSync(MIGRATIONS).filter((name) => name.en
 const BASE = `
   create role anon; create role authenticated; create role service_role;
   create schema auth;
-  create table auth.users(id uuid primary key, email text, is_anonymous boolean not null default false,
+  create table auth.users(id uuid primary key, email text, is_anonymous boolean not null default false, raw_user_meta_data jsonb,
     created_at timestamptz not null default now(), last_sign_in_at timestamptz);
   create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
   create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt()->>'sub')::uuid $$;

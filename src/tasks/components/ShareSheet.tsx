@@ -1,9 +1,18 @@
-import { createSignal, Match, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  Match,
+  on,
+  Show,
+  Switch,
+} from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import { PrivacyPolicyButton } from "../../components/PrivacyPolicyButton";
 import { SHARE, SPACES } from "../constants";
 import { SpaceState } from "../space-state";
 import type { ShareFlow, ShareState } from "../share-state";
+import type { Person } from "../types";
 import { SignInForm } from "./SignInForm";
 
 /** Two list cards, one behind the other: a list more than one person keeps. */
@@ -26,7 +35,7 @@ export function ShareSheet(props: { share: ShareState; spaces: SpaceState }) {
       {(flow) => (
         <Dialog
           class="sheet"
-          aria-label="Share list"
+          aria-label={flow().step === "create" ? "New space" : "Share list"}
           onDismiss={() => props.share.close()}
           onClick={(event) => {
             if (event.target === event.currentTarget) props.share.close();
@@ -60,12 +69,12 @@ export function ShareSheet(props: { share: ShareState; spaces: SpaceState }) {
                 {(step) => (
                   <SignIn
                     share={props.share}
-                    joining={
-                      (step() as Extract<ShareFlow, { step: "sign_in" }>)
-                        .joining
-                    }
+                    flow={step() as Extract<ShareFlow, { step: "sign_in" }>}
                   />
                 )}
+              </Match>
+              <Match when={flow().step === "create"}>
+                <Create share={props.share} />
               </Match>
               <Match when={flow().step === "start"}>
                 <Start share={props.share} />
@@ -94,15 +103,26 @@ export function ShareSheet(props: { share: ShareState; spaces: SpaceState }) {
   );
 }
 
-function SignIn(props: { share: ShareState; joining: boolean }) {
+function SignIn(props: {
+  share: ShareState;
+  flow: Extract<ShareFlow, { step: "sign_in" }>;
+}) {
   return (
     <div class="helper-sign-in">
       <Illustration />
-      <h2>{props.joining ? "Join a shared list" : "Share this list"}</h2>
+      <h2>
+        {props.flow.joining
+          ? "Join a shared list"
+          : props.flow.creating
+            ? "New space"
+            : "Share this list"}
+      </h2>
       <p class="helper-note">
-        {props.joining
+        {props.flow.joining
           ? "Someone shared a list with you. Sign in to open it. Your own tasks stay in Personal."
-          : "Sign in, then send the link. Whoever opens it and signs in edits this list with you."}
+          : props.flow.creating
+            ? "Sign in to make spaces. Your list comes with you."
+            : "Sign in, then send the link. Whoever opens it and signs in edits this list with you."}
       </p>
       <SignInForm
         busy={props.share.busy()}
@@ -114,6 +134,44 @@ function SignIn(props: { share: ShareState; joining: boolean }) {
         By continuing you accept the <PrivacyPolicyButton />.
       </p>
     </div>
+  );
+}
+
+/** The + beside Spaces: a new, empty space under this name. */
+function Create(props: { share: ShareState }) {
+  const [name, setName] = createSignal("");
+  return (
+    <form
+      class="helper-sign-in"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void props.share.createSpace(name());
+      }}
+    >
+      <Illustration />
+      <h2>New space</h2>
+      <p class="helper-note">
+        A separate list. Share its link to edit it with others.
+      </p>
+      <div class="helper-field">
+        <input
+          data-autofocus=""
+          aria-label="Name"
+          placeholder={SPACES.groupName}
+          maxLength={SPACES.nameLength}
+          enterkeyhint="go"
+          value={name()}
+          onInput={(event) => setName(event.currentTarget.value)}
+        />
+        <button
+          type="submit"
+          class="primary-button"
+          disabled={props.share.busy()}
+        >
+          Create
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -156,6 +214,10 @@ function Start(props: { share: ShareState }) {
   );
 }
 
+/** The first letter of someone's name or email, for their round avatar. */
+const initial = (person: Person) =>
+  (person.name ?? person.email ?? "?").trim().charAt(0).toUpperCase() || "?";
+
 function Link(props: {
   share: ShareState;
   spaces: SpaceState;
@@ -163,6 +225,13 @@ function Link(props: {
 }) {
   const [copied, setCopied] = createSignal(false);
   const space = () => props.spaces.open();
+  // Who is in it: on opening, and again whenever someone joins or leaves.
+  createEffect(
+    on(
+      () => [space()?.id, space()?.people],
+      () => void props.share.loadPeople(),
+    ),
+  );
 
   async function copy(): Promise<void> {
     if (!(await props.share.copy())) return;
@@ -213,12 +282,37 @@ function Link(props: {
                 }}
               />
             </label>
-            <div class="share-status">
-              <p class="helper-note">
+            <section class="share-people" aria-label="People">
+              <p class="share-people-title">
                 {group().people === 1
                   ? "Only you so far"
                   : `${group().people} people`}
               </p>
+              <ul>
+                <For each={props.share.people()}>
+                  {(person) => (
+                    <li class="person">
+                      <span class="person-avatar" aria-hidden="true">
+                        {initial(person)}
+                      </span>
+                      <span class="person-text">
+                        <span class="person-name">
+                          {person.name ?? person.email ?? "Someone"}
+                          {person.you ? " (you)" : ""}
+                        </span>
+                        <Show when={person.name && person.email}>
+                          <span class="person-email">{person.email}</span>
+                        </Show>
+                      </span>
+                      <Show when={person.owner}>
+                        <span class="person-role">Owner</span>
+                      </Show>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </section>
+            <div class="share-status">
               <button
                 type="button"
                 class="text-button is-danger"

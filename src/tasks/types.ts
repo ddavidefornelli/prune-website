@@ -54,3 +54,14 @@ export interface ListBatch {
   remove: string[];
   sent: Record<string, number>;
 }
+
+/** Someone in a space, as its Share sheet lists them (see planner_list 'people'). */
+export interface Person {
+  /** From the sign-in provider (Google gives one); null otherwise. */
+  name: string | null;
+  email: string | null;
+  /** Made the space. */
+  owner: boolean;
+  /** The person looking. */
+  you: boolean;
+}

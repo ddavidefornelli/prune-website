@@ -7,15 +7,18 @@ import { STORAGE_KEYS } from "../shared/storage-keys.ts";
 import { SHARE, SPACES } from "./constants.ts";
 import { browserStorage, TaskStorage } from "./task-storage.ts";
 import type { ListState } from "./list-state.ts";
+import type { Person } from "./types.ts";
 import { SpaceState } from "./space-state.ts";
 
 /** Where the person is in sharing; null when its sheet is closed. */
 export type ShareFlow =
   | { step: "loading" }
   /** Sharing and joining both need an account: `joining` when a link brought them. */
-  | { step: "sign_in"; joining: boolean }
+  | { step: "sign_in"; joining: boolean; creating?: boolean }
   /** Sharing Personal: name the shared space its tasks move to. */
   | { step: "start" }
+  /** The + beside Spaces: name a new, empty space. */
+  | { step: "create" }
   /** The link to copy; `joined` right after joining through one. */
   | { step: "link"; joined: boolean }
   /** A link that did not work, or a request that failed: the error says which. */
@@ -33,6 +36,8 @@ export class ShareState {
   readonly link: Accessor<string>;
   readonly error: Accessor<string>;
   readonly busy: Accessor<boolean>;
+  /** Everyone in the open group space, while its link shows. */
+  readonly people: Accessor<Person[]>;
 
   private readonly client: AccountClient;
   private readonly spaces: SpaceState;
@@ -42,6 +47,7 @@ export class ShareState {
   private readonly setLink: (link: string) => void;
   private readonly setError: (error: string) => void;
   private readonly setBusy: (busy: boolean) => void;
+  private readonly setPeople: (people: Person[]) => void;
 
   constructor(
     client: AccountClient,
@@ -55,6 +61,9 @@ export class ShareState {
     const [link, setLink] = createSignal("");
     const [error, setError] = createSignal("");
     const [busy, setBusy] = createSignal(false);
+    const [people, setPeople] = createSignal<Person[]>([]);
+    this.people = people;
+    this.setPeople = setPeople;
     this.flow = flow;
     this.setFlow = setFlow;
     this.link = link;
@@ -125,6 +134,72 @@ export class ShareState {
     this.showToken(token, false);
   }
 
+  /** The + beside Spaces: a name for a new space, after signing in if needed. */
+  async startCreate(): Promise<void> {
+    analytics.capture("space_create_opened");
+    batch(() => {
+      this.setError("");
+      this.setFlow({ step: "loading" });
+    });
+    const account = await this.client.signedIn().catch(() => null);
+    this.setFlow(
+      account
+        ? { step: "create" }
+        : { step: "sign_in", joining: false, creating: true },
+    );
+  }
+
+  /** Makes an empty group space and opens it; Share gives its link. */
+  async createSpace(name: string): Promise<void> {
+    if (this.busy()) return;
+    let space = "";
+    const ok = await this.request(async () => {
+      space = await this.client.createSpace(name);
+    });
+    if (!ok) return;
+    analytics.capture("space_created", { from: "plus" });
+    this.spaces.add({
+      id: space,
+      kind: "group",
+      name: name.trim().slice(0, SPACES.nameLength) || SPACES.groupName,
+      people: 1,
+      owner: true,
+    });
+    this.spaces.select(space);
+    this.close();
+  }
+
+  /**
+   * Who is in the open group space. Quiet: the list just stays as it was
+   * when this fails (offline), and the count is still shown.
+   */
+  async loadPeople(): Promise<void> {
+    const space = this.spaces.open();
+    if (space?.kind !== "group") {
+      this.setPeople([]);
+      return;
+    }
+    try {
+      const people = await this.client.spacePeople(space.id);
+      if (this.spaces.open()?.id !== space.id) return;
+      this.setPeople(people.filter(ShareState.isPerson));
+    } catch {
+      // Shown again the next time the sheet opens.
+    }
+  }
+
+  private static isPerson(value: unknown): value is Person {
+    const person = value as Partial<Person> | null;
+    return (
+      typeof person === "object" &&
+      person !== null &&
+      (person.name === null || typeof person.name === "string") &&
+      (person.email === null || typeof person.email === "string") &&
+      typeof person.owner === "boolean" &&
+      typeof person.you === "boolean"
+    );
+  }
+
   /** Renames the open group space (from the sheet's name field). */
   async rename(name: string): Promise<void> {
     const space = this.spaces.open();
@@ -133,6 +208,7 @@ export class ShareState {
   }
 
   close(): void {
+    this.setPeople([]);
     // Closing an invitation turns it down.
     ShareState.session((storage) => storage.removeItem(STORAGE_KEYS.shareJoin));
     batch(() => {
@@ -223,6 +299,7 @@ export class ShareState {
       return saved;
     });
     if (token) await this.join(token);
+    else if (reopen === SHARE.resumeCreate) await this.startCreate();
     else if (reopen) await this.open();
   }
 
@@ -309,7 +386,10 @@ export class ShareState {
     const flow = this.flow();
     if (flow?.step === "sign_in" && !flow.joining)
       ShareState.session((storage) =>
-        storage.setItem(STORAGE_KEYS.shareResume, "1"),
+        storage.setItem(
+          STORAGE_KEYS.shareResume,
+          flow.creating ? SHARE.resumeCreate : SHARE.resumeShare,
+        ),
       );
   }
 

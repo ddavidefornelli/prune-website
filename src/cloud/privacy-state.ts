@@ -2,7 +2,7 @@ import { STORAGE_KEYS } from "../shared/storage-keys.ts";
 import { MESSAGES } from "./messages.ts";
 
 /** Bump alongside PRIVACY.md whenever a newly presented notice is required. */
-export const PRIVACY_POLICY_VERSION = "privacy-web-v28";
+export const PRIVACY_POLICY_VERSION = "privacy-web-v29";
 export const PRIVACY_ACKNOWLEDGEMENT_KEY = STORAGE_KEYS.privacyAcknowledgement;
 
 interface Acknowledgement {

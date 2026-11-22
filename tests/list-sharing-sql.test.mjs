@@ -222,3 +222,40 @@ test("without Realtime, syncs carry on", async () => {
   await call(db, "join", { token });
   assert.deepEqual(titles(await sync(db, { space, save: [task(2)] })), ["Task 2", "Task 1"]);
 });
+
+test("+ makes an empty group space with its link; Personal stays as it was", async () => {
+  const db = await fixture();
+  await as(db, owner);
+  await sync(db, { save: [task(1)] });
+  const { space, token } = await call(db, "create", { name: "  Flat  " });
+  assert.match(token, /^[0-9a-f]{32}$/);
+  assert.deepEqual((await sync(db, { space })).tasks, []);
+  const personal = await sync(db);
+  assert.deepEqual(titles(personal), ["Task 1"]);
+  assert.deepEqual(spaces(personal), [["personal", "", 1, true], ["group", "Flat", 1, true]]);
+  assert.equal((await call(db, "create")).space === space, false);
+  assert.equal(spaces(await sync(db))[2][1], "Shared list");
+  // Others join it by its link, as any group space.
+  await as(db, friend);
+  assert.deepEqual(await call(db, "join", { token }), { space });
+  // Guests make no spaces.
+  await as(db, stranger, { is_anonymous: true });
+  await assert.rejects(call(db, "create", { name: "Mine" }), (error) => error.code === "PT400");
+});
+
+test("people in a space see each other's names and emails; nobody else does", async () => {
+  const db = await fixture();
+  await db.query(`update auth.users set raw_user_meta_data = '{"full_name": "Ana Owner"}' where id = $1`, [owner]);
+  const { space, token } = await shared(db);
+  await as(db, friend);
+  await call(db, "join", { token });
+  const { people } = await call(db, "people", { space });
+  assert.deepEqual(people, [
+    { name: "Ana Owner", email: "owner@example.test", owner: true, you: false },
+    { name: null, email: "friend@example.test", owner: false, you: true },
+  ]);
+  // Personal: just the caller.
+  assert.deepEqual((await call(db, "people")).people.map((p) => p.email), ["friend@example.test"]);
+  await as(db, stranger);
+  await assert.rejects(call(db, "people", { space }), (error) => error.code === "PT404");
+});

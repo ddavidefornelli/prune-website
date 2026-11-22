@@ -99,7 +99,7 @@ test.describe("opening a shared space's link", () => {
     backend.groups = [];
     await page.reload();
     await expect(page.getByRole("checkbox", { name: "My own errand" })).toBeVisible();
-    await expect(page.locator(".space-sidebar")).toHaveCount(0);
+    await expect(page.locator(".space-sidebar").getByRole("button", { name: "Trip" })).toHaveCount(0);
   });
 });
 
@@ -163,5 +163,50 @@ test.describe("on a phone", () => {
     await openSpace(page, "Trip");
     await expect(page.locator(".space-button")).toHaveText("Trip");
     await expect(page.getByRole("checkbox", { name: "Book flights" })).toBeVisible();
+  });
+});
+
+test.describe("the + beside Spaces", () => {
+  test.use({ visitor: "account", seed: { tasks: [cloudTask("My own errand")] } });
+
+  test("makes an empty space and opens it; Personal keeps its tasks", async ({ page, backend }) => {
+    await openList(page);
+    await page.locator(".space-sidebar").getByRole("button", { name: "New space" }).click();
+    const dialog = page.getByRole("dialog", { name: "New space" });
+    await dialog.getByRole("textbox", { name: "Name" }).fill("Flat");
+    await dialog.getByRole("button", { name: "Create" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator(".space-button")).toHaveText("Flat");
+    await expect(page.getByRole("checkbox", { name: "My own errand" })).toHaveCount(0);
+    await addTask(page, "Buy a plant");
+    await expect.poll(() => backend.groups[0]?.tasks.map((task) => task.title)).toEqual(["Buy a plant"]);
+    expect(backend.tasks.map((task) => task.title)).toEqual(["My own errand"]);
+  });
+
+  test("the Share button lists everyone in the space", async ({ page, backend }) => {
+    theirSpace(backend, ["99999999-9999-4999-8999-999999999999", ACCOUNT_ID]);
+    await openList(page);
+    await openSpace(page, "Trip");
+    await page.getByRole("button", { name: "Shared · 2" }).click();
+    const people = sheet(page).getByRole("region", { name: "People" });
+    await expect(people.getByRole("listitem")).toHaveCount(2);
+    await expect(people.getByRole("listitem").first()).toContainText("9999@example.test");
+    await expect(people.getByRole("listitem").first()).toContainText("Owner");
+    await expect(people.getByRole("listitem").nth(1)).toContainText("Alice (you)");
+  });
+});
+
+test.describe("a guest pressing +", () => {
+  test("signs in first, then names the space", async ({ page }) => {
+    await openList(page);
+    await addTask(page, "Plan the trip");
+    await page.locator(".space-sidebar").getByRole("button", { name: "New space" }).click();
+    const dialog = page.getByRole("dialog", { name: "Share list" });
+    await expect(dialog.getByRole("heading", { name: "New space" })).toBeVisible();
+    await dialog.getByRole("textbox", { name: "Email" }).fill("alice@example.test");
+    await dialog.getByRole("button", { name: "Send code" }).click();
+    await dialog.getByRole("textbox", { name: "Code" }).fill("123456");
+    await dialog.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByRole("dialog", { name: "New space" }).getByRole("button", { name: "Create" })).toBeVisible();
   });
 });

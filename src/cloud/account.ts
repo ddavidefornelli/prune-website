@@ -114,6 +114,18 @@ export class AccountClient {
     return { space: result.space, token: result.token };
   }
 
+  /** Makes an empty group space (the + beside Spaces); returns its id. */
+  async createSpace(name: string): Promise<string> {
+    const { space } = await this.call<{ space?: unknown }>(
+      "planner_list",
+      "create",
+      { name },
+    );
+    if (typeof space !== "string")
+      throw new CloudError("server", MESSAGES.incompleteResponse);
+    return space;
+  }
+
   /** Joins the group space behind a link token; returns its id. */
   async joinSpace(token: string): Promise<string> {
     const { space } = await this.call<{ space?: unknown }>(
@@ -124,6 +136,18 @@ export class AccountClient {
     if (typeof space !== "string")
       throw new CloudError("server", MESSAGES.incompleteResponse);
     return space;
+  }
+
+  /** Everyone in a space (names and emails), for its Share sheet. */
+  async spacePeople(space: string): Promise<unknown[]> {
+    const { people } = await this.call<{ people?: unknown }>(
+      "planner_list",
+      "people",
+      { space },
+    );
+    if (!Array.isArray(people))
+      throw new CloudError("server", MESSAGES.incompleteResponse);
+    return people;
   }
 
   /** Renames a group space. */

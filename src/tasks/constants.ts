@@ -58,6 +58,9 @@ export const HELPER_TIMING = {
 /** A shared list's link: `/?join=<token>` (see planner_list 'share'). */
 export const SHARE = {
   joinParam: "join",
+  /** What to reopen after signing in: Share, or the + beside Spaces. */
+  resumeShare: "1",
+  resumeCreate: "create",
   tokenPattern: /^[0-9a-f]{32}$/i,
   /** How long "Copied" shows on the button. */
   copiedMs: 1500,
