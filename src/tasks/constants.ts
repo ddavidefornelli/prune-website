@@ -62,3 +62,11 @@ export const SHARE = {
   /** How long "Copied" shows on the button. */
   copiedMs: 1500,
 } as const;
+
+/** Spaces (see planner_list): names on screen and the server's limits. */
+export const SPACES = {
+  personalName: "Personal",
+  /** A group space nobody named yet. */
+  groupName: "Shared list",
+  nameLength: 60,
+} as const;

@@ -1,8 +1,8 @@
 import { createSignal, Match, Show, Switch } from "solid-js";
 import { Dialog } from "../../components/Dialog";
 import { PrivacyPolicyButton } from "../../components/PrivacyPolicyButton";
-import { SHARE } from "../constants";
-import type { ListState } from "../list-state";
+import { SHARE, SPACES } from "../constants";
+import { SpaceState } from "../space-state";
 import type { ShareFlow, ShareState } from "../share-state";
 import { SignInForm } from "./SignInForm";
 
@@ -20,7 +20,7 @@ const Illustration = () => (
 );
 
 /** Share: sign in, copy the link. Also where a link brings the person it was sent to. */
-export function ShareSheet(props: { share: ShareState; list: ListState }) {
+export function ShareSheet(props: { share: ShareState; spaces: SpaceState }) {
   return (
     <Show when={props.share.flow()}>
       {(flow) => (
@@ -67,11 +67,14 @@ export function ShareSheet(props: { share: ShareState; list: ListState }) {
                   />
                 )}
               </Match>
+              <Match when={flow().step === "start"}>
+                <Start share={props.share} />
+              </Match>
               <Match when={flow().step === "link" && flow()}>
                 {(step) => (
                   <Link
                     share={props.share}
-                    list={props.list}
+                    spaces={props.spaces}
                     joined={
                       (step() as Extract<ShareFlow, { step: "link" }>).joined
                     }
@@ -98,7 +101,7 @@ function SignIn(props: { share: ShareState; joining: boolean }) {
       <h2>{props.joining ? "Join a shared list" : "Share this list"}</h2>
       <p class="helper-note">
         {props.joining
-          ? "Someone shared their list with you. Sign in to open it. Your tasks join theirs."
+          ? "Someone shared a list with you. Sign in to open it. Your own tasks stay in Personal."
           : "Sign in, then send the link. Whoever opens it and signs in edits this list with you."}
       </p>
       <SignInForm
@@ -114,9 +117,52 @@ function SignIn(props: { share: ShareState; joining: boolean }) {
   );
 }
 
-function Link(props: { share: ShareState; list: ListState; joined: boolean }) {
+/** Sharing Personal: what is in it becomes a new shared space, under this name. */
+function Start(props: { share: ShareState }) {
+  const [name, setName] = createSignal("");
+  return (
+    <form
+      class="helper-sign-in"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void props.share.create(name());
+      }}
+    >
+      <Illustration />
+      <h2>Share this list</h2>
+      <p class="helper-note">
+        Your tasks move to a new shared space. Personal starts fresh, just for
+        you.
+      </p>
+      <div class="helper-field">
+        <input
+          data-autofocus=""
+          aria-label="Name"
+          placeholder={SPACES.groupName}
+          maxLength={SPACES.nameLength}
+          enterkeyhint="go"
+          value={name()}
+          onInput={(event) => setName(event.currentTarget.value)}
+        />
+        <button
+          type="submit"
+          class="primary-button"
+          disabled={props.share.busy()}
+        >
+          Create link
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Link(props: {
+  share: ShareState;
+  spaces: SpaceState;
+  joined: boolean;
+}) {
   const [copied, setCopied] = createSignal(false);
-  const sharing = () => props.list.sharing();
+  const space = () => props.spaces.open();
 
   async function copy(): Promise<void> {
     if (!(await props.share.copy())) return;
@@ -127,11 +173,11 @@ function Link(props: { share: ShareState; list: ListState; joined: boolean }) {
   return (
     <div class="helper-sign-in">
       <Illustration />
-      <h2>{props.joined ? "You're in" : "Share this list"}</h2>
+      <h2>{props.joined ? "You're in" : SpaceState.label(space())}</h2>
       <p class="helper-note">
         {props.joined
-          ? "This list is shared now. What anyone adds or ticks shows up for everyone."
-          : "Anyone with this link can sign in and edit this list."}
+          ? `You joined ${SpaceState.label(space())}. What anyone adds or ticks shows up for everyone, right away.`
+          : "Anyone with this link can sign in and edit this space with you."}
       </p>
       <div class="helper-field">
         <input
@@ -149,19 +195,40 @@ function Link(props: { share: ShareState; list: ListState; joined: boolean }) {
           {copied() ? "Copied" : "Copy link"}
         </button>
       </div>
-      <Show when={sharing()}>
-        {(shared) => (
-          <div class="share-status">
-            <p class="helper-note">{shared().people} people share this list</p>
-            <button
-              type="button"
-              class="text-button is-danger"
-              disabled={props.share.busy()}
-              onClick={() => void props.share.leave()}
-            >
-              {shared().role === "owner" ? "Stop sharing" : "Leave this list"}
-            </button>
-          </div>
+      <Show when={space()?.kind === "group" && space()}>
+        {(group) => (
+          <>
+            <label class="share-name">
+              <span>Name</span>
+              <input
+                value={group().name}
+                placeholder={SPACES.groupName}
+                maxLength={SPACES.nameLength}
+                enterkeyhint="done"
+                onChange={(event) =>
+                  void props.share.rename(event.currentTarget.value)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+              />
+            </label>
+            <div class="share-status">
+              <p class="helper-note">
+                {group().people === 1
+                  ? "Only you so far"
+                  : `${group().people} people`}
+              </p>
+              <button
+                type="button"
+                class="text-button is-danger"
+                disabled={props.share.busy()}
+                onClick={() => void props.share.leave()}
+              >
+                {group().owner ? "Delete space" : "Leave space"}
+              </button>
+            </div>
+          </>
         )}
       </Show>
     </div>

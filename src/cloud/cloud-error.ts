@@ -5,7 +5,8 @@ import { MESSAGES } from "./messages.ts";
 const SQL_CODES = {
   unauthorized: "PT401",
   deleted: "PT403",
-  rejected: ["PT400", "PT404", "PT409"],
+  missing: "PT404",
+  rejected: ["PT400", "PT409"],
 } as const;
 
 /** A rejection message longer than this is not authored copy. */
@@ -46,6 +47,13 @@ export class CloudError extends Error {
       return new CloudError("unauthorized", MESSAGES.sessionExpired);
     if (body.code === SQL_CODES.deleted)
       return new CloudError("account_deleted", MESSAGES.accountDeleted);
+    // A space (or a link) that is gone, or never was the caller's.
+    if (
+      body.code === SQL_CODES.missing &&
+      typeof body.message === "string" &&
+      body.message.length < MAX_REJECTION_LENGTH
+    )
+      return new CloudError("missing", body.message);
     if (status === HTTP_STATUS.tooManyRequests)
       return new CloudError("rate_limited", MESSAGES.rateLimited);
     if (

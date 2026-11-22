@@ -81,9 +81,9 @@ export class AccountClient {
     return this.account;
   }
 
-  /** Sends changes and reads the whole list back (see planner_list). */
-  syncList<T>(changes: ListChanges): Promise<T> {
-    return this.call("planner_list", "sync", { ...changes });
+  /** Sends changes and reads a space's whole list back; null space is Personal (see planner_list). */
+  syncList<T>(changes: ListChanges, space: string | null): Promise<T> {
+    return this.call("planner_list", "sync", { ...changes, space });
   }
 
   /**
@@ -96,26 +96,44 @@ export class AccountClient {
     return account && !account.guest ? account : null;
   }
 
-  /** The shared list's link token (made on first use); see planner_list('share'). */
-  async shareToken(): Promise<string> {
-    const { token } = await this.call<{ token?: unknown }>(
+  /**
+   * Shares a space: Personal becomes a new group space (its tasks move
+   * there); a group space gives its link token. See planner_list('share').
+   */
+  async shareSpace(
+    space: string | null,
+    name = "",
+  ): Promise<{ space: string; token: string }> {
+    const result = await this.call<{ space?: unknown; token?: unknown }>(
       "planner_list",
       "share",
-      {},
+      { space, name },
     );
-    if (typeof token !== "string")
+    if (typeof result.space !== "string" || typeof result.token !== "string")
       throw new CloudError("server", MESSAGES.incompleteResponse);
-    return token;
+    return { space: result.space, token: result.token };
   }
 
-  /** Joins the list behind a link token. */
-  async joinList(token: string): Promise<void> {
-    await this.call("planner_list", "join", { token });
+  /** Joins the group space behind a link token; returns its id. */
+  async joinSpace(token: string): Promise<string> {
+    const { space } = await this.call<{ space?: unknown }>(
+      "planner_list",
+      "join",
+      { token },
+    );
+    if (typeof space !== "string")
+      throw new CloudError("server", MESSAGES.incompleteResponse);
+    return space;
   }
 
-  /** A member leaves the shared list; the owner stops sharing it. */
-  async leaveList(): Promise<void> {
-    await this.call("planner_list", "leave", {});
+  /** Renames a group space. */
+  async renameSpace(space: string, name: string): Promise<void> {
+    await this.call("planner_list", "rename", { space, name });
+  }
+
+  /** A member leaves a group space; its owner deletes it for everyone. */
+  async leaveSpace(space: string): Promise<void> {
+    await this.call("planner_list", "leave", { space });
   }
 
   /** For listening to this account's shared list in real time; null before there is an account. */

@@ -73,16 +73,25 @@ export interface Backend {
   helperStarts: Record<string, number>;
   /** Emails a sign-in code was sent to. */
   codesSent: string[];
-  /** The list's share link token, once shared. */
-  shareToken: string | null;
-  /** How many people are in the shared list (the caller included); 1 while not shared. */
-  people: number;
-  /** The caller's role in the shared list, if any. */
-  role: "owner" | "member" | null;
+  /** Group spaces (Personal is `tasks` above, for whoever syncs). */
+  groups: GroupSpace[];
 }
 
+/** A group space in the fixture: made by sharing Personal, joined by its link. */
+export interface GroupSpace {
+  id: string;
+  name: string;
+  token: string;
+  owner: string;
+  members: string[];
+  tasks: Task[];
+}
+
+export const GROUP_ID = "55555555-5555-4555-8555-555555555555";
+export const TOKEN = "0123456789abcdef0123456789abcdef";
+
 /** planner_list's merge: removals, then saves where the newest edit wins. */
-function applySync(state: Backend, save: Task[], remove: string[]): string[] {
+function applySync(state: { tasks: Task[]; full?: boolean }, save: Task[], remove: string[]): string[] {
   const rejected: string[] = [];
   state.tasks = state.tasks.filter((task) => !remove.includes(task.id));
   for (const task of save) {
@@ -109,7 +118,7 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
   /** The cloud's list when the test starts (wrapped: test.use reads a bare array as [value, options]). */
   seed: [{ tasks: [] }, { option: true }],
   backend: async ({ context, visitor, seed }, use) => {
-    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [], shareToken: null, people: 1, role: null };
+    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [], groups: [] };
     const initial = visitor === "account" ? session(ACCOUNT_ID, false) : visitor === "guest" ? session(GUEST_ID, true) : null;
     // Seed once per browser context, not on reload or each new tab.
     await context.addInitScript(({ initialSession, authKey, privacyKey, version }) => {
@@ -207,23 +216,46 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
           state.deletedAt = null;
         }
         if (body.p_action === "erase") { state.tasks = []; await send({ tasks: [], rejected: [] }); return; }
-        // Sharing: one fixture list; joining makes the caller a member of it.
-        if (["share", "join", "leave"].includes(body.p_action) && claims(authorization).is_anonymous) { await send({ code: "PT400", message: "Sign in to share a list." }, 400); return; }
-        if (body.p_action === "share") { state.shareToken ??= "0123456789abcdef0123456789abcdef"; await send({ token: state.shareToken }); return; }
+        // Spaces: Personal is `state.tasks`; group spaces are `state.groups`.
+        const anonymous = Boolean(claims(authorization).is_anonymous);
+        const group = (id: unknown) => state.groups.find((g) => g.id === id);
+        const missing = () => send({ code: "PT404", message: "This space isn't available any more." }, 404);
+        if (["share", "join"].includes(body.p_action) && anonymous) { await send({ code: "PT400", message: "Sign in to share a list." }, 400); return; }
         if (body.p_action === "join") {
-          if (args.token !== state.shareToken) { await send({ code: "PT404", message: "This link doesn't work any more. Ask for a new one." }, 404); return; }
-          state.role = "member";
-          state.people = 2;
-          await send({ joined: true });
+          const found = state.groups.find((g) => g.token === args.token);
+          if (!found) { await send({ code: "PT404", message: "This link doesn't work any more. Ask for a new one." }, 404); return; }
+          if (!found.members.includes(caller)) found.members.push(caller);
+          await send({ space: found.id });
           return;
         }
-        if (body.p_action === "leave") { state.role = null; state.people = 1; state.tasks = []; await send({ left: true }); return; }
+        const space = args.space && args.space !== caller ? group(args.space) : null;
+        if (args.space && args.space !== caller && (!space || !space.members.includes(caller))) { await missing(); return; }
+        if (body.p_action === "share") {
+          if (space) { await send({ space: space.id, token: space.token }); return; }
+          const made: GroupSpace = { id: GROUP_ID, name: args.name?.trim() || "Shared list", token: TOKEN, owner: caller, members: [caller], tasks: state.tasks };
+          state.groups.push(made);
+          state.tasks = [];
+          await send({ space: made.id, token: made.token });
+          return;
+        }
+        if (body.p_action === "rename" && space) { space.name = args.name.trim(); await send({ space: space.id, name: space.name }); return; }
+        if (body.p_action === "leave" && space) {
+          if (space.owner === caller) state.groups = state.groups.filter((g) => g !== space);
+          else space.members = space.members.filter((m) => m !== caller);
+          await send({ left: true });
+          return;
+        }
         if (state.failSyncs) { await send(state.failSyncs.body, state.failSyncs.status); return; }
         const save: Task[] = args.save ?? [];
         const remove: string[] = args.remove ?? [];
         state.syncs.push({ save, remove });
-        const rejected = applySync(state, save, remove);
-        await send({ tasks: [...state.tasks].sort((a, b) => b.createdAt - a.createdAt), rejected, shared: state.role ? { role: state.role, people: state.people } : null });
+        const holder = space ?? state;
+        const rejected = applySync(holder, save, remove);
+        const spaces = [
+          { id: caller, kind: "personal", name: "", people: 1, owner: true },
+          ...state.groups.filter((g) => g.members.includes(caller)).map((g) => ({ id: g.id, kind: "group", name: g.name, people: g.members.length, owner: g.owner === caller })),
+        ];
+        await send({ tasks: [...holder.tasks].sort((a, b) => b.createdAt - a.createdAt), rejected, spaces });
         return;
       }
       if (url.pathname !== "/rest/v1/rpc/planner_call") { await send({ error: "Unexpected fixture route" }, 404); return; }

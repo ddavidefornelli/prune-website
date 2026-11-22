@@ -913,3 +913,149 @@
     animation: none;
   }
 }
+
+/* ——— Spaces: Personal and the shared ones, like files in tldraw ——— */
+.space-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--tap);
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  font-size: var(--text);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.space-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.space-button svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .space-button:hover {
+    background: var(--hover);
+  }
+}
+.sheet-title {
+  margin: 0;
+  font-size: var(--text);
+  font-weight: 650;
+}
+.space-list {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+}
+.space-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--ink);
+  font-size: var(--text);
+  text-align: left;
+}
+.space-row svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.space-row.is-open {
+  background: var(--hover);
+  font-weight: 600;
+}
+.space-row.is-open svg {
+  stroke: var(--ink);
+}
+.space-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.space-row-people {
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) {
+  .space-row:hover {
+    background: var(--hover);
+  }
+}
+.space-sidebar {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .space-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    width: 248px;
+    padding: 18px 12px;
+    border-right: 1px solid var(--line);
+    background: var(--bg);
+    overflow-y: auto;
+  }
+  .space-sidebar .wordmark {
+    padding: 0 12px;
+  }
+  .app.has-spaces {
+    margin-left: max(280px, calc((100vw - var(--column)) / 2));
+  }
+  /* The sidebar lists the spaces: the header just names the open one. */
+  .app.has-spaces .space-button {
+    pointer-events: none;
+  }
+  .app.has-spaces .space-button svg {
+    display: none;
+  }
+}
+.share-name {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+}
+.share-name input {
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font-size: var(--text);
+}
+.share-name input:focus {
+  outline: none;
+  border-color: var(--ink);
+}

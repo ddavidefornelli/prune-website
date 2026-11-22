@@ -1,6 +1,5 @@
 import {
   batch,
-  createEffect,
   createMemo,
   createSignal,
   onCleanup,
@@ -11,13 +10,23 @@ import { analytics } from "../analytics.ts";
 import type { AccountClient } from "../cloud/account.ts";
 import { CloudError } from "../cloud/cloud-error.ts";
 import { MESSAGES } from "../cloud/messages.ts";
-import { ListChannel } from "../cloud/realtime.ts";
+import { STORAGE_KEYS } from "../shared/storage-keys.ts";
 import type { Account } from "../cloud/types.ts";
 import { LIST_TIMING, OPEN_TASK_LIMIT } from "./constants.ts";
 import { ListSync } from "./list-sync.ts";
 import { TaskList } from "./task-list.ts";
 import { browserStorage, TaskStorage } from "./task-storage.ts";
-import type { ListResponse, Sharing, Task } from "./types.ts";
+import type { ListResponse, Space, Task } from "./types.ts";
+
+/** Which space a ListState is, and what it tells the space switcher. */
+export interface ListOptions {
+  /** A group space's id; Personal when left out. */
+  space?: string | null;
+  /** Every sync's answer lists the account's spaces. */
+  onSpaces?: (spaces: Space[]) => void;
+  /** The space is gone (deleted by its owner) or the caller left it elsewhere. */
+  onMissing?: () => void;
+}
 
 /** Deleted tasks that one tap on Undo puts back. */
 export interface UndoOffer {
@@ -49,8 +58,6 @@ export class ListState {
   readonly account: Accessor<Account | null>;
   readonly erasing: Accessor<boolean>;
   readonly eraseError: Accessor<string>;
-  /** Who else edits this list, from the last sync; null while it is not shared. */
-  readonly sharing: Accessor<Sharing | null>;
 
   private readonly client: AccountClient;
   private readonly storage: TaskStorage;
@@ -64,13 +71,20 @@ export class ListState {
   private readonly settleTimers = new Map<string, Timer>();
   private undoTimer: Timer | undefined;
 
+  /** The space this list is (null: Personal). */
+  readonly space: string | null;
+  private readonly browser: Storage | null;
+
   constructor(
     client: AccountClient,
     storage: Storage | null = browserStorage(),
+    options: ListOptions = {},
   ) {
     this.client = client;
+    this.space = options.space ?? null;
+    this.browser = storage;
     TaskStorage.clearRetired(storage);
-    this.storage = new TaskStorage(storage);
+    this.storage = new TaskStorage(storage, this.space);
     const [list, setList] = createSignal(this.storage.read());
     const [undo, setUndo] = createSignal<UndoOffer | null>(null);
     const [notice, setNotice] = createSignal("");
@@ -80,10 +94,6 @@ export class ListState {
     const [settling, setSettling] = createSignal<ReadonlySet<string>>(
       new Set(),
     );
-    const [sharing, setSharing] = createSignal<Sharing | null>(null, {
-      equals: (a, b) => a?.role === b?.role && a?.people === b?.people,
-    });
-    this.sharing = sharing;
     this.list = list;
     this.setList = setList;
     this.undo = undo;
@@ -117,12 +127,13 @@ export class ListState {
       },
       send: async (changes) => {
         try {
-          const body = await client.syncList({
-            save: changes.save,
-            remove: changes.remove,
-          });
+          const body = await client.syncList(
+            { save: changes.save, remove: changes.remove },
+            this.space,
+          );
           const response = ListState.response(body);
-          setSharing(ListState.readSharing(body));
+          const spaces = ListState.readSpaces(body);
+          if (spaces) options.onSpaces?.(spaces);
           return response;
         } catch (error) {
           await this.recover(error);
@@ -134,16 +145,11 @@ export class ListState {
         setList(next);
         if (refused) setNotice(MESSAGES.listFull);
       },
-    });
-    // A shared list: everyone's changes arrive the moment they are saved.
-    const live = createMemo(() => !!sharing() && !!account());
-    createEffect(() => {
-      if (!live()) return;
-      const channel = new ListChannel(
-        () => client.realtimeAccess(),
-        () => this.sync.request(0),
-      );
-      onCleanup(() => channel.close());
+      carryOver: this.space === null,
+      onMissing: () => {
+        this.storage.clear();
+        options.onMissing?.();
+      },
     });
     const unwatch = this.storage.watch(() => setList(this.storage.read()));
     this.sync.start();
@@ -166,20 +172,29 @@ export class ListState {
     };
   }
 
-  /** Who else edits the list, from a sync's answer. */
-  private static readSharing(value: unknown): Sharing | null {
-    const shared = (value as { shared?: Partial<Sharing> } | null)?.shared;
-    if (
-      (shared?.role !== "owner" && shared?.role !== "member") ||
-      typeof shared.people !== "number"
-    )
-      return null;
-    return { role: shared.role, people: shared.people };
+  /** The spaces in a sync's answer, or null when it has none (an older backend). */
+  private static readSpaces(value: unknown): Space[] | null {
+    const spaces = (value as { spaces?: unknown } | null)?.spaces;
+    if (!Array.isArray(spaces)) return null;
+    return spaces
+      .filter(
+        (space): space is Space =>
+          typeof space?.id === "string" &&
+          (space.kind === "personal" || space.kind === "group") &&
+          typeof space.name === "string" &&
+          typeof space.owner === "boolean",
+      )
+      .map((space) => ({ ...space, people: Number(space.people) || 1 }));
   }
 
-  /** Syncs now: after joining or leaving a shared list, the cloud's list is another. */
+  /** Syncs now: someone else changed this space. */
   refresh(): void {
     this.sync.request(0);
+  }
+
+  /** Syncs now and waits, so the cloud has everything this device has. */
+  flush(): Promise<void> {
+    return this.sync.flush();
   }
 
   task(id: string): Task | undefined {
@@ -264,6 +279,12 @@ export class ListState {
     try {
       await this.client.eraseEverything();
       this.storage.clear();
+      TaskStorage.clearSpaces(this.browser);
+      try {
+        this.browser?.removeItem(STORAGE_KEYS.spaces);
+      } catch {
+        // Only the switcher's cache: the next account starts with Personal anyway.
+      }
       analytics.capture("everything_erased");
       analytics.forgetAccount();
       window.location.reload();

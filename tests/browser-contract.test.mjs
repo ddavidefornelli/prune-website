@@ -25,10 +25,15 @@ for (const [url, secret] of [
   ["https://project.supabase.co", `h.${btoa(JSON.stringify({ role: "service_role" }))}.s`],
 ]) test(`rejects unsafe or missing public config: ${url}`, () => assert.throws(() => publicConfig(url, secret)));
 
-for (const code of ["PT400", "PT404", "PT409"]) test(`only a definite rejection (${code}) lets the list drop a change`, () => {
+for (const code of ["PT400", "PT409"]) test(`only a definite rejection (${code}) lets the list drop a change`, () => {
   const error = httpError(400, { code, message: "Some changes could not be read." });
   assert.equal(error.code, "validation");
   assert.match(error.message, /could not be read/);
+});
+test("a space that is gone (PT404) closes it instead of dropping changes", () => {
+  const error = httpError(404, { code: "PT404", message: "This space isn't available any more." });
+  assert.equal(error.code, "missing");
+  assert.match(error.message, /isn't available/);
 });
 for (const status of [400, 404, 409, 500, 502, 503]) test(`ambiguous HTTP ${status} keeps changes to retry, without leaking details`, () => {
   const error = httpError(status, { code: "XX000", message: "sensitive database details" });

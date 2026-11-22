@@ -7,9 +7,9 @@ The hosted Supabase project, after `20261125000100_retire_day_planner.sql`. The 
 | Table | What it holds | Who reaches it |
 | --- | --- | --- |
 | `planner_accounts` | One row per account: `user_id`, `"isDeleted"`, `deleted_at` (deletion and the 30-day manual removal). | `planner_list`, `planner_call`; owners may read their own row. |
-| `planner_list_tasks` | The list: one row per task (title, done, created, last edited, finished), at most 1,000 per account. The website also allows only five open tasks at a time (`OPEN_TASK_LIMIT`, browser only; the database does not check it). | Only `planner_list` (no browser grants). |
-| `planner_list_shares` | A shared list's secret link token, one per owner (32 hex characters). Stop sharing deletes it. | Only `planner_list`. |
-| `planner_list_members` | Who joined whose list through its link: one list per member. A member's `planner_list` calls read and write the owner's tasks. | Only `planner_list`. |
+| `planner_list_tasks` | The lists: one row per task (its space, title, done, created, last edited, finished), at most 1,000 per space. The website also allows only five open tasks at a time (`OPEN_TASK_LIMIT`, browser only; the database does not check it). | Only `planner_list` (no browser grants). |
+| `planner_spaces` | Spaces: one Personal per account (its id is the user id) and group spaces (name, link token, owner). Deleting one deletes its tasks. | Only `planner_list`. |
+| `planner_space_members` | Who is in which space (everyone in their Personal; owner and joiners in a group space). | Only `planner_list`. |
 | `planner_email_reminders` | Come-back emails for accounts from before guests: time zone, last visit, the switch, send count, unsubscribe token, and the focus time and weekdays-only choice that set the morning window. | The reminder functions (service role); `planner_list` records visits. |
 | `planner_push_subscriptions` | Browsers that turned notifications on in the day planner. | The reminder functions (service role). |
 | `planner_helper_runs` | "Do it for me": one answer per task (the question it was asked with, the latest answer, its sources and the refine conversation). Deleting the task deletes it (trigger). | The `task-helper` Edge Function (service role). |
@@ -22,7 +22,7 @@ Every row goes with its Auth user (`on delete cascade`).
 
 | Function | Caller |
 | --- | --- |
-| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` (with `shared`: the role and how many people) and `'erase'` (a member only leaves); signed-in accounts also `'share'` (the link token), `'join'` and `'leave'` (a member leaves; the owner stops sharing). |
+| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` (a space, Personal by default; also lists the caller's spaces) and `'erase'` (deletes the spaces the caller owns, leaves the rest); signed-in accounts also `'share'` (Personal becomes a group space; a group space gives its link), `'join'`, `'rename'` and `'leave'` (the owner deletes the space). |
 | `planner_call(action, args, timezone)` | The browser (`authenticated`, not guests): only `'delete_account'`. |
 | `planner_claim_reminders`, `planner_release_reminder`, `planner_push_targets`, `planner_push_result` | The `daily-reminders` Edge Function. |
 | `planner_unsubscribe` | The `email-unsubscribe` Edge Function. |
@@ -49,4 +49,6 @@ It unschedules cron jobs that used them (`pro-ai-retention`) and runs the remind
 
 ## Realtime
 
-`20261127000200_list_realtime.sql`: after each write to `planner_list_tasks`, statement triggers (`planner_list_broadcast`) send a Supabase Realtime broadcast `changed` (no task content) to the private topic `list:<user id>` of everyone in that list, only when someone joined it. A policy on `realtime.messages` lets a signed-in user receive only their own topic. The browser (`ListChannel`, `src/cloud/realtime.ts`) listens while its list is shared and syncs on each ping; a failed send never blocks a sync, and the half-minute poll stays as the fallback.
+After each write to `planner_list_tasks` or `planner_space_members`, statement triggers call `planner_space_notify`, which sends a Supabase Realtime broadcast `changed` with `{space}` (no task content) to the private topic `list:<user id>` of everyone in a group space with more than one person (and to whoever left or lost a deleted space). A policy on `realtime.messages` lets a signed-in user receive only their own topic. The browser (`ListChannel`, `src/cloud/realtime.ts`) listens while any of its spaces has other people and syncs the open space on each ping; a failed send never blocks a sync, and the half-minute poll stays as the fallback.
+
+`20261128000100_spaces.sql` replaced `planner_list_shares` and `planner_list_members` (one shared list per account) with spaces: each shared list became a group space with the same link and people.

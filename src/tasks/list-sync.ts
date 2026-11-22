@@ -1,6 +1,6 @@
 import { CloudError } from "../cloud/cloud-error.ts";
 import { LIST_SYNC } from "./constants.ts";
-import type { TaskList } from "./task-list.ts";
+import { TaskList } from "./task-list.ts";
 import type { TaskStorage } from "./task-storage.ts";
 import type { ListBatch, ListResponse } from "./types.ts";
 
@@ -15,6 +15,14 @@ interface ListSyncOptions {
   storage: TaskStorage;
   /** A new list from the cloud; `refused` counts new tasks the full list refused. */
   onUpdate: (list: TaskList, refused: number) => void;
+  /**
+   * A list kept for another account: true carries it over (a guest's Personal
+   * list goes with them when they sign in); false starts this one empty (a
+   * group space belongs to its people, not to whoever uses this browser).
+   */
+  carryOver: boolean;
+  /** The space is gone, or not the caller's any more. */
+  onMissing: () => void;
 }
 
 /** One sync at a time across this browser's tabs, so no answer undoes another tab's. */
@@ -86,6 +94,14 @@ export class ListSync {
     this.timer = setTimeout(() => void this.run(), delay);
   }
 
+  /** Syncs now and waits for it: everything on this device is in the cloud after, if it could be. */
+  async flush(): Promise<void> {
+    if (this.stopped) return;
+    clearTimeout(this.timer);
+    await this.running;
+    await this.run();
+  }
+
   /** Syncs straight away, without waiting for a timer. */
   private now(): void {
     if (this.stopped) return;
@@ -128,7 +144,10 @@ export class ListSync {
     if (!owner) return;
     let list = storage.read();
     if (list.owner !== owner) {
-      list = list.adopt(owner);
+      list =
+        this.options.carryOver || !list.owner
+          ? list.adopt(owner)
+          : TaskList.empty().adopt(owner);
       storage.write(list);
       onUpdate(list, 0);
     }
@@ -143,6 +162,10 @@ export class ListSync {
       onUpdate(next, response.rejected.length);
       if (next.hasPending) this.request(0);
     } catch (error) {
+      if (CloudError.codeOf(error) === "missing") {
+        this.options.onMissing();
+        return;
+      }
       const changes = Object.keys(batch.sent).length;
       if (CloudError.codeOf(error) === "validation" && changes > 1) {
         // One change spoils the whole batch: find it without losing the rest.

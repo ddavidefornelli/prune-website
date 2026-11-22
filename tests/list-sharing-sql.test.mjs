@@ -12,9 +12,10 @@ const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const NOW = Date.now();
 const task = (n, fields = {}) => ({ id: id(n), title: `Task ${n}`, done: false, createdAt: NOW + n, updatedAt: NOW + n, doneAt: null, ...fields });
 const titles = (result) => result.tasks.map((t) => t.title);
+const spaces = (result) => result.spaces.map((s) => [s.kind, s.name, Number(s.people), s.owner]);
 
-async function fixture() {
-  const db = await backendDb();
+async function fixture({ until } = {}) {
+  const db = await backendDb(until ? { until } : {});
   await db.query(
     "insert into auth.users(id, email) values ($1, 'owner@example.test'), ($2, 'friend@example.test'), ($3, 'stranger@example.test')",
     [owner, friend, stranger],
@@ -22,115 +23,118 @@ async function fixture() {
   return db;
 }
 
-/** The owner shares a list with one task; returns the link token. */
+/** The owner shares Personal (with one task); returns the new group space and its link token. */
 async function shared(db) {
   await as(db, owner);
   await sync(db, { save: [task(1)] });
-  return (await call(db, "share")).token;
+  return call(db, "share");
 }
 
-test("sharing gives one stable link, and the list says who else is in it", async () => {
+test("everyone starts with Personal; sync without a space is Personal", async () => {
   const db = await fixture();
-  const token = await shared(db);
-  assert.match(token, /^[0-9a-f]{32}$/);
-  assert.equal((await call(db, "share")).token, token);
-  // Nobody joined yet: not shared.
-  assert.equal((await sync(db)).shared, null);
-});
-
-test("joining moves the friend's tasks in, and both edit the same list", async () => {
-  const db = await fixture();
-  const token = await shared(db);
-  await as(db, friend);
-  await sync(db, { save: [task(2)] });
-  assert.deepEqual(await call(db, "join", { token: token.toUpperCase() }), { joined: true });
-  const theirs = await sync(db, { save: [task(3)] });
-  assert.deepEqual(titles(theirs), ["Task 3", "Task 2", "Task 1"]);
-  assert.deepEqual(theirs.shared, { role: "member", people: 2 });
-  // A member gets the same link to pass on.
-  assert.equal((await call(db, "share")).token, token);
   await as(db, owner);
-  const mine = await sync(db, { remove: [id(2)] });
-  assert.deepEqual(titles(mine), ["Task 3", "Task 1"]);
-  assert.deepEqual(mine.shared, { role: "owner", people: 2 });
-  // Joining again, or one's own link, changes nothing.
-  assert.deepEqual(await call(db, "join", { token }), { joined: true });
-  await as(db, friend);
-  assert.deepEqual(await call(db, "join", { token }), { joined: true });
-  assert.deepEqual(titles(await sync(db)), ["Task 3", "Task 1"]);
+  const first = await sync(db, { save: [task(1)] });
+  assert.deepEqual(spaces(first), [["personal", "", 1, true]]);
+  assert.equal(first.spaces[0].id, owner);
+  assert.deepEqual(titles(await sync(db, { space: owner })), ["Task 1"]);
 });
 
-test("guests cannot share or join, and a wrong link is refused", async () => {
+test("sharing Personal makes a group space of its tasks and leaves Personal empty", async () => {
   const db = await fixture();
-  const token = await shared(db);
+  const { space, token } = await shared(db);
+  assert.match(token, /^[0-9a-f]{32}$/);
+  assert.notEqual(space, owner);
+  const personal = await sync(db);
+  assert.deepEqual(personal.tasks, []);
+  assert.deepEqual(spaces(personal), [["personal", "", 1, true], ["group", "Shared list", 1, true]]);
+  assert.deepEqual(titles(await sync(db, { space })), ["Task 1"]);
+  // Sharing the group space again gives the same link.
+  assert.deepEqual(await call(db, "share", { space }), { space, token });
+  // A new Personal task stays personal.
+  await sync(db, { save: [task(2)] });
+  assert.deepEqual(titles(await sync(db, { space })), ["Task 1"]);
+});
+
+test("joining adds the group space and keeps the joiner's Personal apart", async () => {
+  const db = await fixture();
+  const { space, token } = await shared(db);
+  await as(db, friend);
+  await sync(db, { save: [task(5)] });
+  assert.deepEqual(await call(db, "join", { token: token.toUpperCase() }), { space });
+  assert.deepEqual(titles(await sync(db)), ["Task 5"]);
+  const group = await sync(db, { space, save: [task(3)] });
+  assert.deepEqual(titles(group), ["Task 3", "Task 1"]);
+  assert.deepEqual(spaces(group), [["personal", "", 1, true], ["group", "Shared list", 2, false]]);
+  // Anyone in it renames it; everyone sees the name.
+  await call(db, "rename", { space, name: "  Trip  " });
+  await as(db, owner);
+  const theirs = await sync(db, { space, remove: [id(3)] });
+  assert.deepEqual(titles(theirs), ["Task 1"]);
+  assert.deepEqual(spaces(theirs)[1], ["group", "Trip", 2, true]);
+  // Joining again changes nothing.
+  await as(db, friend);
+  assert.deepEqual(await call(db, "join", { token }), { space });
+  assert.equal(Number((await sync(db, { space })).spaces[1].people), 2);
+});
+
+test("guests cannot share or join; wrong links and other people's spaces are refused", async () => {
+  const db = await fixture();
+  const { space, token } = await shared(db);
   await as(db, friend, { is_anonymous: true });
   await assert.rejects(call(db, "share"), (error) => error.code === "PT400");
   await assert.rejects(call(db, "join", { token }), (error) => error.code === "PT400");
   await as(db, friend);
   await assert.rejects(call(db, "join", { token: "0".repeat(32) }), (error) => error.code === "PT404");
   await assert.rejects(call(db, "join", {}), (error) => error.code === "PT404");
-  // A stranger without the link never sees the list.
-  await as(db, stranger);
-  assert.deepEqual((await sync(db)).tasks, []);
+  // Without the link, the space cannot be read, written or renamed.
+  await assert.rejects(sync(db, { space }), (error) => error.code === "PT404");
+  await assert.rejects(sync(db, { space, save: [task(9)] }), (error) => error.code === "PT404");
+  await assert.rejects(call(db, "rename", { space, name: "Mine" }), (error) => error.code === "PT404");
+  // Nor another person's Personal.
+  await assert.rejects(sync(db, { space: owner }), (error) => error.code === "PT404");
+  await assert.rejects(sync(db, { space: "not-a-uuid" }), (error) => error.code === "PT400");
+  await assert.rejects(call(db, "leave", { space: friend }), (error) => error.code === "PT400");
 });
 
-test("a member who leaves gets an empty list; the shared list stays", async () => {
+test("a member leaves; the owner deletes the space for everyone", async () => {
   const db = await fixture();
-  const token = await shared(db);
+  const { space, token } = await shared(db);
   await as(db, friend);
   await call(db, "join", { token });
-  assert.deepEqual(await call(db, "leave"), { left: true });
-  const after = await sync(db);
-  assert.deepEqual(after.tasks, []);
-  assert.equal(after.shared, null);
+  assert.deepEqual(await call(db, "leave", { space }), { left: true });
+  assert.deepEqual(spaces(await sync(db)), [["personal", "", 1, true]]);
   await as(db, owner);
-  assert.deepEqual(titles(await sync(db)), ["Task 1"]);
-});
-
-test("stopping sharing removes every member and the old link stops working", async () => {
-  const db = await fixture();
-  const token = await shared(db);
+  assert.deepEqual(titles(await sync(db, { space })), ["Task 1"]);
   await as(db, friend);
   await call(db, "join", { token });
   await as(db, owner);
-  await call(db, "leave");
-  assert.equal((await sync(db)).shared, null);
+  await call(db, "leave", { space });
+  assert.equal((await db.query("select count(*)::int as n from public.planner_list_tasks")).rows[0].n, 0);
   await as(db, friend);
-  assert.deepEqual((await sync(db)).tasks, []);
-  await assert.rejects(call(db, "join", { token }), (error) => error.code === "PT404");
-  // Sharing again makes a new link.
-  await as(db, owner);
-  assert.notEqual((await call(db, "share")).token, token);
-});
-
-test("an owner with members cannot join another list; erase by a member only leaves", async () => {
-  const db = await fixture();
-  const token = await shared(db);
-  await as(db, friend);
-  await call(db, "join", { token });
-  await as(db, stranger);
-  const other = (await call(db, "share")).token;
-  await as(db, owner);
-  await assert.rejects(call(db, "join", { token: other }), (error) => error.code === "PT409");
-  await as(db, friend);
-  await call(db, "erase");
-  await as(db, owner);
-  const list = await sync(db);
-  assert.deepEqual(titles(list), ["Task 1"]);
-  assert.equal(list.shared, null);
-  // The owner's erase empties the list and stops sharing.
-  await as(db, friend);
-  await call(db, "join", { token });
-  await as(db, owner);
-  await call(db, "erase");
-  await as(db, friend);
-  assert.deepEqual((await sync(db)).tasks, []);
+  await assert.rejects(sync(db, { space }), (error) => error.code === "PT404");
   await assert.rejects(call(db, "join", { token }), (error) => error.code === "PT404");
 });
 
-test("a deleted shared task takes members' helper answers with it", async () => {
+test("erase deletes the spaces one owns and leaves the others", async () => {
   const db = await fixture();
-  const token = await shared(db);
+  const mine = await shared(db);
+  await as(db, friend);
+  await sync(db, { save: [task(5)] });
+  await call(db, "join", { token: mine.token });
+  const theirs = await call(db, "share");
+  await as(db, owner);
+  await call(db, "join", { token: theirs.token });
+  await as(db, friend);
+  await call(db, "erase");
+  // The friend's space is gone; the owner's stays, without the friend.
+  await as(db, owner);
+  const after = await sync(db, { space: mine.space });
+  assert.deepEqual(spaces(after), [["personal", "", 1, true], ["group", "Shared list", 1, true]]);
+});
+
+test("a deleted shared task takes everyone's helper answers with it", async () => {
+  const db = await fixture();
+  const { space, token } = await shared(db);
   await as(db, friend);
   await call(db, "join", { token });
   await db.query(
@@ -138,59 +142,83 @@ test("a deleted shared task takes members' helper answers with it", async () => 
     [friend, id(1)],
   );
   await as(db, owner);
-  await sync(db, { remove: [id(1)] });
+  await sync(db, { space, remove: [id(1)] });
   assert.equal((await db.query("select count(*)::int as n from public.planner_helper_runs")).rows[0].n, 0);
+});
+
+test("shared lists from before spaces become group spaces with the same link and people", async () => {
+  const db = await fixture({ until: "20261127000200_list_realtime.sql" });
+  await as(db, owner);
+  await call(db, "sync", { save: [task(1)] });
+  const { token } = await call(db, "share");
+  await as(db, friend);
+  await call(db, "sync", { save: [task(5)] });
+  await call(db, "join", { token });
+  await as(db, stranger);
+  await call(db, "sync", { save: [task(9)] });
+  await db.exec((await import("./helpers/backend-db.mjs")).migration("20261128000100_spaces.sql"));
+
+  await as(db, owner);
+  const personal = await sync(db);
+  assert.deepEqual(personal.tasks, []);
+  const group = personal.spaces[1];
+  assert.deepEqual([group.kind, group.name, Number(group.people), group.owner], ["group", "Shared list", 2, true]);
+  // The friend's tasks had moved into the shared list when they joined.
+  assert.deepEqual(titles(await sync(db, { space: group.id })), ["Task 5", "Task 1"]);
+  await as(db, friend);
+  assert.deepEqual(await call(db, "join", { token }), { space: group.id });
+  await as(db, stranger);
+  assert.deepEqual(titles(await sync(db)), ["Task 9"]);
 });
 
 /** A stand-in for Supabase Realtime's send, recording each broadcast. */
 async function recordBroadcasts(db) {
   await db.exec(`
     create schema if not exists realtime;
-    create table realtime.sent (topic text, event text, private boolean);
+    create table realtime.sent (topic text, event text, private boolean, payload jsonb);
     create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
-      language sql as 'insert into realtime.sent values (topic, event, private)';
+      language sql as 'insert into realtime.sent values (topic, event, private, payload)';
     grant usage on schema realtime to public;
     grant insert on realtime.sent to public;
   `);
   return async () => {
-    const rows = (await db.query("select topic, event, private from realtime.sent order by topic")).rows;
+    const rows = (await db.query("select topic, event, private, payload->>'space' as space from realtime.sent order by topic")).rows;
     await db.exec("delete from realtime.sent");
     return rows;
   };
 }
 
-test("a change to a shared list tells everyone in it, at once; other lists tell nobody", async () => {
+test("a change to a group space tells everyone in it, at once; Personal tells nobody", async () => {
   const db = await fixture();
   const sent = await recordBroadcasts(db);
-  const token = await shared(db);
-  // Not shared yet: nothing to tell.
+  const { space, token } = await shared(db);
   await sync(db, { save: [task(2)] });
   assert.deepEqual(await sent(), []);
   await as(db, friend);
   await call(db, "join", { token });
-  await sent();
-  await sync(db, { save: [task(3)] });
+  // Joining tells both (the count changed).
+  assert.deepEqual((await sent()).map((row) => row.topic), [`list:${owner}`, `list:${friend}`]);
+  await sync(db, { space, save: [task(3)] });
   assert.deepEqual(await sent(), [
-    { topic: `list:${owner}`, event: "changed", private: true },
-    { topic: `list:${friend}`, event: "changed", private: true },
+    { topic: `list:${owner}`, event: "changed", private: true, space },
+    { topic: `list:${friend}`, event: "changed", private: true, space },
   ]);
-  // A tick and a delete tell them too; a sync that changes nothing does not.
-  await sync(db, { save: [task(3, { done: true, doneAt: NOW + 50, updatedAt: NOW + 50 })] });
+  await sync(db, { space, remove: [id(3)] });
   assert.equal((await sent()).length, 2);
-  await sync(db, { remove: [id(3)] });
-  assert.equal((await sent()).length, 2);
-  await sync(db);
+  await sync(db, { space });
   assert.deepEqual(await sent(), []);
-  // A stranger's own list tells nobody.
-  await as(db, stranger);
   await sync(db, { save: [task(9)] });
   assert.deepEqual(await sent(), []);
+  // The owner deletes it: the friend hears, so it leaves their switcher.
+  await as(db, owner);
+  await call(db, "leave", { space });
+  assert.ok((await sent()).some((row) => row.topic === `list:${friend}`));
 });
 
 test("without Realtime, syncs carry on", async () => {
   const db = await fixture();
-  const token = await shared(db);
+  const { space, token } = await shared(db);
   await as(db, friend);
   await call(db, "join", { token });
-  assert.deepEqual(titles(await sync(db, { save: [task(2)] })), ["Task 2", "Task 1"]);
+  assert.deepEqual(titles(await sync(db, { space, save: [task(2)] })), ["Task 2", "Task 1"]);
 });

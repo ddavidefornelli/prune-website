@@ -152,8 +152,10 @@ test("malformed changes are refused and nothing in the same sync is saved", asyn
 
 test("a full list drops its oldest done task for a new one, and keeps open tasks", async () => {
   const db = await fixture();
+  // The first sync makes the Personal space (its id is the user id).
+  await sync(db);
   await db.query(
-    `insert into public.planner_list_tasks(user_id, id, title, done, created_at, updated_at, done_at)
+    `insert into public.planner_list_tasks(space_id, id, title, done, created_at, updated_at, done_at)
      select $1, gen_random_uuid(), 'Open ' || n, false, now(), now(), null from generate_series(1, 998) n`,
     [owner],
   );

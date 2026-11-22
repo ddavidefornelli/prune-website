@@ -65,10 +65,14 @@ test("a guest is made only when there is something to keep, then remembered", as
 test("list syncs name the account they expect, with the browser's time zone", async (t) => {
   const f = fixture(t);
   await f.client.ensureAccount();
-  await f.client.syncList({ save: [], remove: ["x"] });
-  const sync = f.calls.find(({ command, action }) => command === "planner_list" && action === "sync");
-  assert.equal(sync.accountKey, guest.accountKey);
-  assert.deepEqual(sync.args, { save: [], remove: ["x"] });
+  await f.client.syncList({ save: [], remove: ["x"] }, null);
+  await f.client.syncList({ save: [], remove: [] }, "55555555-5555-4555-8555-555555555555");
+  const [personal, group] = f.calls.filter(({ command, action }) => command === "planner_list" && action === "sync");
+  assert.equal(personal.accountKey, guest.accountKey);
+  // Personal is the default space; a group space is named.
+  assert.deepEqual(personal.args, { save: [], remove: ["x"], space: null });
+  assert.equal(group.args.space, "55555555-5555-4555-8555-555555555555");
+  const sync = personal;
   assert.equal(sync.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
 });
 

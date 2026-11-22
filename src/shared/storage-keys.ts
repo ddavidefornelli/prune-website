@@ -1,3 +1,6 @@
+/** Every group space's list starts with this (see STORAGE_KEYS.spaceList). */
+export const SPACE_LIST_PREFIX = "prune:space:v1:";
+
 /**
  * Every browser storage key the app reads or writes. These are persisted
  * names: changing one silently forgets what visitors already saved, so a new
@@ -8,8 +11,12 @@ export const STORAGE_KEYS = {
   cookieChoice: "prune:cookies:v1",
   /** Supabase's saved session (a guest's or an account's) for one project. */
   auth: (projectUrl: string) => `prune:auth:${projectUrl}`,
-  /** This browser's list, the changes not yet in the cloud, and whose it is. */
+  /** This browser's Personal list, the changes not yet in the cloud, and whose it is. */
   list: "prune:list:v1",
+  /** A group space's list, in the same shape as the Personal one. */
+  spaceList: (spaceId: string) => `${SPACE_LIST_PREFIX}${spaceId}`,
+  /** The spaces this account is in, and which one is open. */
+  spaces: "prune:spaces:v1",
   /** Which tasks the helper can do, and its answers, for this browser's account. */
   helper: "prune:helper:v1",
   /** A "Do it for me" waiting for sign-in to finish (sessionStorage). */

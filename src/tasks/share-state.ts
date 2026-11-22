@@ -4,23 +4,29 @@ import type { AccountClient } from "../cloud/account.ts";
 import { CloudError } from "../cloud/cloud-error.ts";
 import { MESSAGES } from "../cloud/messages.ts";
 import { STORAGE_KEYS } from "../shared/storage-keys.ts";
-import { SHARE } from "./constants.ts";
+import { SHARE, SPACES } from "./constants.ts";
+import { browserStorage, TaskStorage } from "./task-storage.ts";
 import type { ListState } from "./list-state.ts";
+import { SpaceState } from "./space-state.ts";
 
 /** Where the person is in sharing; null when its sheet is closed. */
 export type ShareFlow =
   | { step: "loading" }
   /** Sharing and joining both need an account: `joining` when a link brought them. */
   | { step: "sign_in"; joining: boolean }
+  /** Sharing Personal: name the shared space its tasks move to. */
+  | { step: "start" }
   /** The link to copy; `joined` right after joining through one. */
   | { step: "link"; joined: boolean }
   /** A link that did not work, or a request that failed: the error says which. */
   | { step: "failed" };
 
 /**
- * Sharing the list: sign in, copy the link, send it. Whoever opens the link
- * and signs in joins the same list (see planner_list 'share' and 'join').
- * Create it inside a Solid owner, after the ListState it refreshes.
+ * Sharing, the way tldraw shares a file: sign in, copy the link, send it.
+ * Sharing Personal turns what is in it into a new group space and leaves
+ * Personal empty; a group space just gives its link. Whoever opens the link
+ * and signs in gets that space beside their own (see planner_list 'share'
+ * and 'join'). Create it inside a Solid owner.
  */
 export class ShareState {
   readonly flow: Accessor<ShareFlow | null>;
@@ -29,14 +35,21 @@ export class ShareState {
   readonly busy: Accessor<boolean>;
 
   private readonly client: AccountClient;
-  private readonly list: ListState;
+  private readonly spaces: SpaceState;
+  /** The open space's list, to send what is waiting before sharing it. */
+  private readonly list: () => ListState | null;
   private readonly setFlow: (flow: ShareFlow | null) => void;
   private readonly setLink: (link: string) => void;
   private readonly setError: (error: string) => void;
   private readonly setBusy: (busy: boolean) => void;
 
-  constructor(client: AccountClient, list: ListState) {
+  constructor(
+    client: AccountClient,
+    spaces: SpaceState,
+    list: () => ListState | null,
+  ) {
     this.client = client;
+    this.spaces = spaces;
     this.list = list;
     const [flow, setFlow] = createSignal<ShareFlow | null>(null);
     const [link, setLink] = createSignal("");
@@ -84,6 +97,41 @@ export class ShareState {
     await this.showLink(false);
   }
 
+  /**
+   * Shares Personal: its tasks become a new group space (named `name`), which
+   * opens with its link; Personal starts empty.
+   */
+  async create(name: string): Promise<void> {
+    if (this.busy()) return;
+    let made: { space: string; token: string } | null = null;
+    const ok = await this.request(async () => {
+      // Whatever this device has not sent yet goes along.
+      await this.list()?.flush();
+      made = await this.client.shareSpace(null, name);
+    });
+    if (!ok || !made) return;
+    const { space, token } = made as { space: string; token: string };
+    analytics.capture("space_created");
+    this.spaces.add({
+      id: space,
+      kind: "group",
+      name: name.trim() || SPACES.groupName,
+      people: 1,
+      owner: true,
+    });
+    this.spaces.select(space);
+    // Personal's old copy on this device is now the group's.
+    new TaskStorage(browserStorage(), null).clear();
+    this.showToken(token, false);
+  }
+
+  /** Renames the open group space (from the sheet's name field). */
+  async rename(name: string): Promise<void> {
+    const space = this.spaces.open();
+    if (space?.kind !== "group") return;
+    await this.request(() => this.spaces.rename(space.id, name));
+  }
+
   close(): void {
     // Closing an invitation turns it down.
     ShareState.session((storage) => storage.removeItem(STORAGE_KEYS.shareJoin));
@@ -104,21 +152,22 @@ export class ShareState {
     }
   }
 
-  /** A member leaves; the owner stops sharing. Both after a confirmation. */
+  /** A member leaves the open group space; its owner deletes it. Both after a confirmation. */
   async leave(): Promise<void> {
-    const owner = this.list.sharing()?.role === "owner";
+    const space = this.spaces.open();
+    if (space?.kind !== "group" || this.busy()) return;
+    const name = SpaceState.label(space);
     if (
-      this.busy() ||
       !window.confirm(
-        owner ? MESSAGES.confirmStopSharing : MESSAGES.confirmLeave,
+        space.owner
+          ? MESSAGES.confirmDeleteSpace(name)
+          : MESSAGES.confirmLeaveSpace(name),
       )
     )
       return;
-    const ok = await this.request(() => this.client.leaveList());
+    const ok = await this.request(() => this.spaces.leave(space.id));
     if (!ok) return;
-    analytics.capture(owner ? "share_stopped" : "share_left");
     this.setLink("");
-    this.list.refresh();
     this.close();
   }
 
@@ -189,15 +238,26 @@ export class ShareState {
       this.setFlow({ step: "sign_in", joining: true });
       return;
     }
-    const ok = await this.request(() => this.client.joinList(token), true);
+    let space = "";
+    const ok = await this.request(async () => {
+      space = await this.client.joinSpace(token);
+    }, true);
     ShareState.session((storage) => storage.removeItem(STORAGE_KEYS.shareJoin));
     if (!ok) {
       this.setFlow({ step: "failed" });
       return;
     }
     analytics.capture("share_joined");
-    this.list.refresh();
-    await this.showLink(true);
+    if (!this.spaces.spaces().some((item) => item.id === space))
+      this.spaces.add({
+        id: space,
+        kind: "group",
+        name: "",
+        people: 2,
+        owner: false,
+      });
+    this.spaces.select(space);
+    this.showToken(token, true);
   }
 
   private async showLink(joined: boolean): Promise<void> {
@@ -211,14 +271,24 @@ export class ShareState {
       this.setFlow({ step: "sign_in", joining: false });
       return;
     }
+    // Personal is shared by making a group space of it: ask its name first.
+    const current = this.spaces.current();
+    if (current === null) {
+      this.setFlow({ step: "start" });
+      return;
+    }
     let token = "";
     const ok = await this.request(async () => {
-      token = await this.client.shareToken();
+      token = (await this.client.shareSpace(current)).token;
     });
     if (!ok) {
       this.setFlow({ step: "failed" });
       return;
     }
+    this.showToken(token, joined);
+  }
+
+  private showToken(token: string, joined: boolean): void {
     batch(() => {
       this.setLink(
         `${window.location.origin}/?${SHARE.joinParam}=${encodeURIComponent(token)}`,

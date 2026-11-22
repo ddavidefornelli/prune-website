@@ -41,10 +41,10 @@ export const MESSAGES = {
   // Sharing
   shareUnavailable: "Couldn't share right now. Try again.",
   joined: "You joined a shared list.",
-  confirmLeave:
-    "Leave this shared list? It stays with the people in it. Your list here will be empty.",
-  confirmStopSharing:
-    "Stop sharing? Everyone else leaves the list, and the link stops working.",
+  confirmLeaveSpace: (name: string) =>
+    `Leave ${name}? It stays with the people in it.`,
+  confirmDeleteSpace: (name: string) =>
+    `Delete ${name}? Its tasks are erased for everyone in it. This can't be undone.`,
 
   // The helper
   helperUnavailable: "The helper isn't available right now. Try again.",

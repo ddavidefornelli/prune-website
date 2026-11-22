@@ -33,12 +33,19 @@ export interface ListResponse {
   rejected: string[];
 }
 
-/** Who else edits this list; null while nobody joined it. */
-export interface Sharing {
-  /** The owner shared it; a member joined it through the link. */
-  role: "owner" | "member";
-  /** Everyone in it, the owner included. */
+/**
+ * A space: Personal (one per account, its id is the user id) or a group space
+ * made by sharing Personal or joined through a link (see planner_list).
+ */
+export interface Space {
+  id: string;
+  kind: "personal" | "group";
+  /** Empty for Personal. */
+  name: string;
+  /** Everyone in it, the caller included. */
   people: number;
+  /** The caller made it: they delete it rather than leave it. */
+  owner: boolean;
 }
 
 /** One sync's worth of changes, and the change times it carries. */

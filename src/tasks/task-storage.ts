@@ -1,5 +1,6 @@
 import {
   RETIRED_STORAGE_PREFIXES,
+  SPACE_LIST_PREFIX,
   STORAGE_KEYS,
 } from "../shared/storage-keys.ts";
 import { TaskList } from "./task-list.ts";
@@ -28,23 +29,35 @@ export class TaskStorage {
   private raw: string | null = null;
   private usable = true;
 
-  constructor(storage: ListStorage | null) {
+  /** `space`: a group space's id; null for Personal. */
+  constructor(storage: ListStorage | null, space: string | null = null) {
     this.storage = storage;
-    this.key = STORAGE_KEYS.list;
+    this.key = space ? STORAGE_KEYS.spaceList(space) : STORAGE_KEYS.list;
+  }
+
+  /** Forgets every group space's list on this device (Delete everything, another account). */
+  static clearSpaces(storage: Storage | null): void {
+    TaskStorage.clearPrefixes(storage, [SPACE_LIST_PREFIX]);
   }
 
   /** Removes what earlier versions kept, which nothing reads any more. */
   static clearRetired(storage: Storage | null): void {
+    TaskStorage.clearPrefixes(storage, RETIRED_STORAGE_PREFIXES);
+  }
+
+  private static clearPrefixes(
+    storage: Storage | null,
+    prefixes: readonly string[],
+  ): void {
     try {
       if (!storage) return;
       // Collect first: removing reorders the keys a browser lists by index.
-      const retired: string[] = [];
+      const found: string[] = [];
       for (let index = 0; index < storage.length; index += 1) {
         const key = storage.key(index);
-        if (key && RETIRED_STORAGE_PREFIXES.some((p) => key.startsWith(p)))
-          retired.push(key);
+        if (key && prefixes.some((p) => key.startsWith(p))) found.push(key);
       }
-      for (const key of retired) storage.removeItem(key);
+      for (const key of found) storage.removeItem(key);
     } catch {
       /* Storage is unavailable: there is nothing to clear. */
     }
