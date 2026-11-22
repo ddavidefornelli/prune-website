@@ -17,6 +17,8 @@ function fakeClient({ accepted = true, session = true } = {}) {
     identities: [],
     accountKey: session ? "project:guest-1" : null,
     failure: null,
+    /** Refuses a whole sync, as planner_list does, when any saved task matches. */
+    refuse: null,
     identityFailure: null,
     pending: null,
     erases: 0,
@@ -37,6 +39,7 @@ function fakeClient({ accepted = true, session = true } = {}) {
       client.syncs.push(structuredClone(changes));
       if (client.pending) await client.pending;
       if (client.failure) throw client.failure;
+      if (client.refuse && changes.save.some(client.refuse)) throw new CloudError("validation", "Some changes could not be read.");
       client.tasks = client.tasks.filter((task) => !changes.remove.includes(task.id));
       for (const task of changes.save) {
         const index = client.tasks.findIndex((saved) => saved.id === task.id);
@@ -155,6 +158,38 @@ test("a change the cloud refuses is dropped quietly", async (t) => {
   f.client.failure = null;
   await f.run(0);
   assert.deepEqual(titles(f.state.open()), []);
+});
+
+test("one change the cloud refuses never takes the rest of the batch with it", async (t) => {
+  const f = await fixture(t);
+  f.client.refuse = (task) => task.title === "Bad";
+  for (const title of ["One", "Bad", "Two", "Three"]) f.state.add(title);
+  await f.run(LIST_SYNC.debounceMs);
+  for (let i = 0; i < 6; i++) await f.run(0);
+  assert.deepEqual(titles(f.client.tasks).sort(), ["One", "Three", "Two"]);
+  assert.deepEqual(f.saved().pending, {});
+  // Back to whole batches once the list is caught up.
+  f.client.refuse = null;
+  f.state.add("Four");
+  f.state.add("Five");
+  const before = f.client.syncs.length;
+  await f.run(LIST_SYNC.debounceMs);
+  assert.equal(f.client.syncs.length, before + 1);
+  assert.deepEqual(titles(f.client.syncs.at(-1).save), ["Four", "Five"]);
+});
+
+test("hiding or closing the page sends a new task at once, without waiting for the pause", async (t) => {
+  const f = await fixture(t);
+  f.state.add("Typed, then switched apps");
+  f.document.visibilityState = "hidden";
+  f.document.dispatchEvent(new Event("visibilitychange"));
+  await f.run(0);
+  assert.deepEqual(titles(f.client.tasks), ["Typed, then switched apps"]);
+  f.state.add("Typed, then closed the tab");
+  f.window.dispatchEvent(new Event("pagehide"));
+  await f.run(0);
+  assert.deepEqual(titles(f.client.tasks).sort(), ["Typed, then closed the tab", "Typed, then switched apps"]);
+  assert.deepEqual(f.saved().pending, {});
 });
 
 test("edits made while a sync is out survive its answer, and go out next", async (t) => {

@@ -85,6 +85,21 @@ test("a refresh the server refuses ends the session; an outage keeps it for late
   assert.ok(offline.stored());
 });
 
+test("a token the server refuses although it looks fresh is renewed, unless another tab already did", async () => {
+  const next = session(3600, "guest-1", "refresh-2");
+  const f = fixture({ saved: session(), reply: () => json(next) });
+  assert.deepEqual(await f.auth.renew(session()), next);
+  assert.equal(f.requests.length, 1);
+  assert.deepEqual(f.requests[0].body, { refresh_token: "refresh-guest-1" });
+  assert.deepEqual(f.stored(), next);
+  // The stale copy's token was already replaced: the newer session, with no request.
+  assert.deepEqual(await f.auth.renew(session()), next);
+  assert.equal(f.requests.length, 1);
+  const over = fixture({ saved: session(), reply: () => json({ error_code: "refresh_token_not_found" }, 400) });
+  assert.equal(await over.auth.renew(session()), null);
+  assert.equal(over.stored(), null);
+});
+
 test("the server's check of a session tells a removed user from an outage", async () => {
   const saved = session();
   const known = fixture({ saved, reply: () => json(user("guest-1", { email: "" })) });

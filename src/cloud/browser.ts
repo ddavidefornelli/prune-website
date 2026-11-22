@@ -12,6 +12,9 @@ const RPC_ROUTES: Record<Rpc, string> = {
   planner_call: SUPABASE_ROUTES.planner,
 };
 
+/** Under the browsers' 64 KB limit for requests that outlive the page. */
+const KEEPALIVE_BYTES = 60_000;
+
 /**
  * The browser's transport: Supabase Auth for who this browser is, and the
  * backend's RPCs. Nothing is read or sent before the terms are accepted.
@@ -32,7 +35,16 @@ export class BrowserCloud implements CloudTransport {
     const auth = this.client();
     let session: Session | null = await auth.session();
     if (session) {
-      const user = await auth.user(session);
+      let user = await auth.user(session);
+      // Refused: try a fresh token before deciding the session is over, so a
+      // brief token problem never turns this browser into a new, empty guest.
+      if (!user) {
+        const renewed = await auth.renew(session);
+        if (renewed) {
+          session = renewed;
+          user = await auth.user(renewed);
+        }
+      }
       // Removed on the server, or a saved session that disagrees with its
       // own token (never trusted): start again as a new guest.
       if (!user || user.id !== session.user.id) {
@@ -59,12 +71,37 @@ export class BrowserCloud implements CloudTransport {
   }
 
   async call<T>(rpc: Rpc, accountKey: string, request: RpcRequest): Promise<T> {
+    const session = await this.client().session();
+    try {
+      return await this.send<T>(rpc, accountKey, request, session);
+    } catch (error) {
+      if (CloudError.codeOf(error) !== "unauthorized" || !session) throw error;
+      // The token was refused: once, with a fresh one, before giving up.
+      return this.send<T>(
+        rpc,
+        accountKey,
+        request,
+        await this.client().renew(session),
+      );
+    }
+  }
+
+  private async send<T>(
+    rpc: Rpc,
+    accountKey: string,
+    request: RpcRequest,
+    session: Session | null,
+  ): Promise<T> {
     // Identity and bearer token are read together: a request can never carry
     // one account's changes under another account's token.
-    const session = await this.client().session();
     if (!session) throw new CloudError("unauthorized", MESSAGES.sessionExpired);
     if (this.key(session.user.id) !== accountKey)
       throw new CloudError("account_changed", MESSAGES.accountChanged);
+    const body = JSON.stringify({
+      p_action: request.action,
+      p_args: request.args,
+      p_timezone: request.timezone,
+    });
     let response: Response;
     try {
       response = await boundedFetch.request(
@@ -76,11 +113,10 @@ export class BrowserCloud implements CloudTransport {
             apikey: this.config!.publicKey,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({
-            p_action: request.action,
-            p_args: request.args,
-            p_timezone: request.timezone,
-          }),
+          body,
+          // Finishes even when the page is closed mid-request (browsers cap
+          // such bodies at 64 KB; a larger one goes as a plain request).
+          keepalive: new TextEncoder().encode(body).length < KEEPALIVE_BYTES,
         },
       );
     } catch (error) {

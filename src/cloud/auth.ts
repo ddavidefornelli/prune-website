@@ -122,6 +122,19 @@ export class SupabaseAuth {
     return this.refreshing;
   }
 
+  /**
+   * A new access token even though this one looks fresh: the server refused
+   * it (a device clock running behind, say). Null when the session is over.
+   */
+  async renew(session: Session): Promise<Session | null> {
+    this.refreshing ??= this.locked(() =>
+      this.refresh(session.refresh_token),
+    ).finally(() => {
+      this.refreshing = null;
+    });
+    return this.refreshing;
+  }
+
   /** The user the server sees behind the session, or null when it no longer knows them. */
   async user(session: Session): Promise<AuthUser | null> {
     const response = await this.send(SUPABASE_ROUTES.user, {
@@ -193,10 +206,16 @@ export class SupabaseAuth {
     ) as Promise<unknown> as Promise<T>;
   }
 
-  private async refresh(): Promise<Session | null> {
+  /** `stale`: refresh even if not expiring, unless another tab already replaced that token. */
+  private async refresh(stale?: string): Promise<Session | null> {
     // Another tab may have refreshed it while this one waited for the lock.
     const current = this.saved();
-    if (!current || !SupabaseAuth.expiring(current)) return current;
+    if (!current) return null;
+    const replaced =
+      stale === undefined
+        ? !SupabaseAuth.expiring(current)
+        : current.refresh_token !== stale;
+    if (replaced) return current;
     const response = await this.send(
       `${SUPABASE_ROUTES.token}?grant_type=refresh_token`,
       {

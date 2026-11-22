@@ -174,8 +174,9 @@ test.describe("a returning guest", () => {
     backend.tasks = [];
     await page.reload();
     await expect(page.getByRole("checkbox", { name: "Mine all along" })).toBeVisible();
+    // The old session is tried with a fresh token first, then given up.
+    await expect.poll(() => backend.guests.length).toBe(1);
     await synced(page);
-    expect(backend.guests).toHaveLength(1);
     expect((await savedList(page))?.owner).toBe(`${PROJECT}:${backend.guests[0]}`);
     expect(backend.tasks.map((task) => task.title)).toEqual(["Mine all along"]);
   });

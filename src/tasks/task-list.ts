@@ -198,13 +198,14 @@ export class TaskList {
     return this.with([...this.saved.tasks, ...restored], pending);
   }
 
-  /** The changes to send next, oldest first, within one sync's limits. */
-  batch(): ListBatch {
+  /** The changes to send next, oldest first, within one sync's limits (and `most`, if set). */
+  batch(most: number = Infinity): ListBatch {
     const batch: ListBatch = { save: [], remove: [], sent: {} };
     const changes = Object.entries(this.saved.pending).sort(
       (a, b) => a[1] - b[1],
     );
     for (const [id, at] of changes) {
+      if (Object.keys(batch.sent).length >= most) break;
       const task = this.byId.get(id);
       if (task) {
         if (batch.save.length >= TASK_LIMITS.savesPerSync) continue;

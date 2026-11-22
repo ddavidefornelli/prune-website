@@ -17,12 +17,15 @@ interface ListSyncOptions {
   onUpdate: (list: TaskList, refused: number) => void;
 }
 
+/** One sync at a time across this browser's tabs, so no answer undoes another tab's. */
+const SYNC_LOCK = "prune:list-sync";
+
 /**
  * Copies the device's list to the cloud and brings other devices' changes
- * back: soon after each edit, when the page is shown or back online, and every
- * half minute while it is visible. One sync at a time. The list on the device
- * is the one that counts: a sync that fails is retried later, quietly, and
- * never loses or blocks anything.
+ * back: soon after each edit, at once when the page is hidden or closed, when
+ * it is shown or back online, and every half minute while it is visible. One
+ * sync at a time. The list on the device is the one that counts: a sync that
+ * fails is retried later, quietly, and never loses or blocks anything.
  */
 export class ListSync {
   private readonly options: ListSyncOptions;
@@ -32,6 +35,8 @@ export class ListSync {
   private again = false;
   private stopped = true;
   private retryMs: number = LIST_SYNC.initialRetryMs;
+  /** After a refused batch: send one change at a time, so only the bad one is dropped. */
+  private oneByOne = false;
   private readonly cleanups: (() => void)[] = [];
 
   constructor(options: ListSyncOptions) {
@@ -45,11 +50,21 @@ export class ListSync {
     const shown = () => {
       if (document.visibilityState === "visible") soon();
     };
+    // Leaving the page (another app, a closed tab): send what is waiting now,
+    // not after the pause, which a hidden page may never get.
+    const leaving = () => {
+      if (document.visibilityState === "hidden") this.now();
+    };
+    const closing = () => this.now();
     window.addEventListener("online", soon);
+    window.addEventListener("pagehide", closing);
     document.addEventListener("visibilitychange", shown);
+    document.addEventListener("visibilitychange", leaving);
     this.cleanups.push(() => {
       window.removeEventListener("online", soon);
+      window.removeEventListener("pagehide", closing);
       document.removeEventListener("visibilitychange", shown);
+      document.removeEventListener("visibilitychange", leaving);
     });
     this.poll = setInterval(shown, LIST_SYNC.pollMs);
     soon();
@@ -71,13 +86,20 @@ export class ListSync {
     this.timer = setTimeout(() => void this.run(), delay);
   }
 
+  /** Syncs straight away, without waiting for a timer. */
+  private now(): void {
+    if (this.stopped) return;
+    clearTimeout(this.timer);
+    void this.run();
+  }
+
   private async run(): Promise<void> {
     if (this.stopped) return;
     if (this.running) {
       this.again = true;
       return;
     }
-    this.running = this.cycle();
+    this.running = SyncLock.hold(() => this.cycle());
     try {
       await this.running;
     } finally {
@@ -110,20 +132,25 @@ export class ListSync {
       storage.write(list);
       onUpdate(list, 0);
     }
-    const batch = list.batch();
+    const batch = list.batch(this.oneByOne ? 1 : undefined);
     try {
       const response = await send(batch);
       // Changes made while the request was out are on the stored copy.
       const next = storage.read().confirm(batch, response);
       storage.write(next);
       this.retryMs = LIST_SYNC.initialRetryMs;
+      if (!next.hasPending) this.oneByOne = false;
       onUpdate(next, response.rejected.length);
       if (next.hasPending) this.request(0);
     } catch (error) {
-      if (
-        CloudError.codeOf(error) === "validation" &&
-        Object.keys(batch.sent).length
-      ) {
+      const changes = Object.keys(batch.sent).length;
+      if (CloudError.codeOf(error) === "validation" && changes > 1) {
+        // One change spoils the whole batch: find it without losing the rest.
+        this.oneByOne = true;
+        this.request(0);
+        return;
+      }
+      if (CloudError.codeOf(error) === "validation" && changes) {
         // Sending it again would be refused again: let the cloud's copy win.
         const next = storage.read().discard(batch);
         storage.write(next);
@@ -138,5 +165,14 @@ export class ListSync {
   private retry(cap: number): void {
     this.request(this.retryMs);
     this.retryMs = Math.min(this.retryMs * 2, cap);
+  }
+}
+
+/** A Web Lock where the browser has them; elsewhere the work simply runs. */
+class SyncLock {
+  static hold(work: () => Promise<void>): Promise<void> {
+    const locks = globalThis.navigator?.locks;
+    if (!locks) return work();
+    return locks.request(SYNC_LOCK, work) as Promise<unknown> as Promise<void>;
   }
 }
