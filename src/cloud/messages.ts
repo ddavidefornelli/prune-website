@@ -32,6 +32,7 @@ export const MESSAGES = {
 
   // The list
   listFull: "Your list is full. Delete some tasks to add more.",
+  openLimit: "Five tasks at a time. Finish one to add another.",
   confirmErase:
     "Delete everything? All your tasks are erased, on this device and in the cloud. This can't be undone.",
   eraseFailed:

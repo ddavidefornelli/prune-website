@@ -89,7 +89,11 @@ export function TaskItem(props: {
                 type="checkbox"
                 checked={current().done}
                 aria-label={current().title}
-                onChange={() => props.state.toggle(props.id)}
+                onChange={(event) => {
+                  props.state.toggle(props.id);
+                  // A refused toggle (five open tasks) leaves the task as it was.
+                  event.currentTarget.checked = Boolean(current().done);
+                }}
               />
               <span class="check-mark" aria-hidden="true">
                 <svg viewBox="0 0 24 24">

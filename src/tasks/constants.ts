@@ -8,6 +8,12 @@ export const TASK_LIMITS = {
   removesPerSync: 1000,
 } as const;
 
+/**
+ * Open tasks one list may hold, checked here (2026-11-22: a short list on
+ * purpose, not a place for power use). Done tasks do not count.
+ */
+export const OPEN_TASK_LIMIT = 5;
+
 /** When the list talks to the cloud. */
 export const LIST_SYNC = {
   /** A burst of edits goes out together. */

@@ -7,7 +7,7 @@ The hosted Supabase project, after `20261125000100_retire_day_planner.sql`. The 
 | Table | What it holds | Who reaches it |
 | --- | --- | --- |
 | `planner_accounts` | One row per account: `user_id`, `"isDeleted"`, `deleted_at` (deletion and the 30-day manual removal). | `planner_list`, `planner_call`; owners may read their own row. |
-| `planner_list_tasks` | The list: one row per task (title, done, created, last edited, finished), at most 1,000 per account. | Only `planner_list` (no browser grants). |
+| `planner_list_tasks` | The list: one row per task (title, done, created, last edited, finished), at most 1,000 per account. The website also allows only five open tasks at a time (`OPEN_TASK_LIMIT`, browser only; the database does not check it). | Only `planner_list` (no browser grants). |
 | `planner_email_reminders` | Come-back emails for accounts from before guests: time zone, last visit, the switch, send count, unsubscribe token, and the focus time and weekdays-only choice that set the morning window. | The reminder functions (service role); `planner_list` records visits. |
 | `planner_push_subscriptions` | Browsers that turned notifications on in the day planner. | The reminder functions (service role). |
 | `planner_helper_runs` | "Do it for me": one answer per task (the question it was asked with, the latest answer, its sources and the refine conversation). Deleting the task deletes it (trigger). | The `task-helper` Edge Function (service role). |

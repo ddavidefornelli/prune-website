@@ -11,7 +11,7 @@ import type { AccountClient } from "../cloud/account.ts";
 import { CloudError } from "../cloud/cloud-error.ts";
 import { MESSAGES } from "../cloud/messages.ts";
 import type { Account } from "../cloud/types.ts";
-import { LIST_TIMING } from "./constants.ts";
+import { LIST_TIMING, OPEN_TASK_LIMIT } from "./constants.ts";
 import { ListSync } from "./list-sync.ts";
 import { TaskList } from "./task-list.ts";
 import { browserStorage, TaskStorage } from "./task-storage.ts";
@@ -156,6 +156,8 @@ export class ListState {
    * acknowledgement, which lets the list sync.
    */
   add(title: string): boolean {
+    if (!TaskList.cleanTitle(title)) return false;
+    if (this.atOpenLimit()) return false;
     if (!this.change((list, now) => list.add(title, now))) return false;
     if (!this.client.accepted && this.client.accept()) this.sync.request(0);
     analytics.capture("task_created");
@@ -176,6 +178,7 @@ export class ListState {
     const task = this.list().find(id);
     if (!task) return;
     const done = !task.done;
+    if (!done && this.atOpenLimit()) return;
     if (!this.change((list, now) => list.setDone(id, done, now))) return;
     if (done) {
       this.settle(id);
@@ -252,6 +255,14 @@ export class ListState {
   }
 
   /** Applies a change to the stored list (other tabs' edits included) and saves it. */
+  /** True (and says so) when the list already has its five open tasks. */
+  private atOpenLimit(): boolean {
+    const open = this.open().filter((task) => !task.done).length;
+    if (open < OPEN_TASK_LIMIT) return false;
+    this.setNotice(MESSAGES.openLimit);
+    return true;
+  }
+
   private change(apply: (list: TaskList, now: number) => TaskList): boolean {
     const before = this.storage.read();
     const next = apply(before, Date.now());

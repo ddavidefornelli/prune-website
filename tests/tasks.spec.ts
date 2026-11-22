@@ -169,6 +169,24 @@ test("a full list says so, and keeps what it already has", async ({ page, backen
   expect((await savedList(page))?.pending).toEqual({});
 });
 
+test("five open tasks at a time: a sixth waits until one is done", async ({ page }) => {
+  await openList(page);
+  for (const title of ["One", "Two", "Three", "Four", "Five"]) await addTask(page, title);
+  await input(page).fill("Six");
+  await input(page).press("Enter");
+  await expect(page.getByRole("alert").filter({ hasText: "Five tasks at a time. Finish one to add another." })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Six", exact: true })).toHaveCount(0);
+  await expect(input(page)).toHaveValue("Six");
+  await page.getByRole("checkbox", { name: "One", exact: true }).click();
+  await input(page).press("Enter");
+  await expect(page.getByRole("checkbox", { name: "Six", exact: true })).toBeVisible();
+  // A done task cannot come back while five are open.
+  await page.getByRole("button", { name: "Done 1" }).click();
+  await page.getByRole("checkbox", { name: "One", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Five tasks at a time." })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "One", exact: true })).toBeChecked();
+});
+
 test("a change the cloud refuses is dropped quietly, and the list carries on", async ({ page, backend }) => {
   await openList(page);
   backend.failSyncs = { status: 400, body: { code: "PT400", message: "Some changes could not be read. Reload and try again." } };
