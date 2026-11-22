@@ -158,23 +158,28 @@ export function TaskItem(props: {
               <path d="M7 7l10 10M17 7L7 17" />
             </svg>
           </button>
-          <Show when={editing() && props.helper?.kind(props.id) && !working()}>
-            <div class="task-extra">
-              <button
-                type="button"
-                class="do-it"
-                onClick={() => {
-                  // Saves the edit first; a tap here moved focus off the editor.
-                  finish(true, false);
-                  void props.helper?.open(props.id);
-                }}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 3v5M12 16v5M3 12h5M16 12h5M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5L15 9M9 15l-2.5 2.5" />
-                </svg>
-                Do it for me
-              </button>
-            </div>
+          <Show
+            when={
+              props.helper?.kind(props.id) &&
+              !working() &&
+              (editing() || !run())
+            }
+          >
+            <button
+              type="button"
+              class="do-it"
+              aria-label={`Do it for me: ${current().title}`}
+              title="Do it for me"
+              onClick={() => {
+                // Saves any edit first; a tap here moved focus off the editor.
+                finish(true, false);
+                void props.helper?.open(props.id);
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3c.6 5.4 3.6 8.4 9 9-5.4.6-8.4 3.6-9 9-.6-5.4-3.6-8.4-9-9 5.4-.6 8.4-3.6 9-9z" />
+              </svg>
+            </button>
           </Show>
           <Show when={!editing() && !current().done && run()}>
             {(answer) => (

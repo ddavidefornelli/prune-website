@@ -1,26 +1,29 @@
 import { test, expect, addTask, openList, ACCOUNT_ID, GUEST_ID } from "./helpers/browser";
 
 const edit = (page: import("@playwright/test").Page, title: string) => page.getByRole("button", { name: `Edit ${title}`, exact: true });
-const doIt = (page: import("@playwright/test").Page) => page.getByRole("button", { name: "Do it for me", exact: true });
+const doIt = (page: import("@playwright/test").Page, title: string) => page.getByRole("button", { name: `Do it for me: ${title}`, exact: true });
 const sheet = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Do it for me" });
 
-test("only tasks the helper can do offer Do it for me, once they are sorted", async ({ page, backend }) => {
+test("only tasks the helper can do offer Do it for me, in plain sight once they are sorted", async ({ page, backend }) => {
   await openList(page);
   await addTask(page, "Buy milk");
   await addTask(page, "Email Marco about the budget");
   await expect.poll(() => backend.helperCalls.filter((call) => call.action === "classify").length).toBeGreaterThan(0);
+  // No tap needed: the offer sits under the task.
+  await expect(doIt(page, "Email Marco about the budget")).toBeVisible();
+  await expect(doIt(page, "Buy milk")).toHaveCount(0);
+  // Still there while the words are being changed.
   await edit(page, "Email Marco about the budget").click();
-  await expect(doIt(page)).toBeVisible();
+  await expect(doIt(page, "Email Marco about the budget")).toBeVisible();
   await page.keyboard.press("Escape");
   await edit(page, "Buy milk").click();
-  await expect(doIt(page)).toHaveCount(0);
+  await expect(doIt(page, "Buy milk")).toHaveCount(0);
 });
 
 test("Do it for me: a this-or-that question, a spinner, then the answer under the task to refine, keep or discard", async ({ page, backend }) => {
   await openList(page);
   await addTask(page, "Email Marco about the budget");
-  await edit(page, "Email Marco about the budget").click();
-  await doIt(page).click();
+  await doIt(page, "Email Marco about the budget").click();
   await expect(sheet(page).getByRole("heading", { name: "How should it sound?" })).toBeVisible();
   await sheet(page).getByRole("button", { name: "Warm" }).click();
   await expect(sheet(page)).toHaveCount(0);
@@ -55,8 +58,7 @@ test("after three free answers a guest signs in with an emailed code, and the ta
   await expect.poll(() => backend.helperCalls.some((call) => call.action === "classify")).toBe(true);
   // The guest has used its free answers.
   backend.helperStarts[GUEST_ID] = 3;
-  await edit(page, "Write a bio").click();
-  await doIt(page).click();
+  await doIt(page, "Write a bio").click();
   await sheet(page).getByRole("button", { name: "Either is fine" }).click();
   await expect(sheet(page).getByRole("heading", { name: "Keep letting prune do it" })).toBeVisible();
   await expect(sheet(page).getByRole("button", { name: "Continue with Google" })).toBeVisible();

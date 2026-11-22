@@ -475,35 +475,51 @@
 .task {
   flex-wrap: wrap;
 }
-/* Under the words: the button while editing, the answer once there is one. */
+/* Under the words: the answer once there is one. */
 .task-extra {
   flex: 0 0 calc(100% - 36px);
-  margin: -8px 0 10px 36px;
+  margin: -14px 0 8px 36px;
   min-width: 0;
 }
+/* Just the spark, at the row's end (× shows beside it when needed). It
+   twinkles now and then so it gets noticed. */
 .do-it {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 14px 0 11px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap);
+  height: 52px;
+  margin-right: -12px;
+  padding: 0;
+  border: 0;
   background: none;
-  font-size: var(--text-small);
-  font-weight: 550;
+  color: var(--ink);
 }
 .do-it svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  animation: do-it-twinkle 3.2s ease-in-out infinite;
+}
+@keyframes do-it-twinkle {
+  0%,
+  62%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  74% {
+    transform: scale(1.3) rotate(45deg);
+  }
+  86% {
+    transform: scale(0.9) rotate(90deg);
+  }
+  94% {
+    transform: scale(1.05) rotate(90deg);
+  }
 }
 @media (hover: hover) {
-  .do-it:hover {
-    background: var(--hover);
+  .do-it:hover svg {
+    animation-play-state: paused;
   }
 }
 .task-answer {
@@ -821,5 +837,8 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;
+  }
+  .do-it svg {
+    animation: none;
   }
 }
