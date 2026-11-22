@@ -33,6 +33,14 @@ export interface ListResponse {
   rejected: string[];
 }
 
+/** Who else edits this list; null while nobody joined it. */
+export interface Sharing {
+  /** The owner shared it; a member joined it through the link. */
+  role: "owner" | "member";
+  /** Everyone in it, the owner included. */
+  people: number;
+}
+
 /** One sync's worth of changes, and the change times it carries. */
 export interface ListBatch {
   save: Task[];

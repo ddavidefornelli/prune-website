@@ -4,6 +4,7 @@ import { HELPER_LIMITS } from "../../shared/helper-contract";
 import type { HelperFlow, HelperState } from "../helper-state";
 import type { ListState } from "../list-state";
 import { AnswerText } from "./AnswerText";
+import { SignInForm } from "./SignInForm";
 
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -197,10 +198,6 @@ function Choices(props: {
 }
 
 function SignIn(props: { helper: HelperState }) {
-  const [email, setEmail] = createSignal("");
-  const [code, setCode] = createSignal("");
-  const [sent, setSent] = createSignal(false);
-
   return (
     <div class="helper-sign-in">
       <Illustration />
@@ -209,84 +206,12 @@ function SignIn(props: { helper: HelperState }) {
         You've used your {HELPER_LIMITS.guestRuns} free answers. Sign in to keep
         going. It's free, and your list comes with you.
       </p>
-      <button
-        type="button"
-        class="primary-button is-wide"
-        data-autofocus=""
-        disabled={props.helper.busy()}
-        onClick={() => void props.helper.google()}
-      >
-        Continue with Google
-      </button>
-      <p class="helper-or">or</p>
-      <Show
-        when={sent()}
-        fallback={
-          <form
-            class="helper-field"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (await props.helper.sendCode(email())) setSent(true);
-            }}
-          >
-            <input
-              type="email"
-              autocomplete="email"
-              inputmode="email"
-              aria-label="Email"
-              placeholder="Email"
-              enterkeyhint="send"
-              value={email()}
-              onInput={(event) => setEmail(event.currentTarget.value)}
-            />
-            <button
-              type="submit"
-              class="secondary-button"
-              disabled={!email().trim() || props.helper.busy()}
-            >
-              Send code
-            </button>
-          </form>
-        }
-      >
-        <p class="helper-note">We sent a code to {email().trim()}.</p>
-        <form
-          class="helper-field"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void props.helper.verifyCode(email(), code());
-          }}
-        >
-          <input
-            ref={(element) => queueMicrotask(() => element.focus())}
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            aria-label="Code"
-            placeholder="Code"
-            maxLength={10}
-            enterkeyhint="go"
-            value={code()}
-            onInput={(event) => setCode(event.currentTarget.value)}
-          />
-          <button
-            type="submit"
-            class="secondary-button"
-            disabled={
-              code().replace(/\D/g, "").length < 6 || props.helper.busy()
-            }
-          >
-            Sign in
-          </button>
-        </form>
-        <button
-          type="button"
-          class="text-button"
-          onClick={() => setSent(false)}
-        >
-          Use another email
-        </button>
-      </Show>
+      <SignInForm
+        busy={props.helper.busy()}
+        onGoogle={() => void props.helper.google()}
+        onSendCode={(email) => props.helper.sendCode(email)}
+        onVerify={(email, code) => void props.helper.verifyCode(email, code)}
+      />
     </div>
   );
 }

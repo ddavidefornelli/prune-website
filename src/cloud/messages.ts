@@ -38,6 +38,14 @@ export const MESSAGES = {
   eraseFailed:
     "Couldn't delete right now. Check your connection and try again.",
 
+  // Sharing
+  shareUnavailable: "Couldn't share right now. Try again.",
+  joined: "You joined a shared list.",
+  confirmLeave:
+    "Leave this shared list? It stays with the people in it. Your list here will be empty.",
+  confirmStopSharing:
+    "Stop sharing? Everyone else leaves the list, and the link stops working.",
+
   // The helper
   helperUnavailable: "The helper isn't available right now. Try again.",
 

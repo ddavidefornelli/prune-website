@@ -4,7 +4,7 @@ import { PrivacyPolicyButton } from "../../components/PrivacyPolicyButton";
 import { APP_EVENTS } from "../../shared/storage-keys";
 import type { ListState } from "../list-state";
 
-/** The few things beside the list: the terms, cookies, and deleting everything. */
+/** The few things beside the list: the terms, cookies, and deleting everything. Share sits in the header. */
 export function MenuSheet(props: { state: ListState; onClose: () => void }) {
   // The banner sits behind this sheet's backdrop, so the sheet closes first.
   function openCookieSettings(): void {

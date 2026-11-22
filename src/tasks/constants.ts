@@ -54,3 +54,11 @@ export const HELPER_TIMING = {
   /** How often an answer being written is checked on. */
   pollMs: 3 * TIME.msPerSecond,
 } as const;
+
+/** A shared list's link: `/?join=<token>` (see planner_list 'share'). */
+export const SHARE = {
+  joinParam: "join",
+  tokenPattern: /^[0-9a-f]{32}$/i,
+  /** How long "Copied" shows on the button. */
+  copiedMs: 1500,
+} as const;

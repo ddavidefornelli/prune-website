@@ -8,6 +8,8 @@ The hosted Supabase project, after `20261125000100_retire_day_planner.sql`. The 
 | --- | --- | --- |
 | `planner_accounts` | One row per account: `user_id`, `"isDeleted"`, `deleted_at` (deletion and the 30-day manual removal). | `planner_list`, `planner_call`; owners may read their own row. |
 | `planner_list_tasks` | The list: one row per task (title, done, created, last edited, finished), at most 1,000 per account. The website also allows only five open tasks at a time (`OPEN_TASK_LIMIT`, browser only; the database does not check it). | Only `planner_list` (no browser grants). |
+| `planner_list_shares` | A shared list's secret link token, one per owner (32 hex characters). Stop sharing deletes it. | Only `planner_list`. |
+| `planner_list_members` | Who joined whose list through its link: one list per member. A member's `planner_list` calls read and write the owner's tasks. | Only `planner_list`. |
 | `planner_email_reminders` | Come-back emails for accounts from before guests: time zone, last visit, the switch, send count, unsubscribe token, and the focus time and weekdays-only choice that set the morning window. | The reminder functions (service role); `planner_list` records visits. |
 | `planner_push_subscriptions` | Browsers that turned notifications on in the day planner. | The reminder functions (service role). |
 | `planner_helper_runs` | "Do it for me": one answer per task (the question it was asked with, the latest answer, its sources and the refine conversation). Deleting the task deletes it (trigger). | The `task-helper` Edge Function (service role). |
@@ -20,7 +22,7 @@ Every row goes with its Auth user (`on delete cascade`).
 
 | Function | Caller |
 | --- | --- |
-| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` and `'erase'`. |
+| `planner_list(action, args, timezone)` | The browser (`authenticated`, guests included): `'sync'` (with `shared`: the role and how many people) and `'erase'` (a member only leaves); signed-in accounts also `'share'` (the link token), `'join'` and `'leave'` (a member leaves; the owner stops sharing). |
 | `planner_call(action, args, timezone)` | The browser (`authenticated`, not guests): only `'delete_account'`. |
 | `planner_claim_reminders`, `planner_release_reminder`, `planner_push_targets`, `planner_push_result` | The `daily-reminders` Edge Function. |
 | `planner_unsubscribe` | The `email-unsubscribe` Edge Function. |

@@ -15,7 +15,7 @@ import { LIST_TIMING, OPEN_TASK_LIMIT } from "./constants.ts";
 import { ListSync } from "./list-sync.ts";
 import { TaskList } from "./task-list.ts";
 import { browserStorage, TaskStorage } from "./task-storage.ts";
-import type { ListResponse, Task } from "./types.ts";
+import type { ListResponse, Sharing, Task } from "./types.ts";
 
 /** Deleted tasks that one tap on Undo puts back. */
 export interface UndoOffer {
@@ -47,6 +47,8 @@ export class ListState {
   readonly account: Accessor<Account | null>;
   readonly erasing: Accessor<boolean>;
   readonly eraseError: Accessor<string>;
+  /** Who else edits this list, from the last sync; null while it is not shared. */
+  readonly sharing: Accessor<Sharing | null>;
 
   private readonly client: AccountClient;
   private readonly storage: TaskStorage;
@@ -76,6 +78,10 @@ export class ListState {
     const [settling, setSettling] = createSignal<ReadonlySet<string>>(
       new Set(),
     );
+    const [sharing, setSharing] = createSignal<Sharing | null>(null, {
+      equals: (a, b) => a?.role === b?.role && a?.people === b?.people,
+    });
+    this.sharing = sharing;
     this.list = list;
     this.setList = setList;
     this.undo = undo;
@@ -109,12 +115,13 @@ export class ListState {
       },
       send: async (changes) => {
         try {
-          return ListState.response(
-            await client.syncList({
-              save: changes.save,
-              remove: changes.remove,
-            }),
-          );
+          const body = await client.syncList({
+            save: changes.save,
+            remove: changes.remove,
+          });
+          const response = ListState.response(body);
+          setSharing(ListState.readSharing(body));
+          return response;
         } catch (error) {
           await this.recover(error);
           throw error;
@@ -145,6 +152,22 @@ export class ListState {
       tasks: body.tasks,
       rejected: body.rejected.filter((id) => typeof id === "string"),
     };
+  }
+
+  /** Who else edits the list, from a sync's answer. */
+  private static readSharing(value: unknown): Sharing | null {
+    const shared = (value as { shared?: Partial<Sharing> } | null)?.shared;
+    if (
+      (shared?.role !== "owner" && shared?.role !== "member") ||
+      typeof shared.people !== "number"
+    )
+      return null;
+    return { role: shared.role, people: shared.people };
+  }
+
+  /** Syncs now: after joining or leaving a shared list, the cloud's list is another. */
+  refresh(): void {
+    this.sync.request(0);
   }
 
   task(id: string): Task | undefined {

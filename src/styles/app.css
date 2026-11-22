@@ -19,6 +19,52 @@
   padding-top: env(safe-area-inset-top);
   background: var(--bg);
 }
+.share-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--on-ink);
+  transition: transform 0.15s var(--ease);
+}
+.share-button:active {
+  transform: scale(0.94);
+}
+.share-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* How many people share the list, once anyone joined. */
+.share-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+}
+.share-button + .menu-button {
+  margin-left: 0;
+}
 .menu-button {
   display: grid;
   place-items: center;
@@ -749,6 +795,31 @@
 }
 .helper-sign-in .helper-field,
 .helper-sign-in .helper-note {
+  text-align: left;
+}
+.helper-illustration .is-card {
+  fill: var(--bg);
+}
+.share-terms {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+}
+.share-terms .privacy-policy-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+}
+.share-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
   text-align: left;
 }
 .helper-or {

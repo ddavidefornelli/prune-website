@@ -21,7 +21,7 @@ export function session(id = GUEST_ID, guest = true, signedInAt = Math.floor(Dat
   return { access_token: `${part({ alg: "HS256", typ: "JWT" })}.${part(claims)}.fixture`, refresh_token: `fixture-refresh-${id}`, token_type: "bearer", expires_in: expiresIn, expires_at: now + expiresIn, user: user(id, guest) };
 }
 /** The claims inside a request's bearer token. */
-function claims(authorization: string | undefined): { sub?: string; amr?: { timestamp: number }[] } {
+function claims(authorization: string | undefined): { sub?: string; is_anonymous?: boolean; amr?: { timestamp: number }[] } {
   try {
     return JSON.parse(Buffer.from((authorization ?? "").split(".")[1] ?? "", "base64url").toString() || "{}");
   } catch {
@@ -73,6 +73,12 @@ export interface Backend {
   helperStarts: Record<string, number>;
   /** Emails a sign-in code was sent to. */
   codesSent: string[];
+  /** The list's share link token, once shared. */
+  shareToken: string | null;
+  /** How many people are in the shared list (the caller included); 1 while not shared. */
+  people: number;
+  /** The caller's role in the shared list, if any. */
+  role: "owner" | "member" | null;
 }
 
 /** planner_list's merge: removals, then saves where the newest edit wins. */
@@ -103,7 +109,7 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
   /** The cloud's list when the test starts (wrapped: test.use reads a bare array as [value, options]). */
   seed: [{ tasks: [] }, { option: true }],
   backend: async ({ context, visitor, seed }, use) => {
-    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [] };
+    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [], shareToken: null, people: 1, role: null };
     const initial = visitor === "account" ? session(ACCOUNT_ID, false) : visitor === "guest" ? session(GUEST_ID, true) : null;
     // Seed once per browser context, not on reload or each new tab.
     await context.addInitScript(({ initialSession, authKey, privacyKey, version }) => {
@@ -201,12 +207,23 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
           state.deletedAt = null;
         }
         if (body.p_action === "erase") { state.tasks = []; await send({ tasks: [], rejected: [] }); return; }
+        // Sharing: one fixture list; joining makes the caller a member of it.
+        if (["share", "join", "leave"].includes(body.p_action) && claims(authorization).is_anonymous) { await send({ code: "PT400", message: "Sign in to share a list." }, 400); return; }
+        if (body.p_action === "share") { state.shareToken ??= "0123456789abcdef0123456789abcdef"; await send({ token: state.shareToken }); return; }
+        if (body.p_action === "join") {
+          if (args.token !== state.shareToken) { await send({ code: "PT404", message: "This link doesn't work any more. Ask for a new one." }, 404); return; }
+          state.role = "member";
+          state.people = 2;
+          await send({ joined: true });
+          return;
+        }
+        if (body.p_action === "leave") { state.role = null; state.people = 1; state.tasks = []; await send({ left: true }); return; }
         if (state.failSyncs) { await send(state.failSyncs.body, state.failSyncs.status); return; }
         const save: Task[] = args.save ?? [];
         const remove: string[] = args.remove ?? [];
         state.syncs.push({ save, remove });
         const rejected = applySync(state, save, remove);
-        await send({ tasks: [...state.tasks].sort((a, b) => b.createdAt - a.createdAt), rejected });
+        await send({ tasks: [...state.tasks].sort((a, b) => b.createdAt - a.createdAt), rejected, shared: state.role ? { role: state.role, people: state.people } : null });
         return;
       }
       if (url.pathname !== "/rest/v1/rpc/planner_call") { await send({ error: "Unexpected fixture route" }, 404); return; }

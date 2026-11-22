@@ -75,13 +75,46 @@ export class AccountClient {
       throw new CloudError("privacy", MESSAGES.privacyRequired);
     const account = await this.cloud.identity(create);
     this.assertOpen();
-    this.account = account;
-    return account;
+    // A look without `create` that ends after another call made a guest keeps that guest.
+    this.account = account ?? this.account;
+    return this.account;
   }
 
   /** Sends changes and reads the whole list back (see planner_list). */
   syncList<T>(changes: ListChanges): Promise<T> {
     return this.call("planner_list", "sync", { ...changes });
+  }
+
+  /**
+   * The signed-in account (with an email), or null for a guest or nobody.
+   * Never makes a guest.
+   */
+  async signedIn(): Promise<Account | null> {
+    if (!this.accepted) return null;
+    const account = await this.ensureAccount(false);
+    return account && !account.guest ? account : null;
+  }
+
+  /** The shared list's link token (made on first use); see planner_list('share'). */
+  async shareToken(): Promise<string> {
+    const { token } = await this.call<{ token?: unknown }>(
+      "planner_list",
+      "share",
+      {},
+    );
+    if (typeof token !== "string")
+      throw new CloudError("server", MESSAGES.incompleteResponse);
+    return token;
+  }
+
+  /** Joins the list behind a link token. */
+  async joinList(token: string): Promise<void> {
+    await this.call("planner_list", "join", { token });
+  }
+
+  /** A member leaves the shared list; the owner stops sharing it. */
+  async leaveList(): Promise<void> {
+    await this.call("planner_list", "leave", {});
   }
 
   /** Calls the task helper as this browser's account (a guest is made if needed). */

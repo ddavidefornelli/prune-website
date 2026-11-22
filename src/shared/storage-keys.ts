@@ -14,6 +14,10 @@ export const STORAGE_KEYS = {
   helper: "prune:helper:v1",
   /** A "Do it for me" waiting for sign-in to finish (sessionStorage). */
   helperResume: "prune:helper:resume",
+  /** A shared list's link token, waiting to be joined (sessionStorage). */
+  shareJoin: "prune:share:join",
+  /** The Share sheet, to open again after signing in (sessionStorage). */
+  shareResume: "prune:share:resume",
 } as const;
 
 /**

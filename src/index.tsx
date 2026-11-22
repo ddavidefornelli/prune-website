@@ -3,12 +3,16 @@ import { inject } from "@vercel/analytics";
 import { PrivacyPreferences } from "./components/PrivacyPreferences";
 import App from "./App";
 import { AccountClient } from "./cloud/account";
+import { ShareState } from "./tasks/share-state";
 import { browserStorage } from "./tasks/task-storage";
 import { PRODUCTION_ORIGINS } from "./shared/site";
 import "./styles/app.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("The app root is missing.");
+
+// A shared list's link: its token leaves the address bar before anything records it.
+ShareState.takeInvite();
 
 /**
  * Back from Google sign-in: trade its code for a session before the list
