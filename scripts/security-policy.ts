@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 import { POSTHOG, PRODUCTION_ORIGINS } from "../src/shared/site.ts";
-import { ERROR_LOG_PATH, SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
+import { ERROR_LOG_PATH, REALTIME, SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
 
 /** Every path that answers with the app's one HTML document. */
 export const DOCUMENT_ROUTES = {
@@ -57,6 +57,11 @@ export function integrity(content: string | Uint8Array): string {
   return `sha384-${createHash("sha384").update(content).digest("base64")}`;
 }
 
+/** The shared list's Realtime WebSocket (see src/cloud/realtime.ts). */
+export function realtimeSocket(apiOrigin: string): string {
+  return `${apiOrigin.replace(/^https:/, "wss:")}${REALTIME.socketPath}`;
+}
+
 export function securityHeaders(
   apiOrigin: string,
   scriptHashes: string[],
@@ -80,7 +85,7 @@ export function securityHeaders(
     "script-src-attr 'none'",
     "style-src 'self'",
     "style-src-attr 'none'",
-    `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), ...ERROR_LOG_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" ")}`,
+    `connect-src ${[...API_PATHS.map((path) => `${apiOrigin}${path}`), realtimeSocket(apiOrigin), ...ERROR_LOG_CONNECTIONS, ...ANALYTICS_CONNECTIONS, ...POSTHOG_CONNECTIONS].join(" ")}`,
     "img-src 'self'",
     "font-src 'self'",
     `manifest-src ${MANIFEST_SOURCES.join(" ")}`,

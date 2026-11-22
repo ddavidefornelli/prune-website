@@ -3,6 +3,7 @@ import { BrowserCloud } from "./browser.ts";
 import { CloudError } from "./cloud-error.ts";
 import { MESSAGES } from "./messages.ts";
 import { PrivacyNotice } from "./privacy-state.ts";
+import type { RealtimeAccess } from "./realtime.ts";
 import type { Account, CloudTransport, Rpc } from "./types.ts";
 
 /** What a list sync sends: whole tasks to save and ids to remove. */
@@ -115,6 +116,12 @@ export class AccountClient {
   /** A member leaves the shared list; the owner stops sharing it. */
   async leaveList(): Promise<void> {
     await this.call("planner_list", "leave", {});
+  }
+
+  /** For listening to this account's shared list in real time; null before there is an account. */
+  async realtimeAccess(): Promise<RealtimeAccess | null> {
+    if (this.disposed || !this.account) return null;
+    return this.cloud.realtimeAccess(this.account.accountKey);
   }
 
   /** Calls the task helper as this browser's account (a guest is made if needed). */

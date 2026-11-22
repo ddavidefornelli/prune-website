@@ -1,4 +1,5 @@
 import type { HelperRequest } from "../shared/helper-contract.ts";
+import type { RealtimeAccess } from "./realtime.ts";
 
 /** Records exchanged with the backend. They stay plain JSON objects. */
 
@@ -47,6 +48,8 @@ export interface CloudTransport {
   startGoogle(redirectTo: string): Promise<string>;
   /** Finishes a Google sign-in this browser started; false when it started none. */
   finishGoogle(code: string): Promise<boolean>;
+  /** What a Realtime channel needs for `accountKey`'s session; null without one. */
+  realtimeAccess(accountKey: string): Promise<RealtimeAccess | null>;
   /** Forgets this browser's session. */
   signOut(): Promise<void>;
   dispose(): Promise<void>;

@@ -46,3 +46,7 @@ It unschedules cron jobs that used them (`pro-ai-retention`) and runs the remind
 2. Check every caller: the website, each Edge Function, the cron jobs, open tabs of the previous website.
 3. Deploy the callers that no longer need the objects first; drop them in a separate, reviewed, forward-only migration without `CASCADE`.
 4. Test it in PGlite on top of the full chain (`tests/helpers/backend-db.mjs`).
+
+## Realtime
+
+`20261127000200_list_realtime.sql`: after each write to `planner_list_tasks`, statement triggers (`planner_list_broadcast`) send a Supabase Realtime broadcast `changed` (no task content) to the private topic `list:<user id>` of everyone in that list, only when someone joined it. A policy on `realtime.messages` lets a signed-in user receive only their own topic. The browser (`ListChannel`, `src/cloud/realtime.ts`) listens while its list is shared and syncs on each ping; a failed send never blocks a sync, and the half-minute poll stays as the fallback.

@@ -141,3 +141,56 @@ test("a deleted shared task takes members' helper answers with it", async () => 
   await sync(db, { remove: [id(1)] });
   assert.equal((await db.query("select count(*)::int as n from public.planner_helper_runs")).rows[0].n, 0);
 });
+
+/** A stand-in for Supabase Realtime's send, recording each broadcast. */
+async function recordBroadcasts(db) {
+  await db.exec(`
+    create schema if not exists realtime;
+    create table realtime.sent (topic text, event text, private boolean);
+    create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
+      language sql as 'insert into realtime.sent values (topic, event, private)';
+    grant usage on schema realtime to public;
+    grant insert on realtime.sent to public;
+  `);
+  return async () => {
+    const rows = (await db.query("select topic, event, private from realtime.sent order by topic")).rows;
+    await db.exec("delete from realtime.sent");
+    return rows;
+  };
+}
+
+test("a change to a shared list tells everyone in it, at once; other lists tell nobody", async () => {
+  const db = await fixture();
+  const sent = await recordBroadcasts(db);
+  const token = await shared(db);
+  // Not shared yet: nothing to tell.
+  await sync(db, { save: [task(2)] });
+  assert.deepEqual(await sent(), []);
+  await as(db, friend);
+  await call(db, "join", { token });
+  await sent();
+  await sync(db, { save: [task(3)] });
+  assert.deepEqual(await sent(), [
+    { topic: `list:${owner}`, event: "changed", private: true },
+    { topic: `list:${friend}`, event: "changed", private: true },
+  ]);
+  // A tick and a delete tell them too; a sync that changes nothing does not.
+  await sync(db, { save: [task(3, { done: true, doneAt: NOW + 50, updatedAt: NOW + 50 })] });
+  assert.equal((await sent()).length, 2);
+  await sync(db, { remove: [id(3)] });
+  assert.equal((await sent()).length, 2);
+  await sync(db);
+  assert.deepEqual(await sent(), []);
+  // A stranger's own list tells nobody.
+  await as(db, stranger);
+  await sync(db, { save: [task(9)] });
+  assert.deepEqual(await sent(), []);
+});
+
+test("without Realtime, syncs carry on", async () => {
+  const db = await fixture();
+  const token = await shared(db);
+  await as(db, friend);
+  await call(db, "join", { token });
+  assert.deepEqual(titles(await sync(db, { save: [task(2)] })), ["Task 2", "Task 1"]);
+});

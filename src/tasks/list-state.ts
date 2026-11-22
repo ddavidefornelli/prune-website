@@ -1,5 +1,6 @@
 import {
   batch,
+  createEffect,
   createMemo,
   createSignal,
   onCleanup,
@@ -10,6 +11,7 @@ import { analytics } from "../analytics.ts";
 import type { AccountClient } from "../cloud/account.ts";
 import { CloudError } from "../cloud/cloud-error.ts";
 import { MESSAGES } from "../cloud/messages.ts";
+import { ListChannel } from "../cloud/realtime.ts";
 import type { Account } from "../cloud/types.ts";
 import { LIST_TIMING, OPEN_TASK_LIMIT } from "./constants.ts";
 import { ListSync } from "./list-sync.ts";
@@ -132,6 +134,16 @@ export class ListState {
         setList(next);
         if (refused) setNotice(MESSAGES.listFull);
       },
+    });
+    // A shared list: everyone's changes arrive the moment they are saved.
+    const live = createMemo(() => !!sharing() && !!account());
+    createEffect(() => {
+      if (!live()) return;
+      const channel = new ListChannel(
+        () => client.realtimeAccess(),
+        () => this.sync.request(0),
+      );
+      onCleanup(() => channel.close());
     });
     const unwatch = this.storage.watch(() => setList(this.storage.read()));
     this.sync.start();

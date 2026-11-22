@@ -74,3 +74,37 @@ test.describe("a new visitor opening a link", () => {
     expect(backend.role).toBe("member");
   });
 });
+
+test.describe("a shared list in real time", () => {
+  test.use({ visitor: "account", seed: { tasks: [cloudTask("Book flights")] } });
+
+  test("someone else's change shows up the moment the server says so", async ({ page, backend, context }) => {
+    backend.role = "member";
+    backend.people = 2;
+    let socket: import("@playwright/test").WebSocketRoute | null = null;
+    const joined: Record<string, any>[] = [];
+    await context.routeWebSocket(/\/realtime\/v1\/websocket/, (ws) => {
+      socket = ws;
+      ws.onMessage((raw) => {
+        const message = JSON.parse(String(raw));
+        if (message.event === "phx_join") {
+          joined.push(message);
+          ws.send(JSON.stringify({ topic: message.topic, event: "phx_reply", payload: { status: "ok", response: {} }, ref: message.ref, join_ref: message.join_ref }));
+        }
+      });
+    });
+    await openList(page);
+    await expect.poll(() => joined.length).toBe(1);
+    // Only the person's own private topic, with their token.
+    expect(joined[0].topic).toBe("realtime:list:11111111-1111-4111-8111-111111111111");
+    expect(joined[0].payload.config.private).toBe(true);
+    expect(joined[0].payload.access_token).toEqual(expect.any(String));
+
+    // The other person adds a task; the server pings this browser.
+    backend.tasks.push(cloudTask("Pack the bags", {}, 0));
+    const before = backend.syncs.length;
+    socket!.send(JSON.stringify({ topic: joined[0].topic, event: "broadcast", payload: { type: "broadcast", event: "changed", payload: {} }, ref: null }));
+    await expect(page.getByRole("checkbox", { name: "Pack the bags" })).toBeVisible({ timeout: 3000 });
+    expect(backend.syncs.length).toBeGreaterThan(before);
+  });
+});

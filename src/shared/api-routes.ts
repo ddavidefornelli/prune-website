@@ -20,6 +20,18 @@ export const SUPABASE_ROUTES = {
   helper: "/functions/v1/task-helper",
 } as const;
 
+/** Supabase Realtime: one WebSocket that says when a shared list changed. */
+export const REALTIME = {
+  socketPath: "/realtime/v1/websocket",
+  protocolVersion: "1.0.0",
+  /** Phoenix closes a socket that is silent for 60 s. */
+  heartbeatMs: 25_000,
+  /** How often the channel checks for a refreshed access token. */
+  tokenCheckMs: 5 * 60_000,
+  initialRetryMs: 2000,
+  maxRetryMs: 60_000,
+} as const;
+
 /** Same-domain relay for client error reports (see server/error-log.ts). */
 export const ERROR_LOG_PATH = "/api/error-log";
 

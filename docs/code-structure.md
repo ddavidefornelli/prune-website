@@ -23,6 +23,7 @@ src/
     api-fetch.ts            BoundedFetch: deadlines, cancellation, response size, no redirects
     cloud-error.ts          CloudError: the failure codes the sync relies on
     config.ts               PublicConfig: the public Supabase URL and key, validated
+    realtime.ts             ListChannel: the shared list's Realtime socket ("changed" → sync now)
     error-log.ts            ErrorReporter: connection failures to /api/error-log
     privacy-state.ts        PrivacyNotice: the versioned terms acknowledgement
     messages.ts, types.ts
@@ -53,7 +54,7 @@ tests/                      Unit, SQL (PGlite), reactivity and Playwright suites
 - **`App.tsx`** picks the unsubscribe page or the list (`TaskApp`), under an error boundary. There is no session screen: the list opens at once from the device.
 - **`AccountClient`** knows whether this browser accepted the terms, finds or makes its account (only when there is something to sync), carries list syncs and runs Delete everything. **`BrowserCloud`** turns that into Auth and RPC requests and reloads the page when another tab signs in as someone else. **`SupabaseAuth`** keeps the session in the shape supabase-js saved it, refreshes it under a cross-tab lock, and ends it only when the server refuses it.
 - **`TaskList`** applies every change with a later time than the one before, batches unsaved changes, merges the cloud's answer without losing changes made meanwhile, and `adopt`s a new owner by marking every task to upload. **`TaskStorage`** keeps it in localStorage for all tabs. **`ListSync`** finds the owner, decides when to sync and how to back off, and never surfaces a failure. **`ListState`** ties them to the screen.
-- **`ShareState`** opens Share (signing in first when needed), makes the `/?join=<token>` link, joins a link that brought the tab here (`ShareState.takeInvite` moves its token out of the address bar before the app starts), and leaves or stops sharing. A shared list is still one owner's `planner_list_tasks`; members sync it through `planner_list`, picking up others' edits on the half-minute poll.
+- **`ShareState`** opens Share (signing in first when needed), makes the `/?join=<token>` link, joins a link that brought the tab here (`ShareState.takeInvite` moves its token out of the address bar before the app starts), and leaves or stops sharing. A shared list is still one owner's `planner_list_tasks`; members sync it through `planner_list`, and `ListChannel` makes each person's browser sync the moment anyone changes it.
 - **`HelperState`** sorts open tasks in quiet batches, runs the questions, starts answers and checks on them, and signs a guest in (emailed code or Google) when its free answers are used, carrying the waiting task across the reload. **`HelperEndpoint`** checks every request and the caller's token, counts limits, and writes answers after the response with **`HelperModel`**.
 - **Server:** `HelperEndpoint`, `HelperModel`, `ReminderJob`, `UnsubscribeEndpoint`, `ReminderMessages`, `BrevoMailer`, `WebPushSender` and `ErrorLogRelay`.
 

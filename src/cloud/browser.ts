@@ -6,6 +6,7 @@ import { CloudError } from "./cloud-error.ts";
 import { PublicConfig } from "./config.ts";
 import { MESSAGES } from "./messages.ts";
 import { PrivacyNotice } from "./privacy-state.ts";
+import type { RealtimeAccess } from "./realtime.ts";
 import type { Account, CloudTransport, Rpc, RpcRequest } from "./types.ts";
 
 const RPC_ROUTES: Record<Rpc, string> = {
@@ -63,6 +64,17 @@ export class BrowserCloud implements CloudTransport {
       accountKey: this.accountKey,
       email: user.is_anonymous ? null : user.email || null,
       guest: Boolean(user.is_anonymous),
+    };
+  }
+
+  async realtimeAccess(accountKey: string): Promise<RealtimeAccess | null> {
+    const session = await this.client().session();
+    if (!session || this.key(session.user.id) !== accountKey) return null;
+    return {
+      url: this.config!.url,
+      publicKey: this.config!.publicKey,
+      userId: session.user.id,
+      accessToken: session.access_token,
     };
   }
 
