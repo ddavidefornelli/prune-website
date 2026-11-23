@@ -8,6 +8,7 @@ import {
   type ReminderKind,
   type UnsubscribeKind,
 } from "./email.ts";
+import type { DailyPushJob } from "./daily-push.ts";
 import type { PushPayload, PushResult, PushTarget } from "./web-push.ts";
 
 /**
@@ -46,6 +47,8 @@ export interface ReminderDependencies {
     send: (target: PushTarget, payload: PushPayload) => Promise<PushResult>;
     record: (endpoint: string, result: PushResult) => Promise<void>;
   };
+  /** The daily come-back notification, sent first and independently of email. */
+  daily?: Pick<DailyPushJob, "run">;
   concurrency?: number;
 }
 
@@ -106,11 +109,14 @@ export class ReminderJob {
       !ReminderJob.sameSecret(bearer[1]!, this.deps.secret)
     )
       return json(HTTP_STATUS.unauthorized, { error: "unauthorized" });
+    const daily = this.deps.daily
+      ? { daily: await this.deps.daily.run().catch(() => 0) }
+      : {};
     let reminders: Reminder[];
     try {
       reminders = await this.deps.claim();
     } catch {
-      return json(HTTP_STATUS.serverError, { error: "claim_failed" });
+      return json(HTTP_STATUS.serverError, { error: "claim_failed", ...daily });
     }
     const counts: Counts = {
       sent: 0,
@@ -148,8 +154,8 @@ export class ReminderJob {
     );
     // Counts only: never addresses or task text in a response or log.
     return halted
-      ? json(HTTP_STATUS.badGateway, { error: "provider_refused", ...counts })
-      : json(HTTP_STATUS.ok, counts);
+      ? json(HTTP_STATUS.badGateway, { error: "provider_refused", ...counts, ...daily })
+      : json(HTTP_STATUS.ok, { ...counts, ...daily });
   };
 
   private async sendEmail(reminder: Reminder): Promise<SendResult> {

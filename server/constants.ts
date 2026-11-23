@@ -13,6 +13,8 @@ export const REMINDERS = {
   /** Emails per run when REMINDER_BATCH_LIMIT is unset (Brevo's free plan allows 300 a day). */
   defaultBatch: 100,
   maxBatch: 1000,
+  /** Daily notifications claimed by one hourly run. */
+  maxDailyPushes: 2000,
   sender: SITE.name,
 } as const;
 

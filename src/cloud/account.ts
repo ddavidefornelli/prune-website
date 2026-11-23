@@ -3,6 +3,7 @@ import { BrowserCloud } from "./browser.ts";
 import { CloudError } from "./cloud-error.ts";
 import { MESSAGES } from "./messages.ts";
 import { PrivacyNotice } from "./privacy-state.ts";
+import { PushNotifications } from "./push.ts";
 import type { RealtimeAccess } from "./realtime.ts";
 import type { Account, CloudTransport, Rpc } from "./types.ts";
 
@@ -30,6 +31,7 @@ export class AccountClient {
   private readonly timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   private account: Account | null = null;
   private disposed = false;
+  private pushSaved = false;
 
   constructor({ cloud = new BrowserCloud(), storage }: AccountClientOptions) {
     this.cloud = cloud;
@@ -198,6 +200,24 @@ export class AccountClient {
   }
 
   /**
+   * Stores this browser's notification subscription with its account, once
+   * per page load: it also tells the server prune was opened today. Only
+   * with permission and an account (after the first task); never throws.
+   */
+  async savePush(): Promise<void> {
+    if (this.pushSaved || !this.account || !PushNotifications.granted) return;
+    this.pushSaved = true;
+    try {
+      const subscription = await PushNotifications.subscription();
+      if (subscription)
+        await this.call("planner_call", "save_push", { ...subscription });
+    } catch {
+      // Best effort: the next visit tries again.
+      this.pushSaved = false;
+    }
+  }
+
+  /**
    * Erases this browser's account in the cloud: its helper answers, a guest's list, or an older
    * account (marked for removal after its list is erased). Then forgets the
    * session, so the next task starts a new guest.
@@ -208,6 +228,9 @@ export class AccountClient {
     const account = await this.ensureAccount(false);
     if (!account) return;
     await this.cloud.helper(account.accountKey, { action: "erase" });
+    const endpoint = await PushNotifications.unsubscribe();
+    if (endpoint)
+      await this.call("planner_call", "remove_push", { endpoint }).catch(() => {});
     await this.call("planner_list", "erase", {});
     if (!account.guest) {
       const result = await this.call<{ isDeleted: boolean }>(

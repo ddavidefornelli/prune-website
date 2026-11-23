@@ -1,7 +1,7 @@
-// Supabase Edge Function (Deno), called by pg_cron (see the
-// email_reminders_cron and reminders_every_ten_minutes migrations). Sends the
-// weekly come-back email, and the same nudge as a notification to browsers
-// that turned them on in the day planner. Deploy with JWT verification off; it
+// Supabase Edge Function (Deno), called by pg_cron every hour (see the
+// email_reminders_cron and retire_day_planner migrations). Sends the daily
+// come-back notification to browsers that allowed them (see daily_push), the
+// weekly come-back email, and the same nudge as a notification with it. Deploy with JWT verification off; it
 // checks its own shared secret instead.
 // Secrets: BREVO_API_KEY, REMINDER_FROM_EMAIL (a sender verified in Brevo),
 // REMINDER_CRON_SECRET, optional SITE_URL and REMINDER_BATCH_LIMIT (emails per
@@ -14,6 +14,7 @@ import { SUPABASE_ROUTES } from "../../../src/shared/api-routes.ts";
 import { SITE } from "../../../src/shared/site.ts";
 import { REMINDERS } from "../../../server/constants.ts";
 import { BrevoMailer } from "../../../server/reminders/brevo.ts";
+import { DailyPushJob, type DailyTarget } from "../../../server/reminders/daily-push.ts";
 import type { Reminder } from "../../../server/reminders/email.ts";
 import { ReminderJob } from "../../../server/reminders/handler.ts";
 import { WebPushSender } from "../../../server/reminders/web-push.ts";
@@ -47,9 +48,32 @@ const mailer = new BrevoMailer({
   fromEmail: env("REMINDER_FROM_EMAIL") ?? "",
 });
 
+const siteUrl = env("SITE_URL") || SITE.url;
+
+const daily = pushSender
+  ? new DailyPushJob({
+      siteUrl,
+      async claim() {
+        const { data, error } = await db.rpc("planner_claim_daily_pushes", {
+          p_limit: REMINDERS.maxDailyPushes,
+        });
+        if (error) throw new Error("Daily claim failed");
+        return data as DailyTarget[];
+      },
+      send: (target, payload) => pushSender.send(target, payload),
+      async record(endpoint, result) {
+        await db.rpc("planner_push_result", {
+          p_endpoint: endpoint,
+          p_result: result,
+        });
+      },
+    })
+  : undefined;
+
 const job = new ReminderJob({
   secret: env("REMINDER_CRON_SECRET") ?? "",
-  siteUrl: env("SITE_URL") || SITE.url,
+  siteUrl,
+  daily,
   unsubscribeEndpoint: `${env("SUPABASE_URL")}${SUPABASE_ROUTES.emailUnsubscribe}`,
   async claim() {
     // Claim nothing while sending is not configured, so no reminder is lost.

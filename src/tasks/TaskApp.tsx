@@ -8,6 +8,7 @@ import {
   untrack,
 } from "solid-js";
 import { AccountClient } from "../cloud/account";
+import { PushNotifications } from "../cloud/push";
 import { ListChannel } from "../cloud/realtime";
 import { AddTask } from "./components/AddTask";
 import { DoneTasks } from "./components/DoneTasks";
@@ -40,6 +41,14 @@ export function TaskApp() {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
   const people = () => spaces.open()?.people ?? 1;
+
+  // One come-back notification a day: asked for as soon as prune opens,
+  // stored once there is an account to store it with (after the first task).
+  const savePush = () => void client.savePush();
+  PushNotifications.askOnOpen(savePush);
+  createEffect(() => {
+    if (list()?.account()) savePush();
+  });
 
   // Spaces with other people: their changes arrive the moment they are saved.
   const live = createMemo(() => spaces.live() && !!list()?.account());
