@@ -3,6 +3,12 @@ import { TIME } from "../shared/time-constants.ts";
 /** Mirrors the limits planner_list enforces (20261124000100_task_list.sql). */
 export const TASK_LIMITS = {
   titleLength: 500,
+  notesLength: 2000,
+  /** A planned task lasts 15 minutes to 12 hours, in steps of 15. */
+  minMinutes: 15,
+  maxMinutes: 720,
+  stepMinutes: 15,
+  defaultMinutes: 60,
   tasks: 1000,
   savesPerSync: 200,
   removesPerSync: 1000,

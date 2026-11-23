@@ -9,6 +9,7 @@ import {
   type UnsubscribeKind,
 } from "./email.ts";
 import type { DailyPushJob } from "./daily-push.ts";
+import type { StartAlertJob } from "./start-alerts.ts";
 import type { PushPayload, PushResult, PushTarget } from "./web-push.ts";
 
 /**
@@ -49,6 +50,8 @@ export interface ReminderDependencies {
   };
   /** The daily come-back notification, sent first and independently of email. */
   daily?: Pick<DailyPushJob, "run">;
+  /** Task-start alerts: the whole run when the scheduler sends {"job": "starts"}. */
+  starts?: Pick<StartAlertJob, "run">;
   concurrency?: number;
 }
 
@@ -109,6 +112,13 @@ export class ReminderJob {
       !ReminderJob.sameSecret(bearer[1]!, this.deps.secret)
     )
       return json(HTTP_STATUS.unauthorized, { error: "unauthorized" });
+    // Every minute: only the alerts for tasks about to start.
+    if (await ReminderJob.isStartsRun(request)) {
+      const starts = this.deps.starts
+        ? await this.deps.starts.run()
+        : { alerts: 0, pushed: 0, emailed: 0 };
+      return json(HTTP_STATUS.ok, starts);
+    }
     const daily = this.deps.daily
       ? { daily: await this.deps.daily.run().catch(() => 0) }
       : {};
@@ -143,7 +153,11 @@ export class ReminderJob {
         }
         counts[result] += 1;
         if (result === "retry") await release(next);
-        else counts.pushed += await this.notify(next, devices);
+        else {
+          // Awaited first: `+= await` would add to a count read before the wait.
+          const pushed = await this.notify(next, devices);
+          counts.pushed += pushed;
+        }
       }
     };
     await Promise.all(
@@ -154,9 +168,23 @@ export class ReminderJob {
     );
     // Counts only: never addresses or task text in a response or log.
     return halted
-      ? json(HTTP_STATUS.badGateway, { error: "provider_refused", ...counts, ...daily })
+      ? json(HTTP_STATUS.badGateway, {
+          error: "provider_refused",
+          ...counts,
+          ...daily,
+        })
       : json(HTTP_STATUS.ok, { ...counts, ...daily });
   };
+
+  /** The scheduler's body says which run this is; anything unreadable is the hourly one. */
+  private static async isStartsRun(request: Request): Promise<boolean> {
+    try {
+      const body = (await request.json()) as { job?: unknown } | null;
+      return body?.job === "starts";
+    } catch {
+      return false;
+    }
+  }
 
   private async sendEmail(reminder: Reminder): Promise<SendResult> {
     try {

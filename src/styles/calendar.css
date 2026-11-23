@@ -1,0 +1,628 @@
+/* ——— The calendar above the list ———
+   Closed: a strip of seven days. Open: the hours, never the whole screen.
+   The toggle and the hour labels share one rail, so the days line up with
+   their columns on laptops. */
+.calendar {
+  --rail: 44px;
+  --hour-height: 44px;
+  --calendar-open: min(50dvh, 30rem);
+  margin: 4px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+  transition:
+    border-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
+}
+.calendar.is-dragging {
+  border-color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.calendar-strip {
+  display: flex;
+  align-items: stretch;
+  min-height: 60px;
+}
+.calendar-toggle {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--rail);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+.calendar-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.38s var(--ease);
+}
+.calendar.is-open .calendar-toggle svg {
+  transform: rotate(180deg);
+}
+.calendar-days {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 6px 6px 6px 0;
+}
+.calendar-day {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--ink);
+  transition: background-color 0.15s;
+}
+.calendar-weekday {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.calendar-date {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: var(--text-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-day.is-today .calendar-date {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.calendar-day.is-selected {
+  background: var(--hover);
+}
+.calendar-dots {
+  display: flex;
+  gap: 3px;
+  height: 4px;
+}
+.calendar-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+@media (hover: hover) {
+  .calendar-toggle:hover,
+  .calendar-step:hover {
+    color: var(--ink);
+  }
+  .calendar-day:hover {
+    background: var(--hover);
+  }
+}
+
+/* The hours open with a height animation: small, then bigger as a task comes in. */
+.calendar-body {
+  display: flex;
+  flex-direction: column;
+  height: 0;
+  overflow: hidden;
+  transition: height 0.38s var(--ease);
+}
+.calendar.is-open .calendar-body {
+  height: var(--calendar-open);
+}
+.calendar-bar {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  height: 44px;
+  border-top: 1px solid var(--line);
+}
+.calendar-step {
+  display: grid;
+  place-items: center;
+  width: var(--rail);
+  height: var(--rail);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+.calendar-step svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.calendar-range {
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: var(--text-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.calendar-scroll::-webkit-scrollbar {
+  display: none;
+}
+.calendar-grid {
+  display: flex;
+  height: calc(24 * var(--hour-height));
+}
+.calendar-hours {
+  display: grid;
+  flex: none;
+  grid-template-rows: repeat(24, var(--hour-height));
+  width: var(--rail);
+}
+.calendar-hour {
+  align-self: start;
+  padding-right: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transform: translateY(-50%);
+}
+.calendar-columns {
+  position: relative;
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--line) 0 1px,
+    transparent 1px var(--hour-height)
+  );
+}
+.calendar-column {
+  position: relative;
+  min-width: 0;
+  border-left: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.calendar-item,
+.calendar-drop {
+  position: absolute;
+  top: calc(var(--from) / 60 * var(--hour-height) + 1px);
+  height: calc((var(--to) - var(--from)) / 60 * var(--hour-height) - 2px);
+  left: calc(var(--lane, 0) / var(--lanes, 1) * 100% + 2px);
+  width: calc(100% / var(--lanes, 1) - 4px);
+  overflow: hidden;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 15px;
+  text-align: left;
+}
+.calendar-item {
+  display: block;
+  margin: 0;
+  padding: 4px 6px;
+  border: 0;
+}
+.calendar-item-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.calendar-item.is-task {
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 500;
+  cursor: grab;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  animation: calendar-land 0.32s var(--ease);
+  transition: opacity 0.2s;
+}
+.calendar-item.is-task.is-done {
+  background: var(--line-strong);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.calendar-item.is-moving {
+  opacity: 0.3;
+}
+.calendar-item-time,
+.calendar-item-space {
+  display: block;
+  overflow: hidden;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.75;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-item.is-short .calendar-item-time,
+.calendar.is-wide .calendar-item-time {
+  display: none;
+}
+.calendar-item.is-short .calendar-item-title {
+  -webkit-line-clamp: 1;
+}
+/* The bottom edge of a planned task: drag it to change how long it takes. */
+.calendar-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 10px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.calendar-resize::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 16px;
+  height: 2px;
+  margin-left: -8px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.calendar-item.is-stretching {
+  z-index: 3;
+  box-shadow: var(--shadow);
+  animation: none;
+}
+.calendar-item.is-stretching .calendar-resize::after {
+  opacity: 0.6;
+}
+@media (hover: hover) {
+  .calendar-item.is-task:hover .calendar-resize::after {
+    opacity: 0.6;
+  }
+}
+@media (hover: none) {
+  .calendar-resize {
+    height: 14px;
+  }
+  .calendar-resize::after {
+    opacity: 0.45;
+  }
+}
+/* In Personal: a task planned in a group space, labelled with the group. */
+.calendar-item.is-elsewhere {
+  border: 1px solid var(--ink);
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 500;
+}
+.calendar-item.is-elsewhere.is-done {
+  border-color: var(--line-strong);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+/* In a group: when people in it are busy elsewhere. Blurred: never who or what. */
+.calendar-busy {
+  position: absolute;
+  top: calc(var(--from) / 60 * var(--hour-height) + 2px);
+  right: 3px;
+  left: 3px;
+  height: calc((var(--to) - var(--from)) / 60 * var(--hour-height) - 4px);
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--line-strong) 0 6px,
+    var(--line) 6px 12px
+  );
+  filter: blur(2.5px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@keyframes calendar-land {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+.calendar-drop {
+  --to: calc(var(--from) + 60);
+  z-index: 1;
+  display: grid;
+  align-content: start;
+  padding: 3px 6px;
+  border: 1.5px dashed var(--ink);
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 600;
+  pointer-events: none;
+  animation: calendar-land 0.18s var(--ease);
+}
+.calendar-drop-title {
+  overflow: hidden;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.calendar-now {
+  position: absolute;
+  top: calc(var(--from) / 60 * var(--hour-height));
+  right: 0;
+  left: 0;
+  z-index: 2;
+  height: 2px;
+  background: var(--danger);
+  pointer-events: none;
+}
+.calendar-now::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.calendar-sheet-title {
+  overflow-wrap: anywhere;
+}
+.calendar-sheet-task {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+.calendar-sheet-when {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+/* When: the day, then start – end, each a field that opens the device's picker. */
+.calendar-when {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: -4px 0 4px;
+}
+.calendar-when-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 10px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.calendar-when-lines {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+}
+.calendar-when-times {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.calendar-when-dash {
+  color: var(--muted);
+}
+.calendar-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--radius-small);
+  color: var(--ink);
+  font-size: var(--text);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.calendar-when-times .calendar-field + .calendar-when-dash + .calendar-field {
+  margin-left: 0;
+}
+.calendar-field:active {
+  background: var(--hover);
+}
+.calendar-field:focus-within {
+  background: var(--hover);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+/* The real control covers its text, invisible: a tap opens the device's own picker. */
+.calendar-field select,
+.calendar-field input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+  appearance: none;
+}
+@media (hover: hover) {
+  .calendar-field:hover {
+    background: var(--hover);
+  }
+}
+.calendar-notes {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-small);
+  background: none;
+  font-size: var(--text-small);
+  line-height: 1.45;
+  resize: vertical;
+}
+.calendar-notes:focus {
+  border-color: var(--ink);
+  outline: none;
+}
+.calendar-notes::placeholder {
+  color: var(--muted);
+}
+.calendar-sheet-notes {
+  margin: 0;
+  font-size: var(--text-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.calendar-links {
+  display: grid;
+  gap: 2px;
+  margin: -4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.calendar-links a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  color: var(--ink);
+  font-size: var(--text-small);
+  text-decoration: none;
+}
+.calendar-links span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+.calendar-links svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.calendar-sheet-empty {
+  margin: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+/* ——— Dragging a task ——— */
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  max-width: 280px;
+  overflow: hidden;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow);
+  font-size: var(--text-small);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform-origin: 0 0;
+  transition:
+    scale 0.2s var(--ease),
+    opacity 0.2s var(--ease);
+  animation: drag-lift 0.18s var(--ease);
+}
+.drag-ghost.is-over {
+  scale: 0.85;
+  opacity: 0.85;
+}
+@keyframes drag-lift {
+  from {
+    scale: 0.96;
+    opacity: 0;
+  }
+}
+html.is-dragging,
+html.is-dragging * {
+  cursor: grabbing !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.task.is-draggable:not(.is-editing) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.task.is-drag-source {
+  opacity: 0.35;
+}
+.task-when {
+  flex: none;
+  padding-top: 15px;
+  color: var(--muted);
+  font-size: var(--text-tiny);
+  line-height: 22px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 640px) {
+  .calendar {
+    --calendar-open: min(56dvh, 34rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .calendar-body,
+  .calendar-toggle svg,
+  .drag-ghost {
+    transition: none;
+  }
+  .calendar-item.is-task,
+  .calendar-drop,
+  .drag-ghost {
+    animation: none;
+  }
+}
+/* Narrow week columns: one line of title, so the group's name still shows. */
+.calendar.is-wide .calendar-item.is-elsewhere .calendar-item-title {
+  -webkit-line-clamp: 1;
+}

@@ -1,17 +1,21 @@
 import { REMINDERS } from "../constants.ts";
 import type { PushPayload } from "./web-push.ts";
 
-/** The one email still sent: a weekly nudge after 7 days away. */
-export type ReminderKind = "comeback";
+/**
+ * The emails sent: a weekly nudge after 7 days away, and an alert 5 minutes
+ * before a planned task starts (see start-alerts.ts).
+ */
+export type ReminderKind = "comeback" | "starts";
 /**
  * The switches an unsubscribe link can turn off. "daily" and "session" stay
  * for links in emails the day planner sent.
  */
-export type UnsubscribeKind = "daily" | "comeback" | "session";
+export type UnsubscribeKind = "daily" | "comeback" | "session" | "starts";
 export const UNSUBSCRIBE_KINDS: readonly string[] = [
   "daily",
   "comeback",
   "session",
+  "starts",
 ] satisfies UnsubscribeKind[];
 
 export interface Reminder {
@@ -45,8 +49,19 @@ const COMEBACK = {
   pushTag: "prune-comeback",
 } as const;
 
+/** What one email says; `body` is already safe HTML. */
+export interface EmailPage {
+  title: string;
+  /** The preview line inbox lists show. */
+  preheader: string;
+  body: string;
+  button: string;
+  footer: string;
+  unsubscribeUrl: string;
+}
+
 /** Text is never markup. */
-const escapeHtml = (value: string): string =>
+export const escapeHtml = (value: string): string =>
   value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -74,7 +89,14 @@ export class ReminderMessages {
     const unsubscribeUrl = this.unsubscribePageUrl(reminder);
     return {
       subject: COMEBACK.subject,
-      html: this.layout(unsubscribeUrl),
+      html: this.page({
+        title: COMEBACK.subject,
+        preheader: COMEBACK.line,
+        body: escapeHtml(COMEBACK.line),
+        button: COMEBACK.button,
+        footer: COMEBACK.footer,
+        unsubscribeUrl,
+      }),
       text: `${COMEBACK.subject}\n\n${COMEBACK.line}\n\n${COMEBACK.button}: ${this.siteUrl}\n\nStop these emails: ${unsubscribeUrl}\n`,
     };
   }
@@ -90,7 +112,9 @@ export class ReminderMessages {
   }
 
   /** The page that asks for confirmation before turning the email off. */
-  private unsubscribePageUrl(reminder: Reminder): string {
+  unsubscribePageUrl(
+    reminder: Pick<Reminder, "unsubscribeToken" | "kind">,
+  ): string {
     const url = new URL("/", this.siteUrl);
     url.searchParams.set("unsubscribe", reminder.unsubscribeToken);
     url.searchParams.set("kind", reminder.kind);
@@ -100,7 +124,7 @@ export class ReminderMessages {
   // Tables and inline styles only: the lowest common denominator that renders
   // the same in Gmail, Outlook and Apple Mail. The button is a link in a table
   // cell, because email clients do not run scripts or honour most CSS.
-  private layout(unsubscribeUrl: string): string {
+  page(content: EmailPage): string {
     const c = EMAIL_COLORS;
     return `<!doctype html>
 <html lang="en">
@@ -110,23 +134,23 @@ export class ReminderMessages {
 <title>${REMINDERS.sender}</title>
 </head>
 <body style="margin:0;padding:0;background:${c.page};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(COMEBACK.line)}</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(content.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${c.page}" style="background:${c.page};">
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:${c.text};">
 <tr><td style="font-size:17px;font-weight:600;color:${c.text};padding-bottom:28px;">${REMINDERS.sender}</td></tr>
-<tr><td style="font-size:26px;line-height:32px;font-weight:600;color:${c.text};padding-bottom:12px;">${escapeHtml(COMEBACK.subject)}</td></tr>
-<tr><td style="font-size:16px;line-height:24px;color:${c.text};padding-bottom:28px;">${escapeHtml(COMEBACK.line)}</td></tr>
+<tr><td style="font-size:26px;line-height:32px;font-weight:600;color:${c.text};padding-bottom:12px;">${escapeHtml(content.title)}</td></tr>
+<tr><td style="font-size:16px;line-height:24px;color:${c.text};padding-bottom:28px;">${content.body}</td></tr>
 <tr><td style="padding-bottom:36px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr><td align="center" bgcolor="${c.button}" style="background:${c.button};border-radius:999px;">
-<a href="${escapeHtml(this.siteUrl)}" style="display:block;padding:14px 28px;font-size:16px;line-height:20px;font-weight:600;color:${c.buttonText};text-decoration:none;">${escapeHtml(COMEBACK.button)}</a>
+<a href="${escapeHtml(this.siteUrl)}" style="display:block;padding:14px 28px;font-size:16px;line-height:20px;font-weight:600;color:${c.buttonText};text-decoration:none;">${escapeHtml(content.button)}</a>
 </td></tr>
 </table>
 </td></tr>
 <tr><td style="font-size:12px;line-height:18px;color:${c.muted};border-top:1px solid ${c.rule};padding-top:16px;">
-${escapeHtml(COMEBACK.footer)}
-<a href="${escapeHtml(unsubscribeUrl)}" style="color:${c.muted};text-decoration:underline;">Stop these emails</a>
+${escapeHtml(content.footer)}
+<a href="${escapeHtml(content.unsubscribeUrl)}" style="color:${c.muted};text-decoration:underline;">Stop these emails</a>
 </td></tr>
 </table>
 </td></tr>

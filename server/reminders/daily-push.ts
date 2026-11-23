@@ -11,7 +11,10 @@ export interface DailyTarget extends PushTarget {
 
 /** One line a day, each tied to a mood, the same for everyone that day. */
 const NUDGES: readonly { title: string; body: string }[] = [
-  { title: "Ready to get some stuff done?", body: "Your list is one tap away." },
+  {
+    title: "Ready to get some stuff done?",
+    body: "Your list is one tap away.",
+  },
   { title: "Feeling productive?", body: "Tick one thing off while it lasts." },
   { title: "Feeling scattered?", body: "Put it all on the list and pick one." },
   { title: "Low on energy?", body: "One small task still counts." },
@@ -40,7 +43,12 @@ export class DailyNudges {
   private static dayIndex(now: Date, timezone: string): number {
     let local: string;
     try {
-      local = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+      local = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(now);
     } catch {
       local = now.toISOString().slice(0, 10);
     }
@@ -80,14 +88,20 @@ export class DailyPushJob {
     const worker = async () => {
       for (let next = queue.shift(); next; next = queue.shift()) {
         const result = await this.deps
-          .send(next, DailyNudges.payload(this.deps.siteUrl, now, next.timezone))
+          .send(
+            next,
+            DailyNudges.payload(this.deps.siteUrl, now, next.timezone),
+          )
           .catch((): PushResult => "failed");
         await this.deps.record(next.endpoint, result).catch(() => {});
         if (result === "sent") sent += 1;
       }
     };
     await Promise.all(
-      Array.from({ length: Math.max(1, this.deps.concurrency ?? REMINDERS.concurrency) }, worker),
+      Array.from(
+        { length: Math.max(1, this.deps.concurrency ?? REMINDERS.concurrency) },
+        worker,
+      ),
     );
     return sent;
   }

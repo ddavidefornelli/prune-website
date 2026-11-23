@@ -236,6 +236,26 @@ export class ListState {
     } else this.unsettle(id);
   }
 
+  /** Plans the task for the hour starting at `startAt`; null takes it off the calendar. */
+  schedule(id: string, startAt: number | null): boolean {
+    if (!this.change((list, now) => list.schedule(id, startAt, now)))
+      return false;
+    analytics.capture(startAt === null ? "task_unscheduled" : "task_scheduled");
+    return true;
+  }
+
+  /** The task's description; links in it open from the calendar. */
+  describe(id: string, notes: string): void {
+    if (this.change((list, now) => list.setNotes(id, notes, now)))
+      analytics.capture("task_described");
+  }
+
+  /** How long the task takes on the calendar. */
+  resize(id: string, minutes: number): void {
+    if (this.change((list, now) => list.setMinutes(id, minutes, now)))
+      analytics.capture("task_resized");
+  }
+
   remove(id: string): void {
     const task = this.list().find(id);
     if (!task || !this.change((list, now) => list.remove([id], now))) return;

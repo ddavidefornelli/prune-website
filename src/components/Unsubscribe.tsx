@@ -5,11 +5,12 @@ import { SUPABASE_ROUTES } from "../shared/api-routes";
 
 const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** "daily" and "session" stay for links in the day planner's emails. */
+/** "daily" and "session" stay for links in the day planner's emails; "starts" is the task-start alert. */
 const KIND_NAMES = {
   daily: "daily reminder",
   comeback: "come-back",
   session: "start-time",
+  starts: "task start",
 } as const;
 type UnsubscribeKind = keyof typeof KIND_NAMES;
 

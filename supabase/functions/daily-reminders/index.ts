@@ -1,8 +1,10 @@
 // Supabase Edge Function (Deno), called by pg_cron every hour (see the
 // email_reminders_cron and retire_day_planner migrations). Sends the daily
 // come-back notification to browsers that allowed them (see daily_push), the
-// weekly come-back email, and the same nudge as a notification with it. Deploy with JWT verification off; it
-// checks its own shared secret instead.
+// weekly come-back email, and the same nudge as a notification with it. Called
+// every minute with {"job": "starts"} (task_start_alerts_cron), it sends only
+// the alerts for planned tasks starting in 5 minutes. Deploy with JWT
+// verification off; it checks its own shared secret instead.
 // Secrets: BREVO_API_KEY, REMINDER_FROM_EMAIL (a sender verified in Brevo),
 // REMINDER_CRON_SECRET, optional SITE_URL and REMINDER_BATCH_LIMIT (emails per
 // run, default 100: Brevo's free plan allows 300 a day). Optional
@@ -12,11 +14,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SUPABASE_ROUTES } from "../../../src/shared/api-routes.ts";
 import { SITE } from "../../../src/shared/site.ts";
-import { REMINDERS } from "../../../server/constants.ts";
+import { REMINDERS, START_ALERTS } from "../../../server/constants.ts";
 import { BrevoMailer } from "../../../server/reminders/brevo.ts";
 import { DailyPushJob, type DailyTarget } from "../../../server/reminders/daily-push.ts";
 import type { Reminder } from "../../../server/reminders/email.ts";
 import { ReminderJob } from "../../../server/reminders/handler.ts";
+import { StartAlertJob, type StartAlert } from "../../../server/reminders/start-alerts.ts";
 import { WebPushSender } from "../../../server/reminders/web-push.ts";
 
 declare const Deno: {
@@ -70,11 +73,64 @@ const daily = pushSender
     })
   : undefined;
 
+const unsubscribeEndpoint = `${env("SUPABASE_URL")}${SUPABASE_ROUTES.emailUnsubscribe}`;
+const pushDelivery = pushSender
+  ? {
+      async targets(userIds: string[]) {
+        const { data, error } = await db.rpc("planner_push_targets", { p_users: userIds });
+        if (error) throw new Error("Push targets failed");
+        return (data as { user_id: string; endpoint: string; p256dh: string; auth: string }[]).map((row) => ({
+          userId: row.user_id,
+          endpoint: row.endpoint,
+          p256dh: row.p256dh,
+          auth: row.auth,
+        }));
+      },
+      send: (target: Parameters<WebPushSender["send"]>[0], payload: Parameters<WebPushSender["send"]>[1]) =>
+        pushSender.send(target, payload),
+      async record(endpoint: string, result: string) {
+        await db.rpc("planner_push_result", { p_endpoint: endpoint, p_result: result });
+      },
+    }
+  : undefined;
+
+const starts = new StartAlertJob({
+  siteUrl,
+  unsubscribeEndpoint,
+  async claim() {
+    const { data, error } = await db.rpc("planner_claim_start_alerts", { p_limit: START_ALERTS.maxPerRun });
+    if (error) throw new Error("Start alert claim failed");
+    return (
+      data as {
+        user_id: string; task_id: string; title: string; notes: string; start_at: string; minutes: number;
+        space_name: string | null; timezone: string; email: string | null; unsubscribe_token: string | null;
+      }[]
+    ).map(
+      (row): StartAlert => ({
+        userId: row.user_id,
+        taskId: row.task_id,
+        title: row.title,
+        notes: row.notes,
+        startAt: Date.parse(row.start_at),
+        minutes: row.minutes,
+        spaceName: row.space_name,
+        timezone: row.timezone,
+        email: row.email,
+        unsubscribeToken: row.unsubscribe_token,
+      }),
+    );
+  },
+  push: pushDelivery,
+  // Without a configured sender, alerts go by notification only.
+  send: env("BREVO_API_KEY") && env("REMINDER_FROM_EMAIL") ? (email) => mailer.send(email) : undefined,
+});
+
 const job = new ReminderJob({
+  starts,
   secret: env("REMINDER_CRON_SECRET") ?? "",
   siteUrl,
   daily,
-  unsubscribeEndpoint: `${env("SUPABASE_URL")}${SUPABASE_ROUTES.emailUnsubscribe}`,
+  unsubscribeEndpoint,
   async claim() {
     // Claim nothing while sending is not configured, so no reminder is lost.
     if (!env("BREVO_API_KEY") || !env("REMINDER_FROM_EMAIL"))
@@ -105,31 +161,7 @@ const job = new ReminderJob({
     });
     if (error) throw new Error("Release failed");
   },
-  push: pushSender
-    ? {
-        async targets(userIds) {
-          const { data, error } = await db.rpc("planner_push_targets", {
-            p_users: userIds,
-          });
-          if (error) throw new Error("Push targets failed");
-          return (
-            data as { user_id: string; endpoint: string; p256dh: string; auth: string }[]
-          ).map((row) => ({
-            userId: row.user_id,
-            endpoint: row.endpoint,
-            p256dh: row.p256dh,
-            auth: row.auth,
-          }));
-        },
-        send: (target, payload) => pushSender.send(target, payload),
-        async record(endpoint, result) {
-          await db.rpc("planner_push_result", {
-            p_endpoint: endpoint,
-            p_result: result,
-          });
-        },
-      }
-    : undefined,
+  push: pushDelivery,
   send: (email) => mailer.send(email),
 });
 

@@ -12,6 +12,15 @@ export interface Task {
   /** The last edit, on the editing device's clock: the newest edit wins. */
   updatedAt: number;
   doneAt: number | null;
+  /**
+   * When the task is planned on the calendar (the start of its hour), or null.
+   * Lists saved before the calendar have no such field: they read as null.
+   */
+  startAt: number | null;
+  /** A description; links in it open. Empty when there is none. */
+  notes: string;
+  /** How long the task takes on the calendar, in minutes (60 unless changed). */
+  minutes: number;
 }
 
 /** This browser's list. */

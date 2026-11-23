@@ -34,7 +34,9 @@ export class PushNotifications {
   }
 
   static get granted(): boolean {
-    return PushNotifications.supported() && Notification.permission === "granted";
+    return (
+      PushNotifications.supported() && Notification.permission === "granted"
+    );
   }
 
   /**
@@ -75,7 +77,9 @@ export class PushNotifications {
     // A subscription made with another key can never be delivered to.
     if (
       subscription &&
-      PushNotifications.toBase64url(subscription.options.applicationServerKey) !== key
+      PushNotifications.toBase64url(
+        subscription.options.applicationServerKey,
+      ) !== key
     ) {
       await subscription.unsubscribe();
       subscription = null;
@@ -114,7 +118,11 @@ export class PushNotifications {
   private static toBase64url(buffer: ArrayBuffer | null): string {
     if (!buffer) return "";
     let binary = "";
-    for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    for (const byte of new Uint8Array(buffer))
+      binary += String.fromCharCode(byte);
+    return btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
   }
 }

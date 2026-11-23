@@ -6,6 +6,8 @@ import {
   Show,
   Switch,
 } from "solid-js";
+import { CalendarFormat } from "../../calendar/format";
+import type { TaskDrag } from "../../calendar/task-drag";
 import { LIST_TIMING, TASK_LIMITS } from "../constants";
 import type { HelperState } from "../helper-state";
 import type { ListState } from "../list-state";
@@ -22,6 +24,8 @@ export function TaskItem(props: {
   state: ListState;
   /** Absent for done tasks: the helper only works on open ones. */
   helper?: HelperState;
+  /** Open tasks can be dragged onto the calendar. */
+  drag?: TaskDrag;
 }) {
   // The last version seen: the row may outlive its task by a frame when deleted.
   const task = createMemo<Task | undefined>(
@@ -69,8 +73,20 @@ export function TaskItem(props: {
     <Show when={task()}>
       {(current) => (
         <li
+          ref={(element) =>
+            props.drag?.attach(element, {
+              id: () => props.id,
+              from: "list",
+              title: () => current().title,
+              enabled: () => !editing() && !current().done && !working(),
+            })
+          }
           class="task"
-          classList={{ "is-done": current().done, "is-editing": editing() }}
+          classList={{
+            "is-done": current().done,
+            "is-editing": editing(),
+            "is-draggable": !!props.drag && !current().done,
+          }}
         >
           <Show
             when={!working()}
@@ -148,6 +164,11 @@ export function TaskItem(props: {
                 );
               }}
             />
+          </Show>
+          <Show when={!editing() && current().startAt}>
+            {(start) => (
+              <span class="task-when">{CalendarFormat.when(start())}</span>
+            )}
           </Show>
           <button
             type="button"

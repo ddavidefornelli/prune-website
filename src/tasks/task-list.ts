@@ -23,7 +23,10 @@ const sameTask = (a: Task, b: Task) =>
   a.done === b.done &&
   a.createdAt === b.createdAt &&
   a.updatedAt === b.updatedAt &&
-  a.doneAt === b.doneAt;
+  a.doneAt === b.doneAt &&
+  a.startAt === b.startAt &&
+  a.notes === b.notes &&
+  a.minutes === b.minutes;
 
 /**
  * One account's list on this device: its tasks and the changes the cloud has
@@ -49,8 +52,10 @@ export class TaskList {
     const raw = value as Partial<Record<keyof SavedList, unknown>>;
     const tasks = new Map<string, Task>();
     if (Array.isArray(raw.tasks))
-      for (const task of raw.tasks)
-        if (TaskList.isTask(task)) tasks.set(task.id, task);
+      for (const value of raw.tasks) {
+        const task = TaskList.read(value);
+        if (task) tasks.set(task.id, task);
+      }
     const pending: Record<string, number> = {};
     if (typeof raw.pending === "object" && raw.pending !== null)
       for (const [id, at] of Object.entries(raw.pending))
@@ -71,7 +76,52 @@ export class TaskList {
       typeof task.done === "boolean" &&
       Number.isFinite(task.createdAt) &&
       Number.isFinite(task.updatedAt) &&
-      (task.done ? Number.isFinite(task.doneAt) : task.doneAt === null)
+      (task.done ? Number.isFinite(task.doneAt) : task.doneAt === null) &&
+      (task.startAt === null || Number.isFinite(task.startAt)) &&
+      typeof task.notes === "string" &&
+      task.notes.length <= TASK_LIMITS.notesLength &&
+      Number.isInteger(task.minutes) &&
+      (task.minutes as number) >= TASK_LIMITS.minMinutes &&
+      (task.minutes as number) <= TASK_LIMITS.maxMinutes
+    );
+  }
+
+  /**
+   * A task from storage or the cloud, or null when it is not one. A task
+   * saved before the calendar (or sent by an older backend) has no start,
+   * no description and the usual hour.
+   */
+  static read(value: unknown): Task | null {
+    if (typeof value !== "object" || value === null) return null;
+    const raw = value as Record<string, unknown>;
+    const task = {
+      ...raw,
+      startAt: raw.startAt ?? null,
+      notes: raw.notes ?? "",
+      minutes: raw.minutes ?? TASK_LIMITS.defaultMinutes,
+    };
+    return TaskList.isTask(task) ? task : null;
+  }
+
+  /** A typed description as the list keeps it: line breaks stay, the ends are trimmed. */
+  static cleanNotes(notes: string): string {
+    const clean = Array.from(notes.replace(/\r\n?/g, "\n"))
+      .filter(isWhole)
+      .join("")
+      // Tabs and line breaks stay; other control characters go.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, " ")
+      .trim();
+    return Array.from(clean).slice(0, TASK_LIMITS.notesLength).join("").trim();
+  }
+
+  /** A duration on the 15-minute grid, within the limits. */
+  static cleanMinutes(minutes: number): number {
+    if (!Number.isFinite(minutes)) return TASK_LIMITS.defaultMinutes;
+    const step = TASK_LIMITS.stepMinutes;
+    return Math.min(
+      TASK_LIMITS.maxMinutes,
+      Math.max(TASK_LIMITS.minMinutes, Math.round(minutes / step) * step),
     );
   }
 
@@ -153,6 +203,9 @@ export class TaskList {
       createdAt: at,
       updatedAt: at,
       doneAt: null,
+      startAt: null,
+      notes: "",
+      minutes: TASK_LIMITS.defaultMinutes,
     };
     return this.with([...this.saved.tasks, task], {
       ...this.saved.pending,
@@ -172,6 +225,29 @@ export class TaskList {
     if (!task || task.done === done) return this;
     const at = this.stamp(id, now);
     return this.replace({ ...task, done, doneAt: done ? at : null }, at);
+  }
+
+  /** Plans the task for `startAt` on the calendar; null takes it off. */
+  schedule(id: string, startAt: number | null, now: number): TaskList {
+    const task = this.byId.get(id);
+    const start = startAt === null ? null : Math.floor(startAt);
+    if (!task || task.startAt === start) return this;
+    if (start !== null && !Number.isFinite(start)) return this;
+    return this.replace({ ...task, startAt: start }, this.stamp(id, now));
+  }
+
+  setNotes(id: string, notes: string, now: number): TaskList {
+    const task = this.byId.get(id);
+    const clean = TaskList.cleanNotes(notes);
+    if (!task || clean === task.notes) return this;
+    return this.replace({ ...task, notes: clean }, this.stamp(id, now));
+  }
+
+  setMinutes(id: string, minutes: number, now: number): TaskList {
+    const task = this.byId.get(id);
+    const clean = TaskList.cleanMinutes(minutes);
+    if (!task || clean === task.minutes) return this;
+    return this.replace({ ...task, minutes: clean }, this.stamp(id, now));
   }
 
   remove(ids: readonly string[], now: number): TaskList {
@@ -231,8 +307,10 @@ export class TaskList {
     // The list was full: the cloud refused these new tasks.
     for (const id of response.rejected) delete pending[id];
     const merged = new Map<string, Task>();
-    for (const task of response.tasks)
-      if (TaskList.isTask(task)) merged.set(task.id, task);
+    for (const value of response.tasks) {
+      const task = TaskList.read(value);
+      if (task) merged.set(task.id, task);
+    }
     for (const id of Object.keys(pending)) {
       const local = this.byId.get(id);
       if (local) merged.set(id, local);

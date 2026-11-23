@@ -5,7 +5,7 @@ const MIGRATIONS = new URL("../../supabase/migrations/", import.meta.url);
 /** The day planner's retirement: the last migration, run separately so tests can seed planner data first. */
 export const RETIREMENT = "20261125000100_retire_day_planner.sql";
 /** pg_cron and pg_net are not in PGlite; the schedule itself is not under test. */
-const NEEDS_CRON = ["20261112000300_email_reminders_cron.sql", "20261120000200_reminders_every_ten_minutes.sql"];
+const NEEDS_CRON = ["20261112000300_email_reminders_cron.sql", "20261120000200_reminders_every_ten_minutes.sql", "20261201000300_task_start_alerts_cron.sql"];
 
 export const migration = (name) => readFileSync(new URL(name, MIGRATIONS), "utf8");
 /** Every website migration, oldest first. */

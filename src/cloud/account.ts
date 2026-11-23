@@ -157,6 +157,24 @@ export class AccountClient {
     await this.call("planner_list", "rename", { space, name });
   }
 
+  /**
+   * What a space's calendar shows besides its own tasks, for [from, to):
+   * Personal, the person's plans in their groups; a group, its people's busy
+   * time. Null before there is an account.
+   */
+  async spaceCalendar(
+    space: string | null,
+    from: number,
+    to: number,
+  ): Promise<unknown> {
+    if (this.disposed || !this.account) return null;
+    return this.call(
+      "planner_list",
+      "calendar",
+      space ? { space, from, to } : { from, to },
+    );
+  }
+
   /** A member leaves a group space; its owner deletes it for everyone. */
   async leaveSpace(space: string): Promise<void> {
     await this.call("planner_list", "leave", { space });
@@ -230,7 +248,9 @@ export class AccountClient {
     await this.cloud.helper(account.accountKey, { action: "erase" });
     const endpoint = await PushNotifications.unsubscribe();
     if (endpoint)
-      await this.call("planner_call", "remove_push", { endpoint }).catch(() => {});
+      await this.call("planner_call", "remove_push", { endpoint }).catch(
+        () => {},
+      );
     await this.call("planner_list", "erase", {});
     if (!account.guest) {
       const result = await this.call<{ isDeleted: boolean }>(

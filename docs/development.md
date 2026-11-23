@@ -83,6 +83,16 @@ Open tasks are sorted quietly (`classify`) as they are added; a task that fits (
 
 The model is DeepSeek V4.1 Flash through OpenRouter (`HELPER.defaultModel` and `HELPER.defaultUrl` in `server/constants.ts`). Every request carries OpenRouter provider routing that skips DeepSeek's and Moonshot's own services (China) and providers that keep prompts for training (`HELPER.openRouterProvider`). Any host with OpenAI's chat completions format works: set `HELPER_API_URL` (the full `/chat/completions` URL) and `HELPER_MODEL`, and update the privacy notice's recipients. There is no web search: answers say what to check instead of inventing prices, hours or addresses, and tasks that need live information are not offered the button. A guest's three answers, the daily 30 answers and refines and the daily 300 sorting and question calls are counted by `planner_helper_claim`.
 
+### Deploy the calendar
+
+The calendar sits above the list: a strip of seven days that opens to the hours (a day on phones, the week on laptops) when a task is dragged towards it, or with its button; it never takes more than about half the screen. Drag a task onto an hour to plan it (on a phone, hold it a moment first, so a swipe still scrolls); drag a planned task out of the calendar to take it off; or tap an empty hour and pick a task. Tap a planned task for its length (chips from 15 min to 4 h; dragging its bottom edge sets anything from 15 min to 12 h in 15-minute steps), a description whose links open, and Remove from calendar. A plan is the task's `startAt`, `minutes` and `notes` (`planner_list_tasks.start_at`, `minutes`, `notes`), synced like the rest of it.
+
+Each space has its calendar. Personal is the person's one calendar: it also shows, read-only and labelled, what they planned in their groups. A group's calendar shows when its people are busy with unfinished plans anywhere else, merged into blurred time ranges (never who or what). Both come from `planner_list('calendar', {space?, from, to})`, read for the week shown, 1.5 s after the list changes and every 2 minutes. Code: `src/calendar/` (`CalendarState`, `TaskDrag`, `Week`, the view).
+
+1. Apply `20261201000100_task_start_times.sql`, then deploy the website. A tab still running the previous website leaves plans alone (it sends no `startAt`).
+
+Google Calendar comes later; a two-way version (events in Google, changes there coming back) was built on 23 November 2026 and set aside unshipped.
+
 ### Retire the day planner
 
 `20261125000100_retire_day_planner.sql` deletes everything only the day planner used: ten tables (`planner_tasks`, `planner_stops`, `planner_reviews`, `planner_receipts`, `planner_review_tasks`, `planner_history`, `planner_suggestion_usage`, `ai_controls`, `ai_usage`, `ai_review_requests`), every function that read them, scheduling and history, and their columns in `planner_accounts` and `planner_email_reminders`. First it copies each account's unfinished planner tasks for today and later into its list, for accounts that have not opened the list yet. It slims `planner_call` to `delete_account`, drops `planner_list`'s one-time copy and `'status'`, unschedules any job that used the retired tables, and moves the reminder job back to hourly. It uses no `CASCADE`: anything it does not know still depending on a retired table makes it fail, changing nothing. See [the database](database.md).
@@ -109,6 +119,16 @@ Setup, once (already done for production):
 5. Create two Vault secrets for the cron job: `reminders_function_url` (`https://<project-ref>.supabase.co/functions/v1/daily-reminders`) and `reminders_cron_secret` (the same value as `REMINDER_CRON_SECRET`).
 
 `npm run email:test` sends a sample through Brevo to `REMINDER_TO` (from `.env.reminders.local`). By hand: `curl -X POST -H "Authorization: Bearer $REMINDER_CRON_SECRET" https://<project-ref>.supabase.co/functions/v1/daily-reminders` returns `{"sent":…,"retry":…,"rejected":…,"released":…,"pushed":…}`.
+
+### Task-start alerts
+
+Five minutes before an unfinished planned task starts, everyone in its space gets a push notification on every browser that allowed them (the title, "In 5 min · 2:00 – 2:30 PM", and a group's name) and, when their account has an email address with task-start emails on, an email with the same and the description (links clickable; its own unsubscribe link, `kind=starts`). Guests get the notification only. `planner_claim_start_alerts` picks tasks starting in the next 5 minutes and records one alert per person, task and start time before anything is sent: a moved task alerts again, nothing is sent twice, and a late alert is never retried. Code: `server/reminders/start-alerts.ts`, run by the `daily-reminders` function when its body is `{"job": "starts"}`.
+
+1. Apply `20261201000200_task_start_alerts.sql`.
+2. `npx supabase functions deploy daily-reminders` (and `email-unsubscribe`, for the new kind).
+3. Apply `20261201000300_task_start_alerts_cron.sql`: a `pg_cron` job, `prune-start-alerts`, every minute, with the same Vault secrets as the hourly job. Without Brevo configured, alerts go by notification only; without VAPID keys, by email only.
+
+Each alert is an email: Brevo's free plan (300 a day) is shared with the come-back emails, and a busy day of plans in large groups can reach it. By hand: `curl -X POST -H "Authorization: Bearer $REMINDER_CRON_SECRET" -d '{"job":"starts"}' https://<project-ref>.supabase.co/functions/v1/daily-reminders` returns `{"alerts":…,"pushed":…,"emailed":…}`.
 
 ### Delete everything and account deletion
 

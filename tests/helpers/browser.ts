@@ -35,7 +35,7 @@ export function cloudTask(title: string, fields: Partial<Task> = {}, minutesAgo 
   counter += 1;
   const at = Date.now() - minutesAgo * 60_000 - counter;
   const id = `00000000-0000-4000-8000-${String(counter).padStart(12, "0")}`;
-  return { id, title, done: false, createdAt: at, updatedAt: at, doneAt: null, ...fields };
+  return { id, title, done: false, createdAt: at, updatedAt: at, doneAt: null, startAt: null, notes: "", minutes: 60, ...fields };
 }
 
 export interface RequestLog { path: string; body: Record<string, any>; authorization: string | undefined }
@@ -75,6 +75,8 @@ export interface Backend {
   codesSent: string[];
   /** Group spaces (Personal is `tasks` above, for whoever syncs). */
   groups: GroupSpace[];
+  /** planner_list 'calendar': other spaces' plans (Personal) and busy time (groups), as the server would answer. */
+  calendar: { elsewhere: Record<string, unknown>[]; busy: { start: number; end: number }[] };
 }
 
 /** A group space in the fixture: made by sharing Personal, joined by its link. */
@@ -118,7 +120,7 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
   /** The cloud's list when the test starts (wrapped: test.use reads a bare array as [value, options]). */
   seed: [{ tasks: [] }, { option: true }],
   backend: async ({ context, visitor, seed }, use) => {
-    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [], groups: [] };
+    const state: Backend = { tasks: structuredClone(seed.tasks), requests: [], syncs: [], guests: [], guestsDisabled: false, offline: false, failSyncs: null, isDeleted: false, deletedAt: null, full: false, removedUsers: [], refreshes: [], refreshRevoked: false, helperCalls: [], helperRuns: new Map(), helperStarts: {}, codesSent: [], groups: [], calendar: { elsewhere: [], busy: [] } };
     const initial = visitor === "account" ? session(ACCOUNT_ID, false) : visitor === "guest" ? session(GUEST_ID, true) : null;
     // Seed once per browser context, not on reload or each new tab.
     await context.addInitScript(({ initialSession, authKey, privacyKey, version }) => {
@@ -247,6 +249,10 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
         if (body.p_action === "people") {
           const members = space ? space.members : [caller];
           await send({ people: members.map((member) => ({ name: member === ACCOUNT_ID ? "Alice" : null, email: `${member.slice(0, 4)}@example.test`, owner: space ? space.owner === member : true, you: member === caller })) });
+          return;
+        }
+        if (body.p_action === "calendar") {
+          await send(space ? { elsewhere: [], busy: state.calendar.busy } : { elsewhere: state.calendar.elsewhere, busy: [] });
           return;
         }
         if (body.p_action === "rename" && space) { space.name = args.name.trim(); await send({ space: space.id, name: space.name }); return; }

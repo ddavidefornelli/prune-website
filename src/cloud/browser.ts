@@ -101,15 +101,20 @@ export class BrowserCloud implements CloudTransport {
       SUPABASE_ROUTES.helper,
       accountKey,
       request,
-      (status, value) => {
-        const body = (value ?? {}) as { code?: unknown; message?: unknown };
-        if (status === HTTP_STATUS.unauthorized)
-          return new CloudError("unauthorized", MESSAGES.sessionExpired);
-        return typeof body.code === "string" && typeof body.message === "string"
-          ? new CloudError(body.code, body.message)
-          : new CloudError("server", MESSAGES.helperUnavailable);
-      },
+      BrowserCloud.functionError(MESSAGES.helperUnavailable),
     );
+  }
+
+  /** An Edge Function's refusal: its own code and message, or `fallback`. */
+  private static functionError(fallback: string) {
+    return (status: number, value: unknown): CloudError => {
+      const body = (value ?? {}) as { code?: unknown; message?: unknown };
+      if (status === HTTP_STATUS.unauthorized)
+        return new CloudError("unauthorized", MESSAGES.sessionExpired);
+      return typeof body.code === "string" && typeof body.message === "string"
+        ? new CloudError(body.code, body.message)
+        : new CloudError("server", fallback);
+    };
   }
 
   async sendCode(email: string): Promise<void> {

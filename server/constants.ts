@@ -63,3 +63,13 @@ export const HELPER = {
   staleMs: 10 * 60 * 1000,
   maxBodyBytes: 32 * 1024,
 } as const;
+
+/** Alerts 5 minutes before a planned task starts (see reminders/start-alerts.ts). */
+export const START_ALERTS = {
+  /** Alerts claimed by one run, which comes every minute. */
+  maxPerRun: 1000,
+  pushTag: "prune-start",
+  button: "Open prune",
+  footer:
+    "You get this 5 minutes before each task planned in your prune calendars. ",
+} as const;

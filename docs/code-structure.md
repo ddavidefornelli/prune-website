@@ -39,7 +39,14 @@ src/
     share-state.ts          ShareState: Share (sign in, name the space, copy the link) and joining through a link
     constants.ts, types.ts
   components/               Native dialog, privacy policy, cookie banner, unsubscribe page
-  shared/                   Storage keys, routes, site and time constants, the helper contract
+  calendar/
+    calendar-state.ts       CalendarState: the week and day shown, open or closed, the drag target, other spaces' plans and busy time
+    task-drag.ts            TaskDrag: picks tasks up (mouse: move; touch: hold) and drops them on an hour or off the calendar
+    week.ts                 Week: Monday-to-Sunday in local time, hours, and side-by-side placing
+    links.ts                The web addresses in a description
+    format.ts, constants.ts, types.ts
+    components/             The calendar (strip, hours, resizable blocks, busy time) and its sheet (plan an hour; length, description, links)
+  shared/                   Storage keys, routes, site and time constants, the helper and calendar contracts
   styles/                   base.css (tokens, light and dark), app.css, preferences.css
 server/                     Code the Edge Functions and the error relay run (Deno and Vercel Edge)
   reminders/                Come-back email, Brevo, Web Push, the reminder job and unsubscribe
@@ -57,6 +64,7 @@ tests/                      Unit, SQL (PGlite), reactivity and Playwright suites
 - **`TaskList`** applies every change with a later time than the one before, batches unsaved changes, merges the cloud's answer without losing changes made meanwhile, and `adopt`s a new owner by marking every task to upload. **`TaskStorage`** keeps it in localStorage for all tabs. **`ListSync`** finds the owner, decides when to sync and how to back off, and never surfaces a failure. **`ListState`** ties them to the screen.
 - **Spaces** work like tldraw's files. `SpaceState` keeps the account's spaces (from every sync) and which one is open; `TaskApp` mounts one `ListState` and `HelperState` per open space (Personal in `prune:list:v1`, a group space in `prune:space:v1:<id>`). The switcher is a sidebar on laptops and a sheet behind the space name on phones, always shown, with a + that makes a new empty space. The Share sheet lists everyone in a group space. **`ShareState`** opens Share (signing in first), turns Personal into a named group space or gives a group space's `/?join=<token>` link, joins a link that brought the tab here (`ShareState.takeInvite` moves its token out of the address bar first), renames, leaves or deletes. `ListChannel` makes the open space sync the moment anyone in it changes it.
 - **`HelperState`** sorts open tasks in quiet batches, runs the questions, starts answers and checks on them, and signs a guest in (emailed code or Google) when its free answers are used, carrying the waiting task across the reload. **`HelperEndpoint`** checks every request and the caller's token, counts limits, and writes answers after the response with **`HelperModel`**.
+- **The calendar** sits above each space's list. `CalendarState` (one per open space) holds the week, the day phones show, whether it is open (its button pins it; a drag opens it until the task lands) and the task being dragged; `TaskDrag` carries a task from a list row or a planned block, asks the view what is under the pointer, and plans it with `ListState.schedule`. A plan is the task's `startAt`, `minutes` and `notes`, so it syncs and is shared with the list. Personal also shows the person's plans in their groups, and a group shows its people's busy time elsewhere (`planner_list` 'calendar').
 - **Server:** `HelperEndpoint`, `HelperModel`, `ReminderJob`, `UnsubscribeEndpoint`, `ReminderMessages`, `BrevoMailer`, `WebPushSender` and `ErrorLogRelay`.
 
 ## Removed

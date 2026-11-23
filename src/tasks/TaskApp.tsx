@@ -7,6 +7,9 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { CalendarState } from "../calendar/calendar-state";
+import { Calendar } from "../calendar/components/Calendar";
+import { TaskDrag } from "../calendar/task-drag";
 import { AccountClient } from "../cloud/account";
 import { PushNotifications } from "../cloud/push";
 import { ListChannel } from "../cloud/realtime";
@@ -163,6 +166,8 @@ function SpaceView(props: {
     onMissing: () => space && spaces.lost(space),
   });
   const helper = new HelperState(client, state, storage);
+  const calendar = new CalendarState(state, client);
+  const drag = new TaskDrag(calendar);
   onList(state);
   onCleanup(() => onRelease(state));
 
@@ -170,6 +175,7 @@ function SpaceView(props: {
     <>
       <main class="list">
         <h1 class="visually-hidden">{SpaceState.label(props.spaces.open())}</h1>
+        <Calendar calendar={calendar} list={state} drag={drag} />
         <AddTask onAdd={(title) => state.add(title)} />
         <Show when={state.notice()}>
           <p class="notice" role="alert">
@@ -178,7 +184,9 @@ function SpaceView(props: {
         </Show>
         <ul class="tasks" aria-label="To do">
           <For each={state.openIds()}>
-            {(id) => <TaskItem id={id} state={state} helper={helper} />}
+            {(id) => (
+              <TaskItem id={id} state={state} helper={helper} drag={drag} />
+            )}
           </For>
         </ul>
         <DoneTasks state={state} />
