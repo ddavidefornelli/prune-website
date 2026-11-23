@@ -5,7 +5,8 @@
 -- 1. Every table the website relies on exists with RLS enabled (all true/true).
 with expected(name) as (values
   ('planner_accounts'), ('planner_list_tasks'), ('planner_email_reminders'),
-  ('planner_push_subscriptions'), ('planner_spaces'), ('planner_space_members'), ('error_log')
+  ('planner_push_subscriptions'), ('planner_spaces'), ('planner_space_members'),
+  ('planner_deleted_tasks'), ('error_log')
 )
 select e.name, c.oid is not null as table_exists,
   coalesce(c.relrowsecurity, false) as rls_enabled
@@ -18,7 +19,8 @@ order by e.name;
 -- through planner_list; reminders, push and the error log only server-side.
 with expected(name) as (values
   ('planner_accounts'), ('planner_list_tasks'), ('planner_email_reminders'),
-  ('planner_push_subscriptions'), ('planner_spaces'), ('planner_space_members'), ('error_log')
+  ('planner_push_subscriptions'), ('planner_spaces'), ('planner_space_members'),
+  ('planner_deleted_tasks'), ('error_log')
 ), roles(name) as (values ('anon'), ('authenticated'))
 select e.name as table_name, r.name as role_name,
   has_table_privilege(r.name, c.oid, 'SELECT') as can_select,

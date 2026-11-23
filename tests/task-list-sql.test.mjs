@@ -207,3 +207,36 @@ test("browsers can only reach the list through planner_list", async () => {
   ).rows[0];
   assert.deepEqual(privileges, { table_access: false, signed_in: true, signed_out: false });
 });
+
+const kept = async (db) =>
+  (await db.query("select space_id, id, title, done_at is not null as finished from public.planner_deleted_tasks order by id")).rows;
+const totals = async (db) =>
+  (await db.query("select created::int, done::int, deleted_done::int from public.planner_task_totals()")).rows[0];
+
+test("a deleted done task stays in the database and still counts; an open one goes", async () => {
+  const db = await fixture();
+  await sync(db, { save: [task(1, { done: true, doneAt: NOW }), task(2), task(3)] });
+  assert.deepEqual(await totals(db), { created: 3, done: 1, deleted_done: 0 });
+  const after = await sync(db, { remove: [id(1), id(2)] });
+  assert.deepEqual(after.tasks.map((t) => t.id), [id(3)]);
+  assert.deepEqual(await kept(db), [{ space_id: owner, id: id(1), title: "Task 1", finished: true }]);
+  assert.deepEqual(await totals(db), { created: 2, done: 1, deleted_done: 1 });
+  // Browsers cannot read what was kept, or the totals.
+  const privileges = (
+    await db.query(`select has_table_privilege('authenticated', 'public.planner_deleted_tasks', 'select,insert,update,delete') as table_access,
+      has_function_privilege('authenticated', 'public.planner_task_totals()', 'execute') as totals`)
+  ).rows[0];
+  assert.deepEqual(privileges, { table_access: false, totals: false });
+});
+
+test("Delete everything keeps the count of done tasks but not their titles or space", async () => {
+  const db = await fixture();
+  await sync(db, { save: [task(1, { done: true, doneAt: NOW }), task(2, { done: true, doneAt: NOW }), task(3)] });
+  await sync(db, { remove: [id(1)] });
+  await db.query("select public.planner_list('erase', '{}'::jsonb, 'UTC')");
+  assert.deepEqual(await kept(db), [
+    { space_id: null, id: id(1), title: null, finished: true },
+    { space_id: null, id: id(2), title: null, finished: true },
+  ]);
+  assert.deepEqual(await totals(db), { created: 2, done: 2, deleted_done: 2 });
+});

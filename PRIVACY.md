@@ -1,6 +1,6 @@
 # prune Terms & Privacy
 
-Version: privacy-web-v29
+Version: privacy-web-v30
 
 Status: Draft — web adaptation; operator review required before public release.
 
@@ -89,7 +89,7 @@ Before making a restricted transfer, the operator must confirm an applicable law
 
 ## 7. How long is data kept?
 
-- Your list and guest id: until you choose Delete everything, or a justified earlier administrative deletion. Guest ids that have not been used for 12 months may be removed together with their lists; the operator must set up that clean-up before public release (it is not configured yet). The list keeps at most 1,000 tasks: when it is full, the oldest done task is removed to make room for a new one. A deleted task is removed from the database at once.
+- Your list and guest id: until you choose Delete everything, or a justified earlier administrative deletion. Guest ids that have not been used for 12 months may be removed together with their lists; the operator must set up that clean-up before public release (it is not configured yet). The list keeps at most 1,000 tasks: when it is full, the oldest done task is removed from the list to make room for a new one. A deleted task that was not done is removed from the database at once. A done task that is deleted (one at a time, with Clear done, or to make room) leaves your list but is kept in the database, with its title, its space and when it was created, finished and deleted, so we can count how many tasks prune has been used for; it is never shown again. When its space is deleted (by its creator, by Delete everything or with the account), its title and space are erased and only those times remain, as an anonymous count.
 - Shared spaces: a space, its name, link and tasks until its creator deletes it, chooses Delete everything or their account is deleted; a membership until the member leaves, the space is deleted, or the member's account is deleted.
 - "Do it for me" answers: until you discard the answer, delete its task or choose Delete everything. The usage counts used for its limits: as long as the guest id or account exists.
 - Accounts from before guests, and accounts signed in for "Do it for me": until the account is deleted (see section 8). Their earlier planner data: until the day planner is retired from the database (section 2).
