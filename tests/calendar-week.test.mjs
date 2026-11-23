@@ -81,3 +81,23 @@ test("links in a description: web addresses only, without trailing punctuation, 
     { href: "http://x.test/path", label: "x.test/path" },
   ]);
 });
+
+test("a server answer without the calendar fields never wipes this device's plan, length or description", () => {
+  const local = TaskList.empty()
+    .add("Call the bank", T, id(1))
+    .schedule(id(1), T + 3_600_000, T + 1)
+    .setMinutes(id(1), 90, T + 2)
+    .setNotes(id(1), "Agenda", T + 3);
+  const batch = local.batch();
+  const sent = local.find(id(1));
+  // An older backend answers with the task as it knows it: no calendar fields.
+  const { startAt, minutes, notes, ...old } = sent;
+  const confirmed = local.confirm(batch, { tasks: [old], rejected: [] });
+  assert.deepEqual(
+    [confirmed.find(id(1)).startAt, confirmed.find(id(1)).minutes, confirmed.find(id(1)).notes],
+    [T + 3_600_000, 90, "Agenda"],
+  );
+  // A current backend that says the task left the calendar is believed.
+  const cleared = local.confirm(batch, { tasks: [{ ...sent, startAt: null }], rejected: [] });
+  assert.equal(cleared.find(id(1)).startAt, null);
+});

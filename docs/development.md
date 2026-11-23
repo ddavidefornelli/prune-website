@@ -89,7 +89,9 @@ The calendar sits above the list: a strip of seven days that opens to the hours 
 
 Each space has its calendar. Personal is the person's one calendar: it also shows, read-only and labelled, what they planned in their groups. A group's calendar shows when its people are busy with unfinished plans anywhere else, merged into blurred time ranges (never who or what). Both come from `planner_list('calendar', {space?, from, to})`, read for the week shown, 1.5 s after the list changes and every 2 minutes. Code: `src/calendar/` (`CalendarState`, `TaskDrag`, `Week`, the view).
 
-1. Apply `20261201000100_task_start_times.sql`, then deploy the website. A tab still running the previous website leaves plans alone (it sends no `startAt`).
+1. Apply `20261201000100_task_start_times.sql`, then `20261202000100_calendar_catch_up.sql`, then deploy the website. A tab still running the previous website leaves plans alone (it sends no `startAt`), and the website keeps a task's start, length and description when a backend's answer leaves them out.
+
+`20261201000100` and `20261201000200` changed after early versions of them may have been applied (the first stored only the start; the second was Google Calendar). Such a database never gets the later content, so planned tasks fell back to an hour on every sync. `20261202000100_calendar_catch_up.sql` brings any database to the current state and changes nothing on one that is already there; always apply it.
 
 Google Calendar comes later; a two-way version (events in Google, changes there coming back) was built on 23 November 2026 and set aside unshipped.
 

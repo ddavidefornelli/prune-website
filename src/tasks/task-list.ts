@@ -103,6 +103,26 @@ export class TaskList {
     return TaskList.isTask(task) ? task : null;
   }
 
+  /**
+   * The cloud's copy of a task, keeping this device's plan, length and
+   * description where the answer leaves them out (a backend from before the
+   * calendar): an older server never wipes them. A null start is sent, so
+   * taking a task off the calendar elsewhere still comes through.
+   */
+  private static keepUnsent(
+    value: unknown,
+    task: Task,
+    local: Task | undefined,
+  ): Task {
+    if (!local) return task;
+    const raw = value as Record<string, unknown>;
+    const kept = { ...task };
+    if (!("startAt" in raw)) kept.startAt = local.startAt;
+    if (!("minutes" in raw)) kept.minutes = local.minutes;
+    if (!("notes" in raw)) kept.notes = local.notes;
+    return kept;
+  }
+
   /** A typed description as the list keeps it: line breaks stay, the ends are trimmed. */
   static cleanNotes(notes: string): string {
     const clean = Array.from(notes.replace(/\r\n?/g, "\n"))
@@ -309,7 +329,11 @@ export class TaskList {
     const merged = new Map<string, Task>();
     for (const value of response.tasks) {
       const task = TaskList.read(value);
-      if (task) merged.set(task.id, task);
+      if (task)
+        merged.set(
+          task.id,
+          TaskList.keepUnsent(value, task, this.byId.get(task.id)),
+        );
     }
     for (const id of Object.keys(pending)) {
       const local = this.byId.get(id);
