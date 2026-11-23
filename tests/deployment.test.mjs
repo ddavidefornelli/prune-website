@@ -104,7 +104,21 @@ test("unrecognized route semantics, public metadata and symlinks are not silentl
   await assert.rejects(() => checkDeployment(destination), /symbolic links/);
 });
 
+/** Public fixture configuration for a build, restored after the test (CI has no .env). */
+function fixtureConfig(t) {
+  const saved = { url: process.env.VITE_SUPABASE_URL, key: process.env.VITE_SUPABASE_ANON_KEY };
+  process.env.VITE_SUPABASE_URL = "https://fixture.supabase.co";
+  process.env.VITE_SUPABASE_ANON_KEY = "sb_publishable_fixture";
+  t.after(() => {
+    for (const [name, value] of [["VITE_SUPABASE_URL", saved.url], ["VITE_SUPABASE_ANON_KEY", saved.key]]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+}
+
 test("tracking in a copied public script fails even when it is absent from the HTML", async (t) => {
+  fixtureConfig(t);
   const { source, destination } = fixture(t);
   writeFileSync(join(source, "tracking.js"), 'fetch("https://gc.zgo.at/count");');
   await assert.rejects(() => buildRelease({ source, destination, runBuild: () => 0, onResult: () => {} }), /tracker/);
