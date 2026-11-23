@@ -130,6 +130,10 @@ delete from auth.users
 where is_anonymous and coalesce(last_sign_in_at, created_at) < now() - interval '12 months';
 ```
 
+### Metrics dashboard
+
+`npm run dashboard` opens a local page (127.0.0.1:4400) where every number is a share of the week's visitors: new visitors who added a task on day one or came back in their first week, and visitors who used the list, finished a task, used "Do it for me", opened Share or are signed in, plus new-visitor growth. It reads PostHog's query API with a personal API key (scope: query read) and the project id: `POSTHOG_PERSONAL_API_KEY` and `POSTHOG_PROJECT_ID` in `.env.reminders.local`, or asked for; `POSTHOG_API_HOST` defaults to the EU cloud. The page gets weekly totals only. PostHog sees only visitors who accepted optional analytics, so every share is of those visitors.
+
 ## Build and deploy
 
 ```sh

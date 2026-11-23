@@ -22,7 +22,8 @@
     "test:reactivity": "node --conditions=browser --experimental-strip-types --test tests/reactivity/*.test.mjs",
     "test:e2e": "playwright test",
     "check:production": "node --experimental-strip-types scripts/check-production.mjs",
-    "email:test": "node --experimental-strip-types scripts/send-test-reminder.ts"
+    "email:test": "node --experimental-strip-types scripts/send-test-reminder.ts",
+    "dashboard": "node --experimental-strip-types scripts/dashboard.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
