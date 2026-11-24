@@ -19,8 +19,6 @@ export const STORAGE_KEYS = {
   spaces: "prune:spaces:v1",
   /** Which tasks the helper can do, and its answers, for this browser's account. */
   helper: "prune:helper:v1",
-  /** A "Do it for me" waiting for sign-in to finish (sessionStorage). */
-  helperResume: "prune:helper:resume",
   /** A shared list's link token, waiting to be joined (sessionStorage). */
   shareJoin: "prune:share:join",
   /** The Share sheet, to open again after signing in (sessionStorage). */

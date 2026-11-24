@@ -13,14 +13,10 @@ async function fixture() {
   return db;
 }
 
-test("a guest gets three answers, then is asked to sign in; refines and calls are not counted against them", async () => {
+test("a guest is never asked to sign in: only the daily limit stops them", async () => {
   const db = await fixture();
-  for (let n = 0; n < 3; n++) assert.equal(await claim(db, guest, true, "start"), "ok");
-  assert.equal(await claim(db, guest, true, "refine"), "ok");
-  assert.equal(await claim(db, guest, true, "call"), "ok");
-  assert.equal(await claim(db, guest, true, "start"), "sign_in");
-  // Signed in (the same user no longer anonymous), answers are counted per day only.
-  assert.equal(await claim(db, guest, false, "start"), "ok");
+  for (let n = 0; n < 30; n++) assert.equal(await claim(db, guest, true, "start"), "ok");
+  assert.equal(await claim(db, guest, true, "start"), "daily_limit");
 });
 
 test("everyone gets 30 answers and refines, and 300 calls, a day; a new day starts over", async () => {

@@ -183,7 +183,6 @@ export const test = base.extend<{ backend: Backend; visitor: Visitor; seed: { ta
         if (body.action === "choices") { await send({ choices: [{ question: "How should it sound?", options: ["Warm", "Formal"] }] }); return; }
         if (body.action === "start") {
           const started = state.helperStarts[caller] ?? 0;
-          if (caller !== ACCOUNT_ID && started >= 3) { await send({ code: "sign_in", message: "Sign in to keep going." }, 402); return; }
           state.helperStarts[caller] = started + 1;
           const run = { taskId: body.taskId, status: "working", answer: null, sources: [], turns: [], error: null, updatedAt: Date.now(), title: body.title };
           state.helperRuns.set(body.taskId, run);

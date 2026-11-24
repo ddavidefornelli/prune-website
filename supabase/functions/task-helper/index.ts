@@ -81,7 +81,7 @@ const endpoint = new HelperEndpoint({
         p_kind: kind,
       });
       if (error) throw new Error("Claim failed");
-      return data as "ok" | "sign_in" | "daily_limit";
+      return data as "ok" | "daily_limit";
     },
     async runs(userId, taskIds) {
       if (!taskIds.length) return [];

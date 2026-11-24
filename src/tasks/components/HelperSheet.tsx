@@ -4,7 +4,6 @@ import { HELPER_LIMITS } from "../../shared/helper-contract";
 import type { HelperFlow, HelperState } from "../helper-state";
 import type { ListState } from "../list-state";
 import { AnswerText } from "./AnswerText";
-import { SignInForm } from "./SignInForm";
 
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -14,26 +13,7 @@ const CloseIcon = () => (
 
 const Spinner = () => <span class="helper-spinner" aria-hidden="true" />;
 
-/** A list card with a tick and a spark: the helper at work. Strokes in the text colour. */
-const Illustration = () => (
-  <svg class="helper-illustration" viewBox="0 0 160 112" aria-hidden="true">
-    <rect x="24" y="14" width="96" height="84" rx="14" />
-    <circle cx="46" cy="40" r="7" />
-    <path d="M42.5 40.5l2.6 2.6 5-5.4" />
-    <path d="M62 40h40" />
-    <circle cx="46" cy="62" r="7" />
-    <path d="M62 62h30" />
-    <circle cx="46" cy="84" r="7" class="is-faint" />
-    <path d="M62 84h36" class="is-faint" />
-    <path
-      class="is-spark"
-      d="M132 22v20M122 32h20M126 26l12 12M138 26l-12 12"
-    />
-    <path class="is-spark" d="M140 64v10M135 69h10" />
-  </svg>
-);
-
-/** "Do it for me": the questions, signing in, and the finished answer. */
+/** "Do it for me": the questions and the finished answer. */
 export function HelperSheet(props: { helper: HelperState; list: ListState }) {
   const title = (flow: HelperFlow) => props.list.task(flow.taskId)?.title ?? "";
 
@@ -78,9 +58,6 @@ export function HelperSheet(props: { helper: HelperState; list: ListState }) {
                     flow={choose() as Extract<HelperFlow, { step: "choose" }>}
                   />
                 )}
-              </Match>
-              <Match when={flow().step === "sign_in"}>
-                <SignIn helper={props.helper} />
               </Match>
               <Match when={flow().step === "answer"}>
                 <Answer helper={props.helper} taskId={flow().taskId} />
@@ -194,25 +171,6 @@ function Choices(props: {
         </div>
       )}
     </Show>
-  );
-}
-
-function SignIn(props: { helper: HelperState }) {
-  return (
-    <div class="helper-sign-in">
-      <Illustration />
-      <h2>Keep letting prune do it</h2>
-      <p class="helper-note">
-        You've used your {HELPER_LIMITS.guestRuns} free answers. Sign in to keep
-        going. It's free, and your list comes with you.
-      </p>
-      <SignInForm
-        busy={props.helper.busy()}
-        onGoogle={() => void props.helper.google()}
-        onSendCode={(email) => props.helper.sendCode(email)}
-        onVerify={(email, code) => void props.helper.verifyCode(email, code)}
-      />
-    </div>
   );
 }
 

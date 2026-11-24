@@ -21,8 +21,6 @@ export const HELPER_LIMITS = {
   messageLength: 1000,
   /** Refine messages on one answer. */
   refines: 5,
-  /** Runs a guest may start before signing in. */
-  guestRuns: 3,
   /** Runs and refines per account per day (UTC). */
   dailyRuns: 30,
   /** Classify and choices calls per account per day (UTC). */
@@ -108,7 +106,6 @@ export type HelperRequest =
 
 /** Error codes the browser reacts to. */
 export const HELPER_ERRORS = {
-  signIn: "sign_in",
   dailyLimit: "daily_limit",
   refineLimit: "refine_limit",
   busy: "busy",

@@ -29,7 +29,7 @@ async function finishGoogleSignIn(): Promise<void> {
   try {
     await client.finishGoogle(code);
   } catch {
-    // Still a guest: "Do it for me" asks to sign in again.
+    // Still a guest: Share asks to sign in again.
   } finally {
     await client.dispose();
   }

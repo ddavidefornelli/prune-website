@@ -37,7 +37,7 @@ export interface StoredRun extends HelperRun {
 }
 
 /** What a claim answers: go ahead, or which limit was reached. */
-export type Claim = "ok" | "sign_in" | "daily_limit";
+export type Claim = "ok" | "daily_limit";
 export type ClaimKind = "start" | "refine" | "call";
 
 export interface HelperStore {
@@ -476,12 +476,6 @@ export class HelperEndpoint {
 
   private async claim(user: HelperUser, kind: ClaimKind): Promise<void> {
     const claim = await this.deps.store.claim(user, kind);
-    if (claim === "sign_in")
-      throw new RequestError(
-        HTTP_STATUS.paymentRequired,
-        HELPER_ERRORS.signIn,
-        "Sign in to keep going.",
-      );
     if (claim === "daily_limit")
       throw new RequestError(
         HTTP_STATUS.tooManyRequests,

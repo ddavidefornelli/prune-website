@@ -1,4 +1,4 @@
-import { test, expect, addTask, openList, ACCOUNT_ID, GUEST_ID } from "./helpers/browser";
+import { test, expect, addTask, openList, GUEST_ID } from "./helpers/browser";
 
 const edit = (page: import("@playwright/test").Page, title: string) => page.getByRole("button", { name: `Edit ${title}`, exact: true });
 const doIt = (page: import("@playwright/test").Page, title: string) => page.getByRole("button", { name: `Do it for me: ${title}`, exact: true });
@@ -52,28 +52,16 @@ test("Do it for me: a this-or-that question, a spinner, then the answer under th
   expect(backend.helperRuns.size).toBe(0);
 });
 
-test("after three free answers a guest signs in with an emailed code, and the task carries on as that account", async ({ page, backend }) => {
+test("a guest is never asked to sign in, however many answers they ask for", async ({ page, backend }) => {
   await openList(page);
   await addTask(page, "Write a bio");
   await expect.poll(() => backend.helperCalls.some((call) => call.action === "classify")).toBe(true);
-  // The guest has used its free answers.
+  // Well past what used to be the free answers.
   backend.helperStarts[GUEST_ID] = 3;
   await doIt(page, "Write a bio").click();
   await sheet(page).getByRole("button", { name: "Either is fine" }).click();
-  await expect(sheet(page).getByRole("heading", { name: "Keep letting prune do it" })).toBeVisible();
-  await expect(sheet(page).getByRole("button", { name: "Continue with Google" })).toBeVisible();
-
-  await sheet(page).getByRole("textbox", { name: "Email" }).fill("alice@example.test");
-  await sheet(page).getByRole("button", { name: "Send code" }).click();
-  expect(backend.codesSent).toEqual(["alice@example.test"]);
-  await sheet(page).getByRole("textbox", { name: "Code" }).fill("000000");
-  await sheet(page).getByRole("button", { name: "Sign in" }).click();
-  await expect(sheet(page).getByRole("alert")).toHaveText(/didn't work/);
-  await sheet(page).getByRole("textbox", { name: "Code" }).fill("123456");
-  await sheet(page).getByRole("button", { name: "Sign in" }).click();
-
-  // The page reloads as the account; the list comes along and the answer starts.
+  await expect(sheet(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open the answer for Write a bio" })).toBeVisible();
-  expect(backend.helperStarts[ACCOUNT_ID]).toBe(1);
-  await expect.poll(() => backend.tasks.map((task) => task.title)).toContain("Write a bio");
+  expect(backend.helperStarts[GUEST_ID]).toBe(4);
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
 });

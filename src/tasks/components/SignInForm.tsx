@@ -1,8 +1,8 @@
 import { createSignal, Show } from "solid-js";
 
 /**
- * Signing in: Google, or a six-digit code sent by email. Used by "Do it for
- * me" (after a guest's free answers) and by Share.
+ * Signing in: Google, or a six-digit code sent by email. Only Share uses it:
+ * signing in is just for sharing.
  */
 export function SignInForm(props: {
   busy: boolean;

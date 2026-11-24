@@ -110,11 +110,7 @@ test("a refine continues the conversation and keeps its turns", async () => {
   ]);
 });
 
-test("limits: a guest out of free answers is asked to sign in; a full day is refused", async () => {
-  const guest = fixture({ claims: { "guest:start": "sign_in" } });
-  const refused = await guest.call(start(), "token-guest");
-  assert.deepEqual([refused.status, refused.body.code], [402, "sign_in"]);
-  assert.equal(guest.runs.size, 0);
+test("limits: a full day is refused", async () => {
   const full = fixture({ claims: { "member:call": "daily_limit" } });
   const choices = await full.call({ action: "choices", taskId: TASK, title: "Email Marco", context: [], locale });
   assert.deepEqual([choices.status, choices.body.code], [429, "daily_limit"]);

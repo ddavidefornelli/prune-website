@@ -39,12 +39,6 @@ interface SavedHelper {
   runs: Record<string, HelperRun>;
 }
 
-/** A "Do it for me" that waits for sign-in (and its page reload) to finish. */
-interface Resume {
-  taskId: string;
-  picks: HelperPick[];
-}
-
 /** Where the person is in "Do it for me"; null when its sheet is closed. */
 export type HelperFlow =
   | { step: "asking"; taskId: string }
@@ -54,7 +48,6 @@ export type HelperFlow =
       choices: HelperChoice[];
       picks: HelperPick[];
     }
-  | { step: "sign_in"; taskId: string; picks: HelperPick[] }
   | { step: "answer"; taskId: string };
 
 type Timer = ReturnType<typeof setTimeout>;
@@ -78,8 +71,8 @@ const isRun = (value: unknown): value is HelperRun => {
 /**
  * "Do it for me": which tasks the helper can do (decided quietly as tasks are
  * added), the this-or-that questions, the answers it writes in the
- * background, and signing in once a guest's free answers are used. Create it
- * inside a Solid owner, after the ListState it reads.
+ * background. No sign-in: guests use it as they are. Create it inside a Solid
+ * owner, after the ListState it reads.
  */
 export class HelperState {
   readonly flow: Accessor<HelperFlow | null>;
@@ -146,7 +139,6 @@ export class HelperState {
         if (this.saved().owner !== account.accountKey)
           this.update({ owner: account.accountKey, runs: {} });
         void this.refresh();
-        this.resume();
       }),
     );
     onCleanup(() => {
@@ -275,43 +267,6 @@ export class HelperState {
     this.close();
   }
 
-  async sendCode(email: string): Promise<boolean> {
-    const address = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-      this.setError(MESSAGES.emailInvalid);
-      return false;
-    }
-    return this.request(() => this.client.sendCode(address));
-  }
-
-  /** Signs in with the emailed code, then reloads as that account and carries on. */
-  async verifyCode(email: string, code: string): Promise<void> {
-    const digits = code.replace(/\D/g, "");
-    let signedIn = false;
-    const ok = await this.request(async () => {
-      signedIn = await this.client.verifyCode(email.trim(), digits);
-    });
-    if (!ok) return;
-    if (!signedIn) {
-      this.setError(MESSAGES.codeWrong);
-      return;
-    }
-    analytics.capture("helper_signed_in", { method: "email" });
-    this.saveResume();
-    window.location.reload();
-  }
-
-  /** Leaves for Google; the page that comes back finishes signing in and carries on. */
-  async google(): Promise<void> {
-    let url = "";
-    const ok = await this.request(async () => {
-      url = await this.client.startGoogle(`${window.location.origin}/`);
-    });
-    if (!ok) return;
-    this.saveResume();
-    window.location.assign(url);
-  }
-
   private async start(taskId: string, picks: HelperPick[]): Promise<void> {
     const task = this.list.task(taskId);
     const kind = this.kind(taskId) ?? this.saved().kinds[taskId]?.kind;
@@ -319,29 +274,18 @@ export class HelperState {
       this.close();
       return;
     }
-    let refused: unknown = null;
     const ok = await this.request(async () => {
-      try {
-        const answer = await this.client.helper<{ run?: unknown }>({
-          action: "start",
-          taskId,
-          title: task.title,
-          kind,
-          context: this.context(taskId),
-          picks,
-          locale: HelperState.locale(),
-        });
-        this.store(answer.run);
-      } catch (error) {
-        if (CloudError.codeOf(error) !== HELPER_ERRORS.signIn) throw error;
-        refused = error;
-      }
+      const answer = await this.client.helper<{ run?: unknown }>({
+        action: "start",
+        taskId,
+        title: task.title,
+        kind,
+        context: this.context(taskId),
+        picks,
+        locale: HelperState.locale(),
+      });
+      this.store(answer.run);
     });
-    if (refused) {
-      analytics.capture("helper_sign_in_asked");
-      this.setFlow({ step: "sign_in", taskId, picks });
-      return;
-    }
     if (!ok) {
       // Asked straight from the row (a retry): show why in the answer sheet.
       if (!this.flow()) this.setFlow({ step: "answer", taskId });
@@ -493,39 +437,6 @@ export class HelperState {
       .filter((task) => task.id !== taskId && !task.done)
       .slice(0, HELPER_LIMITS.contextTasks)
       .map((task) => task.title);
-  }
-
-  private saveResume(): void {
-    const flow = this.flow();
-    if (flow?.step !== "sign_in") return;
-    const resume: Resume = { taskId: flow.taskId, picks: flow.picks };
-    try {
-      sessionStorage.setItem(STORAGE_KEYS.helperResume, JSON.stringify(resume));
-    } catch {
-      // Without it, the person taps "Do it for me" once more after signing in.
-    }
-  }
-
-  /** After signing in: carry on with the "Do it for me" that asked for it. */
-  private resume(): void {
-    let resume: Resume | null;
-    try {
-      resume = JSON.parse(
-        sessionStorage.getItem(STORAGE_KEYS.helperResume) ?? "null",
-      );
-      sessionStorage.removeItem(STORAGE_KEYS.helperResume);
-    } catch {
-      return;
-    }
-    if (
-      !resume ||
-      typeof resume.taskId !== "string" ||
-      !Array.isArray(resume.picks)
-    )
-      return;
-    if (!this.list.task(resume.taskId)) return;
-    this.setFlow({ step: "asking", taskId: resume.taskId });
-    void this.start(resume.taskId, resume.picks);
   }
 
   private update(change: Partial<SavedHelper>): void {
