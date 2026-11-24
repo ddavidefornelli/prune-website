@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 import { POSTHOG, PRODUCTION_ORIGINS } from "../src/shared/site.ts";
-import { ERROR_LOG_PATH, REALTIME, SUPABASE_ROUTES } from "../src/shared/api-routes.ts";
+import {
+  ERROR_LOG_PATH,
+  REALTIME,
+  SUPABASE_ROUTES,
+} from "../src/shared/api-routes.ts";
 
 /** Every path that answers with the app's one HTML document. */
 export const DOCUMENT_ROUTES = {
@@ -154,6 +158,10 @@ function assetAttributes(
   return attributes;
 }
 
+/** The one non-executable inline script allowed: schema.org JSON-LD. */
+const STRUCTURED_DATA =
+  /^<script type="application\/ld\+json">([\s\S]*)<\/script>$/;
+
 /** Harden Vite's final HTML, or revalidate the exact artifact before packaging. */
 export function hardenHtml(
   html: string,
@@ -202,7 +210,29 @@ export function hardenHtml(
     }
     return hash;
   };
+  let structuredData = 0;
   html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, (tag) => {
+    const data = STRUCTURED_DATA.exec(tag);
+    if (data) {
+      // A schema.org data block is never executed, so CSP does not govern it.
+      // Accept one, with exactly this opening tag and a JSON object body.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data[1]!);
+      } catch {
+        throw new Error("Structured data must be valid JSON.");
+      }
+      if (
+        ++structuredData > 1 ||
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        /</.test(data[1]!)
+      ) {
+        throw new Error("Unexpected structured data in production HTML.");
+      }
+      return tag;
+    }
     if (!/^<script\b[^>]*\btype="module"[^>]*>\s*<\/script>$/i.test(tag)) {
       throw new Error(
         "Production HTML may contain only external module entry scripts.",
@@ -234,7 +264,8 @@ export function hardenHtml(
     return verify ? tag : tag.replace(/^<link\b/i, `<link integrity="${hash}"`);
   });
   if (
-    (html.match(/<script\b/gi) ?? []).length !== hashes.length ||
+    (html.match(/<script\b/gi) ?? []).length !==
+      hashes.length + structuredData ||
     /<style\b|<base\b|\s(?:style|on\w+)\s*=/i.test(html)
   ) {
     throw new Error("Unexpected inline executable content in production HTML.");

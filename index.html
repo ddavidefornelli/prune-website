@@ -17,6 +17,34 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="prune" />
     <title>prune — No-login minimal to-do list</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://www.prune.win/#website",
+            "name": "prune",
+            "url": "https://www.prune.win/",
+            "description": "A minimal to-do list with no login: open it and type. Share a list by sending its link.",
+            "inLanguage": "en"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://www.prune.win/#app",
+            "name": "prune",
+            "url": "https://www.prune.win/",
+            "description": "No login. Open it, type a task, tick it off. Share a list with a link.",
+            "applicationCategory": "ProductivityApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript.",
+            "image": "https://www.prune.win/prune-touch-icon.png",
+            "isPartOf": { "@id": "https://www.prune.win/#website" },
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

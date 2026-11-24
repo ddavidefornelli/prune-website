@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import viteConfig from "../vite.config.ts";
 import { PRIVACY_POLICY_VERSION } from "../src/cloud/privacy-state.ts";
+import { SITE } from "../src/shared/site.ts";
 
 const deployment = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
 test("Vercel uses generated build output, not a static wildcard CSP", () => {
@@ -76,9 +77,25 @@ test("public support surfaces do not publish a personal email or email contact l
 test("HTML entry point contains no marketing trackers or remote executable dependencies", () => {
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   assert.ok(!/googletagmanager|goatcounter|google-analytics|gc\.zgo\.at|vercel-scripts/i.test(html));
-  const scripts = [...html.matchAll(/<script\b([^>]*)>/g)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>/g)].filter(
+    ([, attributes]) => attributes !== ' type="application/ld+json"',
+  );
   assert.ok(scripts.length > 0);
   for (const [, attributes] of scripts) {
     assert.match(attributes, /\bsrc="\/(?!\/)[^"]+"/);
+  }
+});
+
+test("HTML entry point describes the site with schema.org data at the canonical address", () => {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  assert.equal(blocks.length, 1);
+  const data = JSON.parse(blocks[0][1]);
+  assert.equal(data["@context"], "https://schema.org");
+  const types = Object.fromEntries(data["@graph"].map((node) => [node["@type"], node]));
+  assert.ok(types.WebSite && types.WebApplication);
+  for (const node of data["@graph"]) {
+    assert.equal(node.url, SITE.url);
+    assert.equal(node.name, SITE.name);
   }
 });
