@@ -94,6 +94,27 @@ test.describe("on a laptop", () => {
     await synced(page);
     expect(backend.tasks.find((task) => task.title === "Pay rent")!.startAt).toBeNull();
   });
+
+  test("a task typed on an empty hour is created already planned there", async ({ page, backend }) => {
+    await openList(page);
+    await openCalendar(page);
+    await page.locator(".calendar-scroll").evaluate((element) => (element.scrollTop = 0));
+    const day = await page.locator(".calendar-day.is-today").evaluate((el) => [...el.parentElement!.children].indexOf(el));
+    const point = await hourPoint(page, 4, day);
+    await page.mouse.click(point.x, point.y);
+    const sheet = page.getByRole("dialog");
+    const field = sheet.getByRole("textbox", { name: "New task" });
+    await expect(field).toBeFocused();
+    await field.fill("Dentist");
+    await page.keyboard.press("Enter");
+    await expect(sheet).toHaveCount(0);
+    await expect(calendar(page).getByRole("button", { name: /^Dentist, / })).toBeVisible();
+    await expect(page.getByRole("listitem").filter({ hasText: "Dentist" }).locator(".task-when")).toBeVisible();
+    await synced(page);
+    expect(backend.tasks).toHaveLength(1);
+    expect(backend.tasks[0].title).toBe("Dentist");
+    expect(backend.tasks[0].startAt).toBe(todayAt(4));
+  });
 });
 
 test.describe("on a phone", () => {
@@ -113,6 +134,24 @@ test.describe("on a phone", () => {
     const other = (await page.locator(".calendar-day.is-today").evaluate((el) => [...el.parentElement!.children].indexOf(el))) === 0 ? 1 : 0;
     await page.locator(".calendar-day").nth(other).tap();
     await expect(calendar(page).getByRole("button", { name: /^Gym, / })).toHaveCount(0);
+  });
+
+  test("an empty calendar says to tap an hour; its + adds a task at the next hour", async ({ page, backend }) => {
+    await openList(page);
+    await calendar(page).getByRole("button", { name: "Open calendar" }).tap();
+    await isOpen(page);
+    await expect(calendar(page).locator(".calendar-hint")).toHaveText("Tap an hour", { useInnerText: true });
+    await calendar(page).getByRole("button", { name: "New task in the calendar" }).tap();
+    const expected = todayAt(Math.min(23, new Date().getHours() + 1));
+    const field = page.getByRole("dialog").getByRole("textbox", { name: "New task" });
+    await expect(field).toBeFocused();
+    await field.fill("Call the dentist");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(calendar(page).getByRole("button", { name: /^Call the dentist, / })).toBeVisible();
+    await expect(calendar(page).locator(".calendar-hint")).toHaveText("");
+    await synced(page);
+    expect(backend.tasks.map((task) => [task.title, task.startAt])).toEqual([["Call the dentist", expected]]);
   });
 });
 

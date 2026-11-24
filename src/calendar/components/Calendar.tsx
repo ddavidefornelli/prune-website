@@ -209,6 +209,21 @@ export function Calendar(props: {
     setSheet({ kind: "plan", start: calendar().week().at(day, hour) });
   }
 
+  /** The + in the bar: a new task at the next hour today, or the morning of the day shown. */
+  function addAtNextHour(): void {
+    const day = calendar().wide()
+      ? Math.max(0, today())
+      : calendar().day();
+    const hour =
+      day === today()
+        ? Math.min(23, new Date().getHours() + 1)
+        : CALENDAR.firstHour;
+    setSheet({ kind: "plan", start: calendar().week().at(day, hour) });
+  }
+
+  /** Nothing planned in the days shown: say how to plan. */
+  const empty = () => shown().every((day) => days()[day].length === 0);
+
   /** Up to three dots under a day in the strip, one per planned task. */
   const dots = (day: number) =>
     Array.from({ length: Math.min(days()[day].length, 3) }, (_, i) => i);
@@ -295,6 +310,21 @@ export function Calendar(props: {
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M10 6l6 6-6 6" />
+            </svg>
+          </button>
+          <p class="calendar-hint" aria-hidden={!empty()}>
+            <Show when={empty()}>
+              Tap an hour<span class="calendar-hint-more"> to add a task</span>
+            </Show>
+          </p>
+          <button
+            type="button"
+            class="calendar-step calendar-add"
+            aria-label="New task in the calendar"
+            onClick={addAtNextHour}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
         </div>

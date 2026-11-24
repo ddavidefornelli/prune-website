@@ -160,6 +160,28 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.calendar-hint {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-small);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calendar-hint-more {
+  display: none;
+}
+@media (min-width: 600px) {
+  .calendar-hint-more {
+    display: inline;
+  }
+}
+.calendar-add {
+  color: var(--ink);
+}
 .calendar-scroll {
   flex: 1;
   min-height: 0;
@@ -540,11 +562,61 @@
   stroke-width: 1.75;
   stroke-linecap: round;
 }
-.calendar-sheet-empty {
-  margin: 0;
-  padding: 14px 0;
+.calendar-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
   border-top: 1px solid var(--line);
+}
+.calendar-new-input {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: var(--text);
+}
+.calendar-new-input::placeholder {
   color: var(--muted);
+  opacity: 1;
+}
+.calendar-new-input:focus,
+.calendar-new-input:focus-visible {
+  outline: none;
+}
+.calendar-new:focus-within {
+  border-top-color: var(--ink);
+}
+.calendar-new-add {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  margin-right: -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+}
+.calendar-new-add:disabled {
+  color: var(--muted);
+}
+.calendar-new-add svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.calendar-sheet-notice {
+  margin: 0 0 8px;
+  color: var(--danger);
+  font-size: var(--text-small);
 }
 
 /* ——— Dragging a task ——— */

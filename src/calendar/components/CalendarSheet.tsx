@@ -18,7 +18,8 @@ const DAY_MINUTES = 24 * 60;
 const SAVE_MS = 600;
 
 /**
- * The tap side of the calendar: plan a task on an empty hour; for a planned
+ * The tap side of the calendar: on an empty hour, type a new task or pick an
+ * unplanned one to plan it there; for a planned
  * task, its length, a description with links, and taking it off.
  */
 export function CalendarSheet(props: {
@@ -33,6 +34,11 @@ export function CalendarSheet(props: {
     props.for.kind === "task" ? props.for.id : null,
   );
   const task = () => (taskId ? props.list.task(taskId) : undefined);
+
+  // A task typed on an empty hour, created there.
+  const [newTitle, setNewTitle] = createSignal("");
+  // Only a refusal from this sheet is shown here, not an older notice.
+  const [tried, setTried] = createSignal(false);
 
   // The description being typed, saved quietly as it settles.
   const [draft, setDraft] = createSignal(task()?.notes ?? "");
@@ -64,7 +70,12 @@ export function CalendarSheet(props: {
         if (event.target === event.currentTarget) close();
       }}
       initialFocus={(dialog) =>
-        dialog.querySelector<HTMLElement>(".sheet-row, .sheet-close")?.focus()
+        // In this order: a selector list would pick the header's close first.
+        (
+          dialog.querySelector<HTMLElement>(".calendar-new-input") ??
+          dialog.querySelector<HTMLElement>(".sheet-row") ??
+          dialog.querySelector<HTMLElement>(".sheet-close")
+        )?.focus()
       }
     >
       <div class="sheet-body">
@@ -83,13 +94,44 @@ export function CalendarSheet(props: {
         </header>
 
         <Show when={props.for.kind === "plan"}>
-          <div class="sheet-rows">
-            <For
-              each={unplanned()}
-              fallback={
-                <p class="calendar-sheet-empty">Nothing left to plan</p>
-              }
+          <form
+            class="calendar-new"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const start = (props.for as { start: number }).start;
+              setTried(true);
+              if (props.list.add(newTitle(), start)) props.onClose();
+            }}
+          >
+            <input
+              class="calendar-new-input"
+              name="task"
+              aria-label="New task"
+              placeholder="New task"
+              autocomplete="off"
+              enterkeyhint="done"
+              maxLength={TASK_LIMITS.titleLength}
+              value={newTitle()}
+              onInput={(event) => setNewTitle(event.currentTarget.value)}
+            />
+            <button
+              type="submit"
+              class="calendar-new-add"
+              aria-label="Add to calendar"
+              disabled={!newTitle().trim()}
             >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </form>
+          <Show when={tried() && props.list.notice()}>
+            <p class="calendar-sheet-notice" role="alert">
+              {props.list.notice()}
+            </p>
+          </Show>
+          <div class="sheet-rows">
+            <For each={unplanned()}>
               {(open) => (
                 <button
                   type="button"

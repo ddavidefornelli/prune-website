@@ -203,14 +203,21 @@ export class ListState {
 
   /**
    * False when there was nothing to add. The first task records the terms
-   * acknowledgement, which lets the list sync.
+   * acknowledgement, which lets the list sync. With `startAt`, the new task
+   * is planned on the calendar from that moment.
    */
-  add(title: string): boolean {
+  add(title: string, startAt: number | null = null): boolean {
     if (!TaskList.cleanTitle(title)) return false;
     if (this.atOpenLimit()) return false;
-    if (!this.change((list, now) => list.add(title, now))) return false;
+    const id = crypto.randomUUID();
+    const added = this.change((list, now) => {
+      const next = list.add(title, now, id);
+      return startAt === null ? next : next.schedule(id, startAt, now);
+    });
+    if (!added) return false;
     if (!this.client.accepted && this.client.accept()) this.sync.request(0);
     analytics.capture("task_created");
+    if (startAt !== null) analytics.capture("task_scheduled");
     return true;
   }
 
