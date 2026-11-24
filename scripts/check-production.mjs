@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { loadEnv } from "vite";
 import { PublicConfig } from "../src/cloud/config.ts";
-import { ANALYTICS_SCRIPTS, DOCUMENT_ROUTES, POSTHOG_SCRIPTS, integrity, securityHeaders } from "./security-policy.ts";
+import { ANALYTICS_SCRIPTS, DOCUMENT_ROUTES, POSTHOG_SCRIPTS, integrity, isStructuredData, securityHeaders } from "./security-policy.ts";
 import { hasMarketingTracker } from "./tracking-policy.ts";
 
 const TABLES = ["planner_accounts", "planner_list_tasks", "planner_email_reminders", "planner_push_subscriptions", "error_log"];
@@ -220,8 +220,11 @@ export async function runProductionChecks({ site = "https://www.prune.win", conf
       check(metas.length === 1 && samePolicy(metas[0].content || "", expectedMeta), `site${path}:meta`, `${path}: meta CSP agrees with the HTTP policy`, "Compared parsed directives, not HTML quote style or attribute order.", deploymentFix);
     } else add("SKIP", `site${path}:meta`, `${path}: meta/header agreement`, "No enforced HTTP policy to compare; see the CSP failure above.");
 
-    const scripts = [...html.matchAll(/<script\b((?:"[^"]*"|'[^']*'|[^'">])*)>([\s\S]*?)<\/script\s*>/gi)];
-    let valid = scripts.length > 0 && scripts.length === (html.match(/<script\b/gi) ?? []).length;
+    const tags = [...html.matchAll(/<script\b((?:"[^"]*"|'[^']*'|[^'">])*)>([\s\S]*?)<\/script\s*>/gi)];
+    // One schema.org JSON-LD block may sit beside the entry scripts; it is data, never executed.
+    const structured = tags.filter(([tag]) => isStructuredData(tag));
+    const scripts = tags.filter(([tag]) => !isStructuredData(tag));
+    let valid = scripts.length > 0 && structured.length <= 1 && tags.length === (html.match(/<script\b/gi) ?? []).length;
     const documentHashes = new Set();
     for (const [, raw, inline] of scripts) {
       const attrs = attributes(raw);

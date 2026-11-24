@@ -64,6 +64,18 @@ test("CSP comparison accepts equivalent directive ordering, whitespace and HTML 
   assert.equal((await g.run()).exitCode, 0);
 });
 
+test("one schema.org JSON-LD block passes the deployed script check; a second or a non-JSON one fails", async () => {
+  const ld = '<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite"}</script>';
+  const serve = (html) => fixture({ override: (url) => url.origin === site && url.pathname !== "/assets/app.js" ? new Response(html, { headers: documentHeaders }) : null });
+  const withData = built.html.replace("</head>", `${ld}</head>`);
+  assert.equal((await serve(withData).run()).exitCode, 0);
+  for (const html of [
+    withData.replace("</head>", `${ld}</head>`),
+    built.html.replace("</head>", '<script type="application/ld+json">alert(1)</script></head>'),
+    built.html.replace("</head>", '<script type="application/ld+json">{"x":"<b>"}</script></head>'),
+  ]) assert.equal(result(await serve(html).run(), "site/:scripts").status, "FAIL");
+});
+
 test("guests need sign-ups: enabled passes, disabled fails", async () => {
   const open = await fixture().run();
   assert.equal(result(open, "auth:signup").status, "PASS");

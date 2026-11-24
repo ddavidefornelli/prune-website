@@ -162,6 +162,24 @@ function assetAttributes(
 const STRUCTURED_DATA =
   /^<script type="application\/ld\+json">([\s\S]*)<\/script>$/;
 
+/**
+ * Whether a script tag is an allowed schema.org data block: exactly this
+ * opening tag, a JSON object body and no "<". Browsers never execute it, so
+ * CSP does not govern it. Shared by the build and the deployment checker.
+ */
+export function isStructuredData(tag: string): boolean {
+  const body = STRUCTURED_DATA.exec(tag)?.[1];
+  if (body === undefined || body.includes("<")) return false;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return (
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Harden Vite's final HTML, or revalidate the exact artifact before packaging. */
 export function hardenHtml(
   html: string,
@@ -212,25 +230,11 @@ export function hardenHtml(
   };
   let structuredData = 0;
   html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, (tag) => {
-    const data = STRUCTURED_DATA.exec(tag);
-    if (data) {
-      // A schema.org data block is never executed, so CSP does not govern it.
-      // Accept one, with exactly this opening tag and a JSON object body.
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(data[1]!);
-      } catch {
-        throw new Error("Structured data must be valid JSON.");
-      }
-      if (
-        ++structuredData > 1 ||
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed) ||
-        /</.test(data[1]!)
-      ) {
-        throw new Error("Unexpected structured data in production HTML.");
-      }
+    if (isStructuredData(tag)) {
+      if (++structuredData > 1)
+        throw new Error(
+          "Production HTML may contain one structured data block.",
+        );
       return tag;
     }
     if (!/^<script\b[^>]*\btype="module"[^>]*>\s*<\/script>$/i.test(tag)) {
