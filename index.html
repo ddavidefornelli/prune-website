@@ -7,7 +7,8 @@
     <meta name="theme-color" content="#0b0b0b" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="A minimal to-do list with no login: open it and type. Share a list by sending its link." />
     <meta property="og:title" content="prune — No-login minimal to-do list" />
-    <meta property="og:description" content="No login. Open it, type a task, tick it off. Share a list with a link." />
+    <meta property="og:description" content="A minimal to-do list with no login: open it and type. Share a list by sending its link." />
+    <meta property="og:url" content="https://www.prune.win/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="prune" />
     <meta name="referrer" content="no-referrer" />
@@ -18,32 +19,30 @@
     <meta name="apple-mobile-web-app-title" content="prune" />
     <title>prune — No-login minimal to-do list</title>
     <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "WebSite",
-            "@id": "https://www.prune.win/#website",
-            "name": "prune",
-            "url": "https://www.prune.win/",
-            "description": "A minimal to-do list with no login: open it and type. Share a list by sending its link.",
-            "inLanguage": "en"
-          },
-          {
-            "@type": "WebApplication",
-            "@id": "https://www.prune.win/#app",
-            "name": "prune",
-            "url": "https://www.prune.win/",
-            "description": "No login. Open it, type a task, tick it off. Share a list with a link.",
-            "applicationCategory": "ProductivityApplication",
-            "operatingSystem": "Any",
-            "browserRequirements": "Requires JavaScript.",
-            "image": "https://www.prune.win/prune-touch-icon.png",
-            "isPartOf": { "@id": "https://www.prune.win/#website" },
-            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
-          }
-        ]
-      }
+      [
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebPage",
+              "@id": "https://www.prune.win/#webpage",
+              "url": "https://www.prune.win/",
+              "name": "prune — No-login minimal to-do list",
+              "mainEntity": {
+                "@id": "https://www.prune.win/#webapplication"
+              }
+            },
+            {
+              "@type": "WebApplication",
+              "@id": "https://www.prune.win/#webapplication",
+              "name": "prune",
+              "url": "https://www.prune.win/",
+              "description": "No-login minimal to-do list",
+              "applicationCategory": "ProductivityApplication"
+            }
+          ]
+        }
+      ]
     </script>
   </head>
   <body>

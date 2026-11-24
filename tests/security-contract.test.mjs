@@ -90,12 +90,13 @@ test("HTML entry point describes the site with schema.org data at the canonical 
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
   assert.equal(blocks.length, 1);
-  const data = JSON.parse(blocks[0][1]);
-  assert.equal(data["@context"], "https://schema.org");
-  const types = Object.fromEntries(data["@graph"].map((node) => [node["@type"], node]));
-  assert.ok(types.WebSite && types.WebApplication);
-  for (const node of data["@graph"]) {
-    assert.equal(node.url, SITE.url);
-    assert.equal(node.name, SITE.name);
-  }
+  const documents = [JSON.parse(blocks[0][1])].flat();
+  for (const data of documents) assert.equal(data["@context"], "https://schema.org");
+  const nodes = documents.flatMap((data) => data["@graph"] ?? [data]);
+  const types = Object.fromEntries(nodes.map((node) => [node["@type"], node]));
+  assert.ok(types.WebPage && types.WebApplication);
+  assert.equal(types.WebApplication.name, SITE.name);
+  assert.equal(types.WebPage.mainEntity["@id"], types.WebApplication["@id"]);
+  for (const node of nodes) assert.equal(node.url, SITE.url);
+  assert.match(html, new RegExp(`<meta property="og:url" content="${SITE.url}" />`));
 });

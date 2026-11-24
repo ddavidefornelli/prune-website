@@ -79,12 +79,16 @@ test("one schema.org JSON-LD data block passes through unhashed; anything else i
   const ld = '<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite"}</script>';
   const built = hardenHtml(entry.replace("</head>", `${ld}</head>`), assets, origin);
   assert.ok(built.html.includes(ld));
+  const list = '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"WebPage"}]</script>';
+  assert.ok(hardenHtml(entry.replace("</head>", `${list}</head>`), assets, origin).html.includes(list));
   assert.deepEqual(hardenHtml(built.html, assets, origin, { verify: true }), built);
   assert.equal(built.headers["Content-Security-Policy"], hardenHtml(entry, assets, origin).headers["Content-Security-Policy"]);
   for (const block of [
     ld + ld,
     '<script type="application/ld+json">alert(1)</script>',
     '<script type="application/ld+json">[1]</script>',
+    '<script type="application/ld+json">[]</script>',
+    '<script type="application/ld+json">"text"</script>',
     '<script type="application/ld+json">{"x":"<img src=x>"}</script>',
     '<script type="application/ld+json" src="/assets/app.js"></script>',
     '<script type="application/ld+json" onload="alert(1)">{}</script>',

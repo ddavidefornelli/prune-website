@@ -164,7 +164,7 @@ const STRUCTURED_DATA =
 
 /**
  * Whether a script tag is an allowed schema.org data block: exactly this
- * opening tag, a JSON object body and no "<". Browsers never execute it, so
+ * opening tag, a JSON object (or array of objects) body and no "<". Browsers never execute it, so
  * CSP does not govern it. Shared by the build and the deployment checker.
  */
 export function isStructuredData(tag: string): boolean {
@@ -172,9 +172,12 @@ export function isStructuredData(tag: string): boolean {
   if (body === undefined || body.includes("<")) return false;
   try {
     const parsed: unknown = JSON.parse(body);
-    return (
-      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-    );
+    const isObject = (value: unknown) =>
+      typeof value === "object" && value !== null && !Array.isArray(value);
+    // JSON-LD allows a top-level object or an array of objects.
+    return Array.isArray(parsed)
+      ? parsed.length > 0 && parsed.every(isObject)
+      : isObject(parsed);
   } catch {
     return false;
   }
